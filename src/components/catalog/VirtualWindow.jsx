@@ -71,6 +71,7 @@ const STYLE_CFG = {
     mount: "inside",
     cassette: true,
     bar: true,
+    chain: true,
     zebra: true,
   },
   "pleated-manual": {
@@ -257,6 +258,16 @@ export default function VirtualWindow({ fabric, settings: override }) {
                       backgroundColor: shade(s.frame_color, -0.35),
                       boxShadow: "0 4px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)",
                       borderBottom: `2px solid ${s.rail_color}`,
+                    }}
+                  />
+                )}
+                {cfg.chain && (
+                  <div
+                    className="absolute z-10"
+                    style={{
+                      left: "13.5%", top: "9.6%", width: 4, height: "38%", borderRadius: 3,
+                      background: "repeating-linear-gradient(180deg, rgba(240,235,215,0.85) 0px, rgba(240,235,215,0.85) 3px, rgba(90,74,20,0.9) 5px, rgba(90,74,20,0.9) 7px)",
+                      boxShadow: "1px 1px 3px rgba(0,0,0,0.5)",
                     }}
                   />
                 )}
