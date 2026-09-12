@@ -81,6 +81,7 @@ export default function InteractiveCatalog({ initialCategory }) {
   const [search, setSearch] = useState("");
   const [fabricFilter, setFabricFilter] = useState("");
   const [colorFilter, setColorFilter] = useState("");
+  const [colorOverride, setColorOverride] = useState("");
 
   useEffect(() => {
     const cat = CATEGORIES.find((c) => c.slug === selectedCategory);
@@ -133,6 +134,19 @@ export default function InteractiveCatalog({ initialCategory }) {
     [filterSource]
   );
 
+  // پالت رنگ زنده — برای پیش‌نمایش رنگ روی پنجره
+  const LIVE_COLORS = [
+    "#F5EFE0", "#E8D5B0", "#C9A227", "#A67C00", "#8B5A2B",
+    "#6B4226", "#4A4A4A", "#2C3E5D", "#3E6B4F", "#7B2D3B",
+    "#5B4A73", "#D4C5B9", "#9B8B7A", "#1A1A1A",
+  ];
+
+  // مدلِ نمایش‌داده‌شده روی پنجره — با رنگِ بازنویسی‌شدهٔ کاربر
+  const previewModel = useMemo(
+    () => (selectedModel && colorOverride ? { ...selectedModel, color_code: colorOverride } : selectedModel),
+    [selectedModel, colorOverride]
+  );
+
   const hasActiveFilters = !!(search.trim() || fabricFilter || colorFilter);
 
   function resetFilters() {
@@ -149,6 +163,7 @@ export default function InteractiveCatalog({ initialCategory }) {
     } else {
       setSelectedModel(null);
     }
+    setColorOverride("");
   }, [gridItems, selectedModel]);
 
   return (
@@ -280,7 +295,7 @@ export default function InteractiveCatalog({ initialCategory }) {
           {/* پیش‌نمایش روی پنجره */}
           <div className="lg:col-span-3">
             <div className="relative mx-auto max-w-[440px]">
-              <VirtualWindow fabric={selectedModel} />
+              <VirtualWindow fabric={previewModel} />
               <div className="absolute bottom-4 right-4 z-10 rounded-full bg-background/80 px-4 py-2 backdrop-blur-md">
                 <span className="font-display text-xs font-bold text-primary">{selectedModel ? selectedModel.code : category?.name}</span>
               </div>
@@ -308,6 +323,37 @@ export default function InteractiveCatalog({ initialCategory }) {
                   {selectedModel.color && <Spec label="رنگ" value={selectedModel.color} />}
                   {selectedModel.material && <Spec label="ترکیب" value={selectedModel.material} />}
                   {selectedModel.texture && <Spec label="بافت" value={selectedModel.texture} />}
+                </div>
+
+                {/* پیش‌نمایش زندهٔ رنگ — تغییر رنگ پرده روی پنجره */}
+                <div className="mt-4 rounded-xl border border-secondary/50 bg-background/50 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="font-display text-[11px] font-bold text-foreground">پیش‌نمایش زندهٔ رنگ</span>
+                    {colorOverride && (
+                      <button
+                        onClick={() => setColorOverride("")}
+                        className="font-body text-[10px] text-muted-foreground transition-colors hover:text-primary"
+                      >
+                        بازگشت به رنگ اصلی
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2" dir="rtl">
+                    {LIVE_COLORS.map((hex) => {
+                      const active = colorOverride === hex;
+                      return (
+                        <button
+                          key={hex}
+                          onClick={() => setColorOverride((v) => (v === hex ? "" : hex))}
+                          title={hex}
+                          className={`h-7 w-7 rounded-full border-2 transition-all duration-200 ${
+                            active ? "scale-110 border-primary ring-2 ring-primary/40" : "border-secondary/60 hover:scale-105"
+                          }`}
+                          style={{ backgroundColor: hex }}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
                 {selectedModel.description && (
                   <p className="mt-4 font-body text-xs leading-6 text-muted-foreground">{selectedModel.description}</p>
