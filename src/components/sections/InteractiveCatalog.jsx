@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, Phone, Check, X, SlidersHorizontal, RotateCcw } from "lucide-react";
+import { Search, Phone, Check, X, SlidersHorizontal, RotateCcw, Heart, Bookmark } from "lucide-react";
 import VirtualWindow from "@/components/catalog/VirtualWindow";
+import SavedCurtainsDrawer from "@/components/catalog/SavedCurtainsDrawer";
+import { useSavedCurtains } from "@/hooks/useSavedCurtains";
 import { ALL_CATEGORIES as FALLBACK_CATEGORIES } from "@/lib/catalogData";
 import { base44 } from "@/api/base44Client";
 
@@ -82,6 +84,8 @@ export default function InteractiveCatalog({ initialCategory }) {
   const [fabricFilter, setFabricFilter] = useState("");
   const [colorFilter, setColorFilter] = useState("");
   const [colorOverride, setColorOverride] = useState("");
+  const { saved, isSaved, toggleSave, remove, clear } = useSavedCurtains();
+  const [savedOpen, setSavedOpen] = useState(false);
 
   useEffect(() => {
     const cat = CATEGORIES.find((c) => c.slug === selectedCategory);
@@ -134,11 +138,22 @@ export default function InteractiveCatalog({ initialCategory }) {
     [filterSource]
   );
 
-  // پالت رنگ زنده — برای پیش‌نمایش رنگ روی پنجره
+  // پالت رنگ زنده — برای پیش‌نمایش رنگ روی پنجره (با نام)
   const LIVE_COLORS = [
-    "#F5EFE0", "#E8D5B0", "#C9A227", "#A67C00", "#8B5A2B",
-    "#6B4226", "#4A4A4A", "#2C3E5D", "#3E6B4F", "#7B2D3B",
-    "#5B4A73", "#D4C5B9", "#9B8B7A", "#1A1A1A",
+    { hex: "#F5EFE0", name: "عاج" },
+    { hex: "#E8D5B0", name: "کرم" },
+    { hex: "#D4C5B9", name: "بژ" },
+    { hex: "#C9A227", name: "طلایی" },
+    { hex: "#A67C00", name: "برنزی" },
+    { hex: "#8B5A2B", name: "قهوه‌ای" },
+    { hex: "#6B4226", name: "شکلاتی" },
+    { hex: "#9B8B7A", name: "طوسی گرم" },
+    { hex: "#4A4A4A", name: "زغالی" },
+    { hex: "#1A1A1A", name: "مشکی" },
+    { hex: "#2C3E5D", name: "سرمه‌ای" },
+    { hex: "#3E6B4F", name: "یشمی" },
+    { hex: "#7B2D3B", name: "زرشکی" },
+    { hex: "#5B4A73", name: "بنفش" },
   ];
 
   // مدلِ نمایش‌داده‌شده روی پنجره — با رنگِ بازنویسی‌شدهٔ کاربر
@@ -179,7 +194,21 @@ export default function InteractiveCatalog({ initialCategory }) {
               دسته را انتخاب کنید، رنگ و طرح را عوض کنید. هر پارچه با همان رنگ و بافت دقیق روی پنجره اعمال می‌شود.
             </p>
           </div>
-          <Link to="/#contact" className="btn-ghost-gold shrink-0">تماس و مشاوره</Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={() => setSavedOpen(true)}
+              className="btn-ghost-gold relative !px-5 !py-3"
+            >
+              <Bookmark className="h-4 w-4" />
+              ذخیره‌ها
+              {saved.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                  {saved.length}
+                </span>
+              )}
+            </button>
+            <Link to="/#contact" className="btn-ghost-gold shrink-0">تماس و مشاوره</Link>
+          </div>
         </div>
 
         {/* جستجوی هوشمند — بالای کاتالوگ */}
@@ -314,9 +343,26 @@ export default function InteractiveCatalog({ initialCategory }) {
                     <p className="font-display text-base font-black text-foreground">{selectedModel.code}</p>
                     <p className="font-body text-xs text-muted-foreground">{selectedModel.name}</p>
                   </div>
-                  {selectedModel.color_code && (
-                    <span className="h-9 w-9 rounded-lg border border-secondary/60" style={{ backgroundColor: selectedModel.color_code }} />
-                  )}
+                  <div className="flex items-center gap-2">
+                    {selectedModel.color_code && (
+                      <span className="h-9 w-9 rounded-lg border border-secondary/60" style={{ backgroundColor: selectedModel.color_code }} />
+                    )}
+                    <button
+                      onClick={() => toggleSave(selectedModel, colorOverride)}
+                      title={isSaved(selectedModel.id, colorOverride || selectedModel.color_code) ? "حذف از ذخیره‌شده‌ها" : "ذخیره برای بعد"}
+                      className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-200 ${
+                        isSaved(selectedModel.id, colorOverride || selectedModel.color_code)
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-secondary/60 text-muted-foreground hover:border-primary/50 hover:text-primary"
+                      }`}
+                    >
+                      <Heart
+                        className={`h-4 w-4 ${
+                          isSaved(selectedModel.id, colorOverride || selectedModel.color_code) ? "fill-primary" : ""
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   {selectedModel.fabric && <Spec label="نوع پارچه" value={selectedModel.fabric} />}
@@ -338,19 +384,32 @@ export default function InteractiveCatalog({ initialCategory }) {
                       </button>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-2" dir="rtl">
-                    {LIVE_COLORS.map((hex) => {
-                      const active = colorOverride === hex;
+                  <div className="grid grid-cols-7 gap-2.5" dir="rtl">
+                    {LIVE_COLORS.map((c) => {
+                      const active = colorOverride === c.hex;
                       return (
                         <button
-                          key={hex}
-                          onClick={() => setColorOverride((v) => (v === hex ? "" : hex))}
-                          title={hex}
-                          className={`h-7 w-7 rounded-full border-2 transition-all duration-200 ${
-                            active ? "scale-110 border-primary ring-2 ring-primary/40" : "border-secondary/60 hover:scale-105"
-                          }`}
-                          style={{ backgroundColor: hex }}
-                        />
+                          key={c.hex}
+                          onClick={() => setColorOverride((v) => (v === c.hex ? "" : c.hex))}
+                          title={c.name}
+                          className="group flex flex-col items-center gap-1.5"
+                        >
+                          <span
+                            className={`h-9 w-9 rounded-full border-2 transition-all duration-200 ${
+                              active
+                                ? "scale-110 border-primary shadow-[0_0_0_3px_rgba(201,162,39,0.25)]"
+                                : "border-secondary/50 group-hover:scale-105 group-hover:border-primary/40"
+                            }`}
+                            style={{ backgroundColor: c.hex }}
+                          />
+                          <span
+                            className={`font-body text-[9px] transition-colors ${
+                              active ? "font-bold text-primary" : "text-muted-foreground/80"
+                            }`}
+                          >
+                            {c.name}
+                          </span>
+                        </button>
                       );
                     })}
                   </div>
@@ -447,6 +506,20 @@ export default function InteractiveCatalog({ initialCategory }) {
           </div>
         </div>
       </div>
+    <SavedCurtainsDrawer
+      open={savedOpen}
+      onClose={() => setSavedOpen(false)}
+      saved={saved}
+      onRemove={remove}
+      onClear={clear}
+      onSelect={(item) => {
+        const model = allModels.find((m) => m.id === item.model_id);
+        if (model) {
+          setSelectedModel(model);
+          setColorOverride(item.color_code || "");
+        }
+      }}
+    />
     </section>
   );
 }
