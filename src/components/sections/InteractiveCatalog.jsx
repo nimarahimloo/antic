@@ -279,7 +279,7 @@ export default function InteractiveCatalog({ initialCategory }) {
         <div className="grid gap-8 lg:grid-cols-5">
           {/* پیش‌نمایش روی پنجره */}
           <div className="lg:col-span-3">
-            <div className="relative">
+            <div className="relative mx-auto max-w-[440px]">
               <VirtualWindow fabric={selectedModel} />
               <div className="absolute bottom-4 right-4 z-10 rounded-full bg-background/80 px-4 py-2 backdrop-blur-md">
                 <span className="font-display text-xs font-bold text-primary">{selectedModel ? selectedModel.code : category?.name}</span>

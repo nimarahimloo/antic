@@ -3,23 +3,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import { base44 } from "@/api/base44Client";
 
 /**
- * VirtualWindow — صحنهٔ واقعی پنجره + اجرای «اختصاصی» هر سبک پرده مطابق فرم نصب واقعی:
+ * VirtualWindow — صحنهٔ واقعی پنجره (عمودی و بلند) + اجرای اختصاصی هر سبک پرده.
  *
- * پلیسه دستی   → فقط داخل باکس شیشه (inside) نصب می‌شود
- * پلیسه زنجیری → بیرون فرم نصب + زنجیر مکانیزم در کنار
- * رومن         → طبقاتی جمع می‌شود و لایه‌لایه روی هم در بالا می‌نشیند
- * شید          → یک پارچهٔ صاف که با زنجیر بالا/پایین می‌رود (بیرون فرم)
- * دبل شید      → دو لایه: پارچهٔ زمینه + پارچهٔ رویهٔ آستر، هر دو بیرون فرم
- * کرکره (فلزی/چوبی) → بیرون فرم نصب، با لایه‌های عرضی
- * زبرا         → داخل فرم با کاست، نوار شفاف/مات
- * ترک پنل      → پنل‌های عمودی داخل فرم
- * اورسی        → موج‌های گشاد روی میله + حاشیهٔ طلایی
- * پارچه‌های کلاسیک → چین‌های عمودی نرم روی میله
- *
- * کل صحنه (رنگ دیوار، چهارچوب، میله، چشم‌انداز) از پنل مدیر قابل مدیریت است.
+ * هر دسته با فرم نصب واقعی خود روی پنجره نمایش داده می‌شود:
+ *   رومن     → داخل فرم، پلکانی با چین‌های افقی نرم
+ *   شید      → بیرون فرم، غلتک بالا + پارچهٔ صاف + زنجیر
+ *   دبل شید  → دو لایه: زمینهٔ نازک + رویهٔ آستر
+ *   پلیسه    → داخل/بیرون فرم، چین‌های آکاردئونی تیز
+ *   کرکره    → بیرون فرم، لایه‌های افقی (پره‌های فلزی/چوبی)
+ *   زبرا     → داخل فرم، نوارهای متناوب شفاف/مات
+ *   ترک پنل  → داخل فرم، پنل‌های عمودی متحرک
+ *   اورسی    → روی میله، موج‌های گشاد + حاشیهٔ طلایی
+ *   کلاسیک   → روی میله، چین‌های عمودی نرم
  */
 
-// استایل بر اساس دسته + زیردسته (سبک هر دسته با زیردسته‌اش تعیین می‌شود)
 function resolveStyle(fabric) {
   const cat = fabric?.category_slug;
   const sub = fabric?.subcategory;
@@ -41,78 +38,64 @@ function resolveStyle(fabric) {
     cotton: "drape",
     outdoor: "shade",
     motorized: "shade",
-    accessories: "shade",
+    accessories: "drape",
   };
   return map[cat] || "drape";
 }
 
-// پیکربندی هر سبک: فرم نصب، چین‌ها و جزئیات مکانیزم
 const STYLE_CFG = {
-  // پردهٔ کلاسیک — روی میله، چین‌های عمودی نرم
   drape: {
     mount: "rod",
-    fold: "repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.10) 14px, rgba(0,0,0,0) 34px, rgba(255,255,255,0.09) 52px, rgba(255,255,255,0) 72px)",
+    fold: "repeating-linear-gradient(90deg, rgba(0,0,0,0.32) 0px, rgba(0,0,0,0.12) 18px, rgba(0,0,0,0) 42px, rgba(255,255,255,0.10) 62px, rgba(255,255,255,0) 86px)",
   },
-  // اورسی — موج‌های گشاد + حاشیهٔ طلایی پایین
   wave: {
     mount: "rod",
-    fold: "repeating-linear-gradient(90deg, rgba(0,0,0,0.20) 0px, rgba(0,0,0,0.04) 40px, rgba(255,255,255,0.12) 90px, rgba(255,255,255,0) 130px)",
+    fold: "repeating-linear-gradient(90deg, rgba(0,0,0,0.22) 0px, rgba(0,0,0,0.05) 48px, rgba(255,255,255,0.14) 106px, rgba(255,255,255,0) 156px)",
     hem: true,
   },
-  // ترک پنل — پنل‌های عمودی داخل فرم
   panel: {
     mount: "inside",
     cassette: true,
-    fold: "repeating-linear-gradient(90deg, transparent 0px, transparent calc(25% - 5px), rgba(0,0,0,0.50) calc(25% - 5px), rgba(0,0,0,0.50) calc(25% + 5px), transparent calc(25% + 5px))",
     bar: true,
+    panels: true,
   },
-  // رومن — طبقاتی جمع‌شده در بالا
   roman: {
     mount: "inside",
     cassette: true,
-    bodyBottom: "17%", // کمی بالا رفته تا شیشه از پایین پیدا باشد
-    fold: "repeating-linear-gradient(180deg, rgba(0,0,0,0.22) 0px, rgba(0,0,0,0.05) 4px, rgba(0,0,0,0) 12px, rgba(255,255,255,0.10) 16px, rgba(255,255,255,0) 24px)",
+    bodyBottom: "13%",
     stackTop: true,
   },
-  // زبرا — داخل فرم، نوارهای شفاف/مات
   zebra: {
     mount: "inside",
     cassette: true,
-    fold: "repeating-linear-gradient(180deg, rgba(255,255,255,0.10) 0px, rgba(255,255,255,0.10) 14px, transparent 14px, transparent 34px)",
     bar: true,
+    zebra: true,
   },
-  // پلیسه دستی — فقط داخل باکس شیشه
   "pleated-manual": {
     mount: "inside",
     cassette: true,
-    fold: "repeating-linear-gradient(180deg, rgba(0,0,0,0.30) 0px, rgba(0,0,0,0) 5px, rgba(255,255,255,0.20) 9px, rgba(255,255,255,0) 14px)",
+    pleated: true,
   },
-  // پلیسه زنجیری — بیرون فرم + زنجیر مکانیزم
   "pleated-chain": {
     mount: "box",
-    fold: "repeating-linear-gradient(180deg, rgba(0,0,0,0.30) 0px, rgba(0,0,0,0) 5px, rgba(255,255,255,0.20) 9px, rgba(255,255,255,0) 14px)",
+    pleated: true,
     chain: true,
   },
-  // شید — یک پارچهٔ صاف، بیرون فرم، با زنجیر
   shade: {
     mount: "box",
-    fold: "linear-gradient(180deg, rgba(255,255,255,0.07) 0%, transparent 20%)",
     bar: true,
     chain: true,
   },
-  // دبل شید — دو پارچه: زمینه + رویهٔ آستر، بیرون فرم، با زنجیر
   double: {
     mount: "box",
     double: true,
-    fold: "linear-gradient(180deg, rgba(255,255,255,0.07) 0%, transparent 20%)",
     bar: true,
     chain: true,
   },
-  // کرکره (فلزی/چوبی) — بیرون فرم، لایه‌های عرضی
   roller: {
     mount: "box",
-    fold: "repeating-linear-gradient(180deg, rgba(255,255,255,0.14) 0px, rgba(255,255,255,0.14) 4px, rgba(0,0,0,0.28) 5px, rgba(0,0,0,0.28) 11px)",
     bar: true,
+    roller: true,
   },
 };
 
@@ -123,7 +106,6 @@ const DEFAULT_SETTINGS = {
   view_image: "",
 };
 
-// روشن‌سازی (amt مثبت) یا تیره‌سازی (amt منفی) رنگ برای جزئیات سه‌بعدی
 function shade(hex, amt) {
   if (!hex || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) return "#3b352c";
   let h = hex.slice(1);
@@ -131,10 +113,15 @@ function shade(hex, amt) {
   const nums = h.match(/../g).map((x) => parseInt(x, 16));
   const t = amt < 0 ? 0 : 255;
   const p = Math.abs(amt);
-  return (
-    "#" +
-    nums.map((v) => Math.round((t - v) * p + v).toString(16).padStart(2, "0")).join("")
-  );
+  return "#" + nums.map((v) => Math.round((t - v) * p + v).toString(16).padStart(2, "0")).join("");
+}
+
+function hexToRgba(hex, a) {
+  if (!hex || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) return `rgba(201,162,39,${a})`;
+  let h = hex.slice(1);
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const [r, g, b] = h.match(/../g).map((x) => parseInt(x, 16));
+  return `rgba(${r},${g},${b},${a})`;
 }
 
 export default function VirtualWindow({ fabric, settings: override }) {
@@ -158,78 +145,61 @@ export default function VirtualWindow({ fabric, settings: override }) {
   const isBox = cfg.mount === "box";
 
   return (
-    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-3xl border border-secondary/60 lg:aspect-[16/9]">
+    <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-secondary/60 sm:aspect-[4/5]">
       {/* دیوار گچی + نور محیط */}
       <div className="absolute inset-0" style={{ backgroundColor: s.wall_color }} />
-      <div
-        className="absolute inset-0"
-        style={{ background: "radial-gradient(ellipse at 50% 28%, rgba(255,255,255,0.10), transparent 55%)" }}
-      />
-      {/* هالهٔ روزنِ پنجره روی دیوار */}
+      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 22%, rgba(255,255,255,0.10), transparent 58%)" }} />
+      {/* هالهٔ نورِ پنجره روی دیوار */}
       <div
         className="absolute"
         style={{
-          left: "6%", right: "6%", top: "4%", bottom: "9%",
-          background: "radial-gradient(ellipse at center, rgba(255,222,150,0.16), transparent 62%)",
+          left: "5%", right: "5%", top: "3%", bottom: "8%",
+          background: "radial-gradient(ellipse at center, rgba(255,222,150,0.18), transparent 64%)",
         }}
       />
 
-      {/* پنجره — چهارچوب سه‌بعدی + شیشه و چشم‌انداز */}
+      {/* پنجره — چهارچوب سه‌بعدی عمودی + شیشه و چشم‌انداز */}
       <div
         className="absolute overflow-hidden rounded-md"
         style={{
-          left: "9%", right: "9%", top: "7%", bottom: "13%",
-          border: `12px solid ${s.frame_color}`,
+          left: "13%", right: "13%", top: "5%", bottom: "9%",
+          border: `11px solid ${s.frame_color}`,
           backgroundColor: s.frame_color,
-          boxShadow: `0 22px 55px rgba(0,0,0,0.55), inset 0 0 0 1px ${shade(s.frame_color, 0.25)}`,
+          boxShadow: `0 24px 60px rgba(0,0,0,0.55), inset 0 0 0 1px ${shade(s.frame_color, 0.25)}`,
         }}
       >
-        {/* چشم‌انداز پشت شیشه (از پنل قابل تغییر) */}
+        {/* چشم‌انداز پشت شیشه */}
         <div
           className="absolute inset-0"
           style={
             s.view_image
               ? { backgroundImage: `url("${s.view_image}")`, backgroundSize: "cover", backgroundPosition: "center" }
-              : { background: "linear-gradient(180deg,#33465c 0%,#58718c 45%,#243447 100%)" }
+              : { background: "linear-gradient(180deg,#3a4f66 0%,#6a8499 42%,#2a3a4d 100%)" }
           }
         />
-        {/* درخشش خورشید در افق */}
-        <div
-          className="absolute inset-0"
-          style={{ background: "radial-gradient(circle at 30% 24%, rgba(255,236,180,0.30), transparent 55%)" }}
-        />
-        {/* قاب میانی (کرسی‌پنجره) */}
-        <div className="absolute left-1/2 top-0 h-full w-[5px] -translate-x-1/2" style={{ backgroundColor: shade(s.frame_color, -0.15) }} />
-        <div className="absolute left-0 top-1/2 h-[5px] w-full -translate-y-1/2" style={{ backgroundColor: shade(s.frame_color, -0.15) }} />
-        {/* انعکاس و ته‌رنگ شیشه */}
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.12)_0%,transparent_35%,transparent_70%,rgba(255,255,255,0.06)_100%)]" />
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{ backgroundColor: "rgba(160,190,215,0.05)", boxShadow: "inset 0 0 28px rgba(0,0,0,0.45)" }}
-        />
+        {/* درخشش خورشید */}
+        <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 28% 18%, rgba(255,236,180,0.32), transparent 52%)" }} />
+        {/* کرسی‌پنجره — تقسیم‌بندی واقعی */}
+        <div className="absolute left-1/2 top-0 h-full w-[4px] -translate-x-1/2" style={{ backgroundColor: shade(s.frame_color, -0.12) }} />
+        <div className="absolute left-0 top-1/2 h-[4px] w-full -translate-y-1/2" style={{ backgroundColor: shade(s.frame_color, -0.12) }} />
+        {/* انعکاس شیشه */}
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.14)_0%,transparent_32%,transparent_68%,rgba(255,255,255,0.07)_100%)]" />
+        <div className="pointer-events-none absolute inset-0" style={{ backgroundColor: "rgba(160,190,215,0.05)", boxShadow: "inset 0 0 32px rgba(0,0,0,0.45)" }} />
       </div>
 
       {/* طاقچه (سِیل) زیر پنجره */}
       <div
         className="absolute rounded-[4px]"
         style={{
-          left: "7.2%", right: "7.2%", top: "86.4%", height: "3.2%",
+          left: "11%", right: "11%", top: "91%", height: "2.8%",
           background: `linear-gradient(180deg, ${shade(s.frame_color, 0.25)}, ${shade(s.frame_color, -0.15)})`,
           boxShadow: "0 7px 16px rgba(0,0,0,0.45)",
         }}
       />
-
       {/* قرنیز پایین دیوار */}
-      <div
-        className="absolute inset-x-0 bottom-0"
-        style={{
-          height: "2.6%",
-          backgroundColor: shade(s.wall_color, -0.55),
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10)",
-        }}
-      />
+      <div className="absolute inset-x-0 bottom-0" style={{ height: "2.4%", backgroundColor: shade(s.wall_color, -0.55), boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10)" }} />
 
-      {/* لایهٔ اعمال پرده — تنها بخش متحرک صحنه */}
+      {/* لایهٔ اعمال پرده */}
       <AnimatePresence mode="wait">
         {hasFabric && (
           <motion.div
@@ -237,66 +207,57 @@ export default function VirtualWindow({ fabric, settings: override }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             className="absolute inset-0 z-30"
           >
             {isRod && (
               <>
-                {/* میلهٔ پرده با سرریل‌های طلایی */}
-                <div
-                  className="absolute rounded-full"
-                  style={{ left: "6.5%", right: "6.5%", top: "4.9%", height: 8, background: rodGradient, boxShadow: "0 3px 6px rgba(0,0,0,0.45)" }}
-                />
-                <div className="absolute rounded-full" style={{ left: "5.4%", top: "4.3%", width: 17, height: 17, background: rodGradient, boxShadow: "0 2px 5px rgba(0,0,0,0.4)" }} />
-                <div className="absolute rounded-full" style={{ right: "5.4%", top: "4.3%", width: 17, height: 17, background: rodGradient, boxShadow: "0 2px 5px rgba(0,0,0,0.4)" }} />
-
-                {/* بدنهٔ پردهٔ کلاسیک — از میله تا پایین طاقچه */}
-                <div className="absolute overflow-hidden" style={{ left: "7.5%", right: "7.5%", top: "6.1%", bottom: "9.5%" }}>
-                  <FabricLayer fabric={fabric} cfg={cfg} />
+                {/* میلهٔ پرده + سرریل‌های طلایی */}
+                <div className="absolute rounded-full" style={{ left: "6%", right: "6%", top: "3.4%", height: 7, background: rodGradient, boxShadow: "0 3px 6px rgba(0,0,0,0.45)" }} />
+                <div className="absolute rounded-full" style={{ left: "4.6%", top: "2.8%", width: 16, height: 16, background: rodGradient, boxShadow: "0 2px 5px rgba(0,0,0,0.4)" }} />
+                <div className="absolute rounded-full" style={{ right: "4.6%", top: "2.8%", width: 16, height: 16, background: rodGradient, boxShadow: "0 2px 5px rgba(0,0,0,0.4)" }} />
+                {/* بدنهٔ پرده */}
+                <div className="absolute overflow-hidden" style={{ left: "7%", right: "7%", top: "4.6%", bottom: "10%" }}>
+                  <FabricLayer fabric={fabric} cfg={cfg} style={style} />
                 </div>
               </>
             )}
 
             {isBox && (
               <>
-                {/* کاست بیرونی بالای فرم با لبهٔ طلایی */}
+                {/* کاست بیرونی بالای فرم */}
                 <div
                   className="absolute overflow-hidden rounded-b-md"
                   style={{
-                    left: "6.8%", right: "6.8%", top: "5.2%", height: "4.4%",
+                    left: "7.5%", right: "7.5%", top: "3.8%", height: "4.2%",
                     backgroundColor: shade(s.frame_color, -0.35),
                     boxShadow: "0 5px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)",
                     borderBottom: `2px solid ${s.rail_color}`,
                   }}
                 />
-
-                {/* زنجیر مکانیزم در کنار */}
+                {/* زنجیر مکانیزم */}
                 {cfg.chain && (
                   <div
                     className="absolute z-10"
                     style={{
-                      left: "6.1%", top: "9.6%", width: 4, height: "44%", borderRadius: 3,
-                      background:
-                        "repeating-linear-gradient(180deg, rgba(240,235,215,0.85) 0px, rgba(240,235,215,0.85) 3px, rgba(90,74,20,0.9) 5px, rgba(90,74,20,0.9) 7px)",
+                      left: "6.8%", top: "8%", width: 4, height: "42%", borderRadius: 3,
+                      background: "repeating-linear-gradient(180deg, rgba(240,235,215,0.85) 0px, rgba(240,235,215,0.85) 3px, rgba(90,74,20,0.9) 5px, rgba(90,74,20,0.9) 7px)",
                       boxShadow: "1px 1px 3px rgba(0,0,0,0.5)",
                     }}
                   />
                 )}
-
                 {cfg.double ? (
                   <>
-                    {/* لایهٔ زمینهٔ دبل‌شید — پارچهٔ روشن‌تر پشت */}
-                    <div className="absolute overflow-hidden" style={{ left: "7.3%", right: "7.3%", top: "9.6%", bottom: "9.5%" }}>
-                      <FabricLayer fabric={fabric} cfg={cfg} back />
+                    <div className="absolute overflow-hidden" style={{ left: "8%", right: "8%", top: "8%", bottom: "10%" }}>
+                      <FabricLayer fabric={fabric} cfg={cfg} style={style} back />
                     </div>
-                    {/* لایهٔ رویهٔ آستر — کمی بالا رفته تا زمینه دیده شود */}
-                    <div className="absolute overflow-hidden" style={{ left: "7.3%", right: "7.3%", top: "9.6%", bottom: "36%" }}>
-                      <FabricLayer fabric={fabric} cfg={cfg} />
+                    <div className="absolute overflow-hidden" style={{ left: "8%", right: "8%", top: "8%", bottom: "38%" }}>
+                      <FabricLayer fabric={fabric} cfg={cfg} style={style} />
                     </div>
                   </>
                 ) : (
-                  <div className="absolute overflow-hidden" style={{ left: "7.3%", right: "7.3%", top: "9.6%", bottom: "9.5%" }}>
-                    <FabricLayer fabric={fabric} cfg={cfg} />
+                  <div className="absolute overflow-hidden" style={{ left: "8%", right: "8%", top: "8%", bottom: "10%" }}>
+                    <FabricLayer fabric={fabric} cfg={cfg} style={style} />
                   </div>
                 )}
               </>
@@ -304,22 +265,19 @@ export default function VirtualWindow({ fabric, settings: override }) {
 
             {isInside && (
               <>
-                {/* کاست داخلی داخل فرم با لبهٔ طلایی */}
                 {cfg.cassette && (
                   <div
                     className="absolute overflow-hidden rounded-b-md"
                     style={{
-                      left: "10.2%", right: "10.2%", top: "8.2%", height: "3.9%",
+                      left: "14.5%", right: "14.5%", top: "6%", height: "3.6%",
                       backgroundColor: shade(s.frame_color, -0.35),
                       boxShadow: "0 4px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)",
                       borderBottom: `2px solid ${s.rail_color}`,
                     }}
                   />
                 )}
-
-                {/* بدنهٔ پرده — داخل چهارچوب */}
-                <div className="absolute overflow-hidden" style={{ left: "10.2%", right: "10.2%", top: "12.1%", bottom: cfg.bodyBottom || "14.2%" }}>
-                  <FabricLayer fabric={fabric} cfg={cfg} />
+                <div className="absolute overflow-hidden" style={{ left: "14.5%", right: "14.5%", top: "9.6%", bottom: cfg.bodyBottom || "11%" }}>
+                  <FabricLayer fabric={fabric} cfg={cfg} style={style} />
                 </div>
               </>
             )}
@@ -330,7 +288,6 @@ export default function VirtualWindow({ fabric, settings: override }) {
       {/* سایهٔ داخلی صحنه */}
       <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_60px_rgba(0,0,0,0.5)]" />
 
-      {/* حالت بدون انتخاب */}
       {!hasFabric && (
         <div className="absolute inset-0 z-40 flex items-center justify-center">
           <span className="rounded-full bg-background/70 px-5 py-2 font-body text-xs text-muted-foreground backdrop-blur-md">
@@ -342,53 +299,161 @@ export default function VirtualWindow({ fabric, settings: override }) {
   );
 }
 
-/** یک لایهٔ پارچه — بافت/رنگ دقیق مدل + چین‌ها و جزئیات مخصوص همان سبک */
-function FabricLayer({ fabric, cfg, back }) {
+/** لایهٔ پارچه — بافت/رنگ دقیق مدل + چین‌ها و جزئیات مخصوص همان سبک */
+function FabricLayer({ fabric, cfg, style, back }) {
+  const color = fabric.color_code || "#C9A227";
   const base = fabric.image
     ? { backgroundImage: `url("${fabric.image}")`, backgroundSize: "cover", backgroundPosition: "center" }
-    : { backgroundColor: back ? shade(fabric.color_code || "#C9A227", 0.5) : fabric.color_code || "#C9A227" };
+    : { backgroundColor: back ? shade(color, 0.45) : color };
 
+  // زبرا — نوارهای متناوب مات/شفاف
+  if (cfg.zebra) {
+    const sheer = hexToRgba(color, 0.16);
+    const solid = fabric.image ? `url("${fabric.image}")` : color;
+    return (
+      <div className="absolute inset-0 overflow-hidden">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `repeating-linear-gradient(180deg, ${solid} 0px, ${solid} 20px, ${sheer} 20px, ${sheer} 42px)`,
+            backgroundSize: fabric.image ? "cover" : undefined,
+          }}
+        />
+        {/* سایهٔ عمق بین نوارها */}
+        <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(180deg, rgba(0,0,0,0.18) 19px, rgba(0,0,0,0.18) 21px, transparent 21px, transparent 41px, rgba(0,0,0,0.18) 41px, rgba(0,0,0,0.18) 43px)" }} />
+        <div className="absolute inset-x-0 bottom-0 h-[9px] rounded-[2px] bg-[linear-gradient(180deg,#3a3a3a,#141414)] shadow-[0_2px_6px_rgba(0,0,0,0.55)]" />
+      </div>
+    );
+  }
+
+  // رومن — چین‌های پلکانی افقی نرم
+  if (style === "roman") {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={base}>
+        {/* چین‌های افقی رومن — هر پلکان با سایهٔ بالا و روشنایی پایین */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(180deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 3px, rgba(255,255,255,0.14) 7px, rgba(255,255,255,0) 14px, rgba(0,0,0,0) 28px, rgba(0,0,0,0.10) 30px, rgba(0,0,0,0) 34px)",
+          }}
+        />
+        {/* جمع‌شدگی بالا — چند پلکان روی هم */}
+        <div
+          className="absolute inset-x-0 top-0 h-[34%]"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(180deg, rgba(0,0,0,0.40) 0px, rgba(0,0,0,0.40) 4px, rgba(255,255,255,0.16) 9px, rgba(255,255,255,0) 16px, rgba(0,0,0,0.15) 18px, rgba(0,0,0,0) 24px)",
+            boxShadow: "inset 0 -10px 18px rgba(0,0,0,0.35)",
+          }}
+        />
+        {/* لبهٔ پایین پارچهٔ رومن */}
+        <div className="absolute inset-x-0 bottom-0 h-[10px] bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.25))]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.20)_0%,transparent_25%,transparent_75%,rgba(0,0,0,0.30)_100%)]" />
+        <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/40 to-transparent" />
+        <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-black/40 to-transparent" />
+      </div>
+    );
+  }
+
+  // پلیسه — چین‌های آکاردئونی تیز و منظم
+  if (cfg.pleated) {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={base}>
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(180deg, rgba(0,0,0,0.38) 0px, rgba(0,0,0,0) 3px, rgba(255,255,255,0.24) 7px, rgba(255,255,255,0) 12px, rgba(0,0,0,0.08) 15px, rgba(0,0,0,0) 18px)",
+          }}
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.22)_0%,transparent_20%,transparent_80%,rgba(0,0,0,0.28)_100%)]" />
+        <div className="absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-black/35 to-transparent" />
+        <div className="absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-black/35 to-transparent" />
+      </div>
+    );
+  }
+
+  // کرکره — پره‌های افقی با عمق (مثل کرکره فلزی/چوبی)
+  if (cfg.roller) {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={base}>
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(180deg, rgba(255,255,255,0.18) 0px, rgba(255,255,255,0.18) 2px, rgba(0,0,0,0.35) 3px, rgba(0,0,0,0.35) 9px, rgba(255,255,255,0.05) 10px, rgba(255,255,255,0.05) 22px)",
+          }}
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.15)_0%,transparent_15%,transparent_85%,rgba(0,0,0,0.25)_100%)]" />
+        <div className="absolute inset-y-0 left-0 w-7 bg-gradient-to-r from-black/45 to-transparent" />
+        <div className="absolute inset-y-0 right-0 w-7 bg-gradient-to-l from-black/45 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-[10px] rounded-[2px] bg-[linear-gradient(180deg,#3a3a3a,#141414)] shadow-[0_2px_6px_rgba(0,0,0,0.55)]" />
+      </div>
+    );
+  }
+
+  // ترک پنل — پنل‌های عمودی متحرک
+  if (cfg.panels) {
+    const panelColor = fabric.image ? `url("${fabric.image}")` : color;
+    return (
+      <div className="absolute inset-0 overflow-hidden">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="absolute top-0 bottom-0 overflow-hidden"
+            style={{
+              left: `${i * 33.33}%`,
+              width: "33.33%",
+              backgroundImage: typeof panelColor === "string" && panelColor.startsWith("url") ? panelColor : undefined,
+              backgroundColor: typeof panelColor === "string" && !panelColor.startsWith("url") ? panelColor : undefined,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              borderLeft: i > 0 ? "2px solid rgba(0,0,0,0.45)" : undefined,
+              boxShadow: "inset -6px 0 12px rgba(0,0,0,0.25), inset 6px 0 12px rgba(255,255,255,0.06)",
+            }}
+          >
+            {/* چین عمودی نرم داخل هر پنل */}
+            <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0px, rgba(0,0,0,0) 14px, rgba(255,255,255,0.08) 28px, rgba(255,255,255,0) 44px)" }} />
+          </div>
+        ))}
+        <div className="absolute inset-x-0 bottom-0 h-[9px] rounded-[2px] bg-[linear-gradient(180deg,#3a3a3a,#141414)] shadow-[0_2px_6px_rgba(0,0,0,0.55)]" />
+      </div>
+    );
+  }
+
+  // شید / دبل شید / کلاسیک / اورسی — رندر عمومی با چین‌های سبک
   return (
     <>
       <div
         className="absolute inset-0 overflow-hidden"
         style={{
           ...base,
-          ...(back && { filter: "brightness(1.3) saturate(0.85)", opacity: 0.88 }),
+          ...(back && { filter: "brightness(1.35) saturate(0.8)", opacity: 0.88 }),
         }}
       >
-        {/* چین‌ها / نوارها / لایه‌های عرضی بر اساس سبک */}
-        <div
-          className="absolute inset-0"
-          style={{ backgroundImage: cfg.fold, ...(back && { opacity: 0.45 }) }}
-        />
-
-        {/* جمع‌شدگی طبقاتی رومن — لایه‌لایه روی هم در بالا */}
-        {cfg.stackTop && (
-          <div
-            className="absolute inset-x-0 top-0 h-[38%]"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(180deg, rgba(0,0,0,0.38) 0px, rgba(0,0,0,0.38) 3px, rgba(255,255,255,0.14) 7px, rgba(255,255,255,0) 13px)",
-              boxShadow: "inset 0 -8px 16px rgba(0,0,0,0.35)",
-            }}
-          />
+        {/* چین‌های عمودی برای پردهٔ کلاسیک/اورسی */}
+        {cfg.fold && (
+          <div className="absolute inset-0" style={{ backgroundImage: cfg.fold, ...(back && { opacity: 0.45 }) }} />
         )}
-
-        {/* افت نور از بالا به پایین */}
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.35)_0%,transparent_30%,transparent_70%,rgba(0,0,0,0.40)_100%)]" />
-        {/* سایهٔ کناره‌ها برای عمق پرسپکتیو */}
-        <div className="absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-black/45 to-transparent" />
-        <div className="absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-black/45 to-transparent" />
+        {/* شید: سایهٔ نرم بالا از غلتک */}
+        {!cfg.fold && (
+          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.22) 0%, transparent 16%)" }} />
+        )}
+        {/* افت نور */}
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.28)_0%,transparent_28%,transparent_72%,rgba(0,0,0,0.35)_100%)]" />
+        {/* عمق کناره‌ها */}
+        <div className="absolute inset-y-0 left-0 w-9 bg-gradient-to-r from-black/45 to-transparent" />
+        <div className="absolute inset-y-0 right-0 w-9 bg-gradient-to-l from-black/45 to-transparent" />
       </div>
 
-      {/* ریل پایین پارچه */}
+      {/* ریل پایین */}
       {cfg.bar && !back && (
-        <div className="absolute inset-x-0 bottom-0 h-[9px] rounded-[2px] bg-[linear-gradient(180deg,#3a3a3a,#141414)] shadow-[0_2px_6px_rgba(0,0,0,0.55)]" />
+        <div className="absolute inset-x-0 bottom-0 h-[10px] rounded-[2px] bg-[linear-gradient(180deg,#3a3a3a,#141414)] shadow-[0_2px_6px_rgba(0,0,0,0.55)]" />
       )}
-      {/* حاشیهٔ طلایی پایین — امضای پردهٔ اورسی */}
+      {/* حاشیهٔ طلایی — امضای اورسی */}
       {cfg.hem && (
-        <div className="absolute inset-x-0 bottom-0 h-[7px] bg-[linear-gradient(90deg,#A67C00,#E8C547,#A67C00)] shadow-[0_-1px_6px_rgba(0,0,0,0.4)]" />
+        <div className="absolute inset-x-0 bottom-0 h-[8px] bg-[linear-gradient(90deg,#A67C00,#E8C547,#A67C00)] shadow-[0_-1px_6px_rgba(0,0,0,0.4)]" />
       )}
     </>
   );
