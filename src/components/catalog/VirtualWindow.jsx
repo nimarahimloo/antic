@@ -299,122 +299,122 @@ export default function VirtualWindow({ fabric, settings: override }) {
   );
 }
 
-/** لایهٔ پارچه — بافت/رنگ دقیق مدل + چین‌ها و جزئیات مخصوص همان سبک */
+/**
+ * لایهٔ پارچه — تصویر دقیق پارچۀ بارگذاری‌شده از پنل ادمین روی فرم سه‌بعدی سبک پرده.
+ *
+ * تصویر پارچه به‌صورت «پوسته» روی پرده اعمال می‌شود و چین‌ها/سایه‌های مخصوص
+ * هر سبک با blend-mode روی آن می‌نشینند — طرح و رنگ دقیق پارچه حفظ می‌شود
+ * ولی فرم سه‌بعدی پرده (چین، پلکان، پره) کاملاً دیده می‌شود.
+ */
 function FabricLayer({ fabric, cfg, style, back }) {
   const color = fabric.color_code || "#C9A227";
-  const base = fabric.image
-    ? { backgroundImage: `url("${fabric.image}")`, backgroundSize: "cover", backgroundPosition: "center" }
+  const hasImage = !!fabric.image;
+
+  // پوستۀ پارچه — تصویر دقیق پارچه (کشش کامل روی پرده) یا رنگ
+  const skin = hasImage
+    ? { backgroundImage: `url("${fabric.image}")`, backgroundSize: "100% 100%", backgroundPosition: "center", backgroundRepeat: "no-repeat" }
     : { backgroundColor: back ? shade(color, 0.45) : color };
 
-  // زبرا — نوارهای متناوب مات/شفاف
+  // — زبرا — نوارهای متناوب جامد/شیر
   if (cfg.zebra) {
-    const sheer = hexToRgba(color, 0.16);
-    const solid = fabric.image ? `url("${fabric.image}")` : color;
+    const BANDS = 8;
+    const bandH = 100 / BANDS;
+    const solidH = bandH * 0.55;
     return (
-      <div className="absolute inset-0 overflow-hidden">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `repeating-linear-gradient(180deg, ${solid} 0px, ${solid} 20px, ${sheer} 20px, ${sheer} 42px)`,
-            backgroundSize: fabric.image ? "cover" : undefined,
-          }}
-        />
-        {/* سایهٔ عمق بین نوارها */}
-        <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(180deg, rgba(0,0,0,0.18) 19px, rgba(0,0,0,0.18) 21px, transparent 21px, transparent 41px, rgba(0,0,0,0.18) 41px, rgba(0,0,0,0.18) 43px)" }} />
-        <div className="absolute inset-x-0 bottom-0 h-[9px] rounded-[2px] bg-[linear-gradient(180deg,#3a3a3a,#141414)] shadow-[0_2px_6px_rgba(0,0,0,0.55)]" />
-      </div>
-    );
-  }
-
-  // رومن — چین‌های پلکانی افقی نرم
-  if (style === "roman") {
-    return (
-      <div className="absolute inset-0 overflow-hidden" style={base}>
-        {/* چین‌های افقی رومن — هر پلکان با سایهٔ بالا و روشنایی پایین */}
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(180deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 3px, rgba(255,255,255,0.14) 7px, rgba(255,255,255,0) 14px, rgba(0,0,0,0) 28px, rgba(0,0,0,0.10) 30px, rgba(0,0,0,0) 34px)",
-          }}
-        />
-        {/* جمع‌شدگی بالا — چند پلکان روی هم */}
-        <div
-          className="absolute inset-x-0 top-0 h-[34%]"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(180deg, rgba(0,0,0,0.40) 0px, rgba(0,0,0,0.40) 4px, rgba(255,255,255,0.16) 9px, rgba(255,255,255,0) 16px, rgba(0,0,0,0.15) 18px, rgba(0,0,0,0) 24px)",
-            boxShadow: "inset 0 -10px 18px rgba(0,0,0,0.35)",
-          }}
-        />
-        {/* لبهٔ پایین پارچهٔ رومن */}
-        <div className="absolute inset-x-0 bottom-0 h-[10px] bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.25))]" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.20)_0%,transparent_25%,transparent_75%,rgba(0,0,0,0.30)_100%)]" />
-        <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/40 to-transparent" />
-        <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-black/40 to-transparent" />
-      </div>
-    );
-  }
-
-  // پلیسه — چین‌های آکاردئونی تیز و منظم
-  if (cfg.pleated) {
-    return (
-      <div className="absolute inset-0 overflow-hidden" style={base}>
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(180deg, rgba(0,0,0,0.38) 0px, rgba(0,0,0,0) 3px, rgba(255,255,255,0.24) 7px, rgba(255,255,255,0) 12px, rgba(0,0,0,0.08) 15px, rgba(0,0,0,0) 18px)",
-          }}
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.22)_0%,transparent_20%,transparent_80%,rgba(0,0,0,0.28)_100%)]" />
-        <div className="absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-black/35 to-transparent" />
-        <div className="absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-black/35 to-transparent" />
-      </div>
-    );
-  }
-
-  // کرکره — پره‌های افقی با عمق (مثل کرکره فلزی/چوبی)
-  if (cfg.roller) {
-    return (
-      <div className="absolute inset-0 overflow-hidden" style={base}>
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(180deg, rgba(255,255,255,0.18) 0px, rgba(255,255,255,0.18) 2px, rgba(0,0,0,0.35) 3px, rgba(0,0,0,0.35) 9px, rgba(255,255,255,0.05) 10px, rgba(255,255,255,0.05) 22px)",
-          }}
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.15)_0%,transparent_15%,transparent_85%,rgba(0,0,0,0.25)_100%)]" />
-        <div className="absolute inset-y-0 left-0 w-7 bg-gradient-to-r from-black/45 to-transparent" />
-        <div className="absolute inset-y-0 right-0 w-7 bg-gradient-to-l from-black/45 to-transparent" />
+      <div className="absolute inset-0 overflow-hidden" style={{ isolation: "isolate" }}>
+        {/* لایۀ شیر (نازک) زیرین */}
+        <div className="absolute inset-0" style={hasImage ? { ...skin, opacity: 0.22 } : { backgroundColor: hexToRgba(color, 0.16) }} />
+        {/* نوارهای جامد پارچه — هر نوار تصویر پارچه را کامل نشان می‌دهد */}
+        {Array.from({ length: BANDS }).map((_, i) => (
+          <div key={i} className="absolute inset-x-0 overflow-hidden" style={{ top: `${i * bandH + bandH * 0.1}%`, height: `${solidH}%`, ...skin }}>
+            <div className="absolute inset-x-0 top-0 h-[3px]" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.45), transparent)", mixBlendMode: "multiply" }} />
+            <div className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: "linear-gradient(0deg, rgba(0,0,0,0.45), transparent)", mixBlendMode: "multiply" }} />
+          </div>
+        ))}
+        {/* ریل پایین */}
         <div className="absolute inset-x-0 bottom-0 h-[10px] rounded-[2px] bg-[linear-gradient(180deg,#3a3a3a,#141414)] shadow-[0_2px_6px_rgba(0,0,0,0.55)]" />
       </div>
     );
   }
 
-  // ترک پنل — پنل‌های عمودی متحرک
-  if (cfg.panels) {
-    const panelColor = fabric.image ? `url("${fabric.image}")` : color;
+  // — رومن — چین‌های پلکانی افقی نرم
+  if (style === "roman") {
     return (
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden" style={{ isolation: "isolate" }}>
+        {/* پوستۀ پارچه */}
+        <div className="absolute inset-0" style={skin} />
+        {/* چین‌های افقی رومن — خط سایه + روشنایی روی هر پلکان */}
+        <div className="absolute inset-0" style={{
+          backgroundImage: "repeating-linear-gradient(180deg, rgba(0,0,0,0.5) 0px, rgba(0,0,0,0.5) 3px, transparent 3px, transparent 30px, rgba(255,255,255,0.3) 30px, rgba(255,255,255,0.3) 36px, transparent 36px, transparent 60px)",
+          mixBlendMode: "overlay",
+        }} />
+        {/* جمع‌شدگی بالا — پلکان‌های روی هم */}
+        <div className="absolute inset-x-0 top-0 h-[32%]" style={{
+          backgroundImage: "repeating-linear-gradient(180deg, rgba(0,0,0,0.55) 0px, rgba(0,0,0,0.55) 5px, rgba(255,255,255,0.3) 10px, transparent 18px, rgba(0,0,0,0.25) 20px, transparent 26px)",
+          mixBlendMode: "overlay",
+        }} />
+        <div className="absolute inset-x-0 top-0 h-[32%]" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.35), transparent)", mixBlendMode: "multiply" }} />
+        {/* عمق کناره‌ها */}
+        <div className="absolute inset-y-0 left-0 w-10" style={{ background: "linear-gradient(90deg, rgba(0,0,0,0.45), transparent)", mixBlendMode: "multiply" }} />
+        <div className="absolute inset-y-0 right-0 w-10" style={{ background: "linear-gradient(270deg, rgba(0,0,0,0.45), transparent)", mixBlendMode: "multiply" }} />
+        {/* سایۀ پایین */}
+        <div className="absolute inset-x-0 bottom-0 h-14" style={{ background: "linear-gradient(180deg, transparent, rgba(0,0,0,0.35))", mixBlendMode: "multiply" }} />
+      </div>
+    );
+  }
+
+  // — پلیسه — چین‌های آکاردئونی تیز و منظم
+  if (cfg.pleated) {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ isolation: "isolate" }}>
+        <div className="absolute inset-0" style={skin} />
+        {/* چین‌های آکاردئونی — سایه تیز + روشنایی */}
+        <div className="absolute inset-0" style={{
+          backgroundImage: "repeating-linear-gradient(180deg, rgba(0,0,0,0.6) 0px, rgba(0,0,0,0.6) 2px, transparent 2px, transparent 6px, rgba(255,255,255,0.4) 6px, rgba(255,255,255,0.4) 9px, transparent 9px, transparent 16px)",
+          mixBlendMode: "overlay",
+        }} />
+        {/* عمق کناره‌ها */}
+        <div className="absolute inset-y-0 left-0 w-8" style={{ background: "linear-gradient(90deg, rgba(0,0,0,0.5), transparent)", mixBlendMode: "multiply" }} />
+        <div className="absolute inset-y-0 right-0 w-8" style={{ background: "linear-gradient(270deg, rgba(0,0,0,0.5), transparent)", mixBlendMode: "multiply" }} />
+        {/* سایه‌های بالا و پایین */}
+        <div className="absolute inset-x-0 top-0 h-8" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.3), transparent)", mixBlendMode: "multiply" }} />
+        <div className="absolute inset-x-0 bottom-0 h-8" style={{ background: "linear-gradient(180deg, transparent, rgba(0,0,0,0.3))", mixBlendMode: "multiply" }} />
+      </div>
+    );
+  }
+
+  // — کرکره (رولر) — پره‌های افقی با عمق
+  if (cfg.roller) {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ isolation: "isolate" }}>
+        <div className="absolute inset-0" style={skin} />
+        {/* پره‌های افقی — خط روشنایی + سایه */}
+        <div className="absolute inset-0" style={{
+          backgroundImage: "repeating-linear-gradient(180deg, rgba(255,255,255,0.25) 0px, rgba(255,255,255,0.25) 2px, rgba(0,0,0,0.5) 3px, rgba(0,0,0,0.5) 10px, rgba(255,255,255,0.1) 11px, rgba(255,255,255,0.1) 24px)",
+          mixBlendMode: "overlay",
+        }} />
+        {/* عمق کناره‌ها */}
+        <div className="absolute inset-y-0 left-0 w-8" style={{ background: "linear-gradient(90deg, rgba(0,0,0,0.5), transparent)", mixBlendMode: "multiply" }} />
+        <div className="absolute inset-y-0 right-0 w-8" style={{ background: "linear-gradient(270deg, rgba(0,0,0,0.5), transparent)", mixBlendMode: "multiply" }} />
+        {/* سایۀ پایین */}
+        <div className="absolute inset-x-0 bottom-0 h-10" style={{ background: "linear-gradient(180deg, transparent, rgba(0,0,0,0.3))", mixBlendMode: "multiply" }} />
+        {/* ریل پایین */}
+        <div className="absolute inset-x-0 bottom-0 h-[10px] rounded-[2px] bg-[linear-gradient(180deg,#3a3a3a,#141414)] shadow-[0_2px_6px_rgba(0,0,0,0.55)]" />
+      </div>
+    );
+  }
+
+  // — ترک پنل — پنل‌های عمودی متحرک
+  if (cfg.panels) {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ isolation: "isolate" }}>
         {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className="absolute top-0 bottom-0 overflow-hidden"
-            style={{
-              left: `${i * 33.33}%`,
-              width: "33.33%",
-              backgroundImage: typeof panelColor === "string" && panelColor.startsWith("url") ? panelColor : undefined,
-              backgroundColor: typeof panelColor === "string" && !panelColor.startsWith("url") ? panelColor : undefined,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              borderLeft: i > 0 ? "2px solid rgba(0,0,0,0.45)" : undefined,
-              boxShadow: "inset -6px 0 12px rgba(0,0,0,0.25), inset 6px 0 12px rgba(255,255,255,0.06)",
-            }}
-          >
+          <div key={i} className="absolute top-0 bottom-0 overflow-hidden" style={{ left: `${i * 33.33}%`, width: "33.33%", ...skin, borderLeft: i > 0 ? "2px solid rgba(0,0,0,0.5)" : undefined }}>
             {/* چین عمودی نرم داخل هر پنل */}
-            <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0px, rgba(0,0,0,0) 14px, rgba(255,255,255,0.08) 28px, rgba(255,255,255,0) 44px)" }} />
+            <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(90deg, rgba(0,0,0,0.25) 0px, transparent 14px, rgba(255,255,255,0.15) 28px, transparent 44px)", mixBlendMode: "overlay" }} />
+            {/* عمق لبه‌ها */}
+            <div className="absolute inset-y-0 left-0 w-6" style={{ background: "linear-gradient(90deg, rgba(0,0,0,0.4), transparent)", mixBlendMode: "multiply" }} />
+            <div className="absolute inset-y-0 right-0 w-6" style={{ background: "linear-gradient(270deg, rgba(0,0,0,0.4), transparent)", mixBlendMode: "multiply" }} />
           </div>
         ))}
         <div className="absolute inset-x-0 bottom-0 h-[9px] rounded-[2px] bg-[linear-gradient(180deg,#3a3a3a,#141414)] shadow-[0_2px_6px_rgba(0,0,0,0.55)]" />
@@ -422,36 +422,29 @@ function FabricLayer({ fabric, cfg, style, back }) {
     );
   }
 
-  // شید / دبل شید / کلاسیک / اورسی — رندر عمومی با چین‌های سبک
+  // — شید / دبل شید / کلاسیک / اورسی — رندر عمومی
   return (
     <>
-      <div
-        className="absolute inset-0 overflow-hidden"
-        style={{
-          ...base,
-          ...(back && { filter: "brightness(1.35) saturate(0.8)", opacity: 0.88 }),
-        }}
-      >
-        {/* چین‌های عمودی برای پردهٔ کلاسیک/اورسی */}
+      <div className="absolute inset-0 overflow-hidden" style={{ isolation: "isolate", ...skin, ...(back && { filter: "brightness(1.35) saturate(0.8)", opacity: 0.88 }) }}>
+        {/* چین‌های عمودی برای کلاسیک/اورسی */}
         {cfg.fold && (
-          <div className="absolute inset-0" style={{ backgroundImage: cfg.fold, ...(back && { opacity: 0.45 }) }} />
+          <div className="absolute inset-0" style={{ backgroundImage: cfg.fold, mixBlendMode: "overlay", ...(back && { opacity: 0.45 }) }} />
         )}
-        {/* شید: سایهٔ نرم بالا از غلتک */}
+        {/* شید: سایۀ نرم بالا از غلتک */}
         {!cfg.fold && (
-          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.22) 0%, transparent 16%)" }} />
+          <div className="absolute inset-x-0 top-0 h-16" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.35), transparent)", mixBlendMode: "multiply" }} />
         )}
-        {/* افت نور */}
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.28)_0%,transparent_28%,transparent_72%,rgba(0,0,0,0.35)_100%)]" />
+        {/* افت نور کلی */}
+        <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.25) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.35) 100%)", mixBlendMode: "multiply" }} />
         {/* عمق کناره‌ها */}
-        <div className="absolute inset-y-0 left-0 w-9 bg-gradient-to-r from-black/45 to-transparent" />
-        <div className="absolute inset-y-0 right-0 w-9 bg-gradient-to-l from-black/45 to-transparent" />
+        <div className="absolute inset-y-0 left-0 w-10" style={{ background: "linear-gradient(90deg, rgba(0,0,0,0.45), transparent)", mixBlendMode: "multiply" }} />
+        <div className="absolute inset-y-0 right-0 w-10" style={{ background: "linear-gradient(270deg, rgba(0,0,0,0.45), transparent)", mixBlendMode: "multiply" }} />
       </div>
-
       {/* ریل پایین */}
       {cfg.bar && !back && (
         <div className="absolute inset-x-0 bottom-0 h-[10px] rounded-[2px] bg-[linear-gradient(180deg,#3a3a3a,#141414)] shadow-[0_2px_6px_rgba(0,0,0,0.55)]" />
       )}
-      {/* حاشیهٔ طلایی — امضای اورسی */}
+      {/* حاشیۀ طلایی — امضای اورسی */}
       {cfg.hem && (
         <div className="absolute inset-x-0 bottom-0 h-[8px] bg-[linear-gradient(90deg,#A67C00,#E8C547,#A67C00)] shadow-[0_-1px_6px_rgba(0,0,0,0.4)]" />
       )}
