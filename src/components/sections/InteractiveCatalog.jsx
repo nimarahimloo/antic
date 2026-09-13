@@ -1,58 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, Phone, Check, X, SlidersHorizontal, RotateCcw, Heart, Bookmark, Download } from "lucide-react";
+import { Search, Phone, Check, X, Heart, Bookmark, Download } from "lucide-react";
 import html2canvas from "html2canvas";
 import VirtualWindow from "@/components/catalog/VirtualWindow";
 import SavedCurtainsDrawer from "@/components/catalog/SavedCurtainsDrawer";
 import { useSavedCurtains } from "@/hooks/useSavedCurtains";
 import { ALL_CATEGORIES as FALLBACK_CATEGORIES } from "@/lib/catalogData";
 import { base44 } from "@/api/base44Client";
-
-// طیف‌های رنگی پشتیبانی‌شده در فیلتر پیشرفته
-const COLOR_FAMILIES = [
-  { key: "cream", label: "سفید و کرم", hex: "#EFE6D5" },
-  { key: "brown", label: "بژ و قهوه‌ای", hex: "#8B5A2B" },
-  { key: "gold", label: "طلایی", hex: "#C9A227" },
-  { key: "neutral", label: "خاکستری و مشکی", hex: "#4A4A4A" },
-  { key: "blue", label: "آبی و سرمه‌ای", hex: "#2C3E5D" },
-  { key: "green", label: "سبز", hex: "#3E6B4F" },
-  { key: "red", label: "قرمز و زرشکی", hex: "#7B2D3B" },
-  { key: "purple", label: "بنفش", hex: "#5B4A73" },
-];
-
-// تبدیل کد رنگ (hex) به طیف رنگی برای فیلتر
-function colorFamily(hex) {
-  if (!hex || typeof hex !== "string" || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex.trim())) return null;
-  let h = hex.trim().slice(1);
-  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
-  const r = parseInt(h.slice(0, 2), 16) / 255;
-  const g = parseInt(h.slice(2, 4), 16) / 255;
-  const b = parseInt(h.slice(4, 6), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  const d = max - min;
-  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
-  let hue = 0;
-  if (d !== 0) {
-    if (max === r) hue = ((g - b) / d) % 6;
-    else if (max === g) hue = (b - r) / d + 2;
-    else hue = (r - g) / d + 4;
-    hue *= 60;
-    if (hue < 0) hue += 360;
-  }
-  if (s < 0.15) {
-    if (l > 0.75 && (d === 0 || (hue >= 15 && hue < 70))) return "cream";
-    return "neutral";
-  }
-  if (hue > 330 || hue < 15) return "red";
-  if (hue < 45) return l < 0.5 ? "brown" : "cream";
-  if (hue < 62) return "gold";
-  if (hue < 170) return "green";
-  if (hue < 265) return "blue";
-  return "purple";
-}
 
 export default function InteractiveCatalog({ initialCategory }) {
   // دسته‌ها از دیتابیس (قابل مدیریت از پنل)؛ در نبودِ آن‌ها از فایل ایستا
@@ -82,8 +37,6 @@ export default function InteractiveCatalog({ initialCategory }) {
   const [loading, setLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState(null);
   const [search, setSearch] = useState("");
-  const [fabricFilter, setFabricFilter] = useState("");
-  const [colorFilter, setColorFilter] = useState("");
   const [colorOverride, setColorOverride] = useState("");
   const { saved, isSaved, toggleSave, remove, clear } = useSavedCurtains();
   const [savedOpen, setSavedOpen] = useState(false);
@@ -103,15 +56,10 @@ export default function InteractiveCatalog({ initialCategory }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const categoryModels = useMemo(
-    () => allModels.filter((m) => m.category_slug === selectedCategory),
-    [allModels, selectedCategory]
-  );
-
   // در حالت جستجو، نتیجه‌ها از بین «همهٔ» مدل‌ها می‌آیند؛ وگرنه دسته + زیردسته
   const gridItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let items = q
+    return q
       ? allModels.filter((m) =>
           [m.code, m.name, m.fabric, m.color, m.description].some(
             (v) => v && String(v).toLowerCase().includes(q)
@@ -120,26 +68,9 @@ export default function InteractiveCatalog({ initialCategory }) {
       : allModels.filter(
           (m) =>
             m.category_slug === selectedCategory &&
-            (!selectedSubcategory || m.subcategory === selectedSubcategory)
+            (!selectedSubcategory || !m.subcategory || m.subcategory === selectedSubcategory)
         );
-    if (fabricFilter) items = items.filter((m) => m.fabric === fabricFilter);
-    if (colorFilter) items = items.filter((m) => colorFamily(m.color_code) === colorFilter);
-    return items;
-  }, [allModels, search, selectedCategory, selectedSubcategory, fabricFilter, colorFilter]);
-
-  // گزینه‌های فیلتر بر اساس دامنهٔ فعلی (همه در جستجو، دستهٔ جاری در مرور)
-  const filterSource = useMemo(
-    () => (search.trim() ? allModels : categoryModels),
-    [search, allModels, categoryModels]
-  );
-  const availableFabrics = useMemo(
-    () => [...new Set(filterSource.map((m) => m.fabric).filter(Boolean))],
-    [filterSource]
-  );
-  const availableFamilies = useMemo(
-    () => [...new Set(filterSource.map((m) => colorFamily(m.color_code)).filter(Boolean))],
-    [filterSource]
-  );
+  }, [allModels, search, selectedCategory, selectedSubcategory]);
 
   // پالت رنگ زنده — برای پیش‌نمایش رنگ روی پنجره (با نام)
   const LIVE_COLORS = [
@@ -165,7 +96,7 @@ export default function InteractiveCatalog({ initialCategory }) {
     [selectedModel, colorOverride]
   );
 
-  const hasActiveFilters = !!(search.trim() || fabricFilter || colorFilter);
+  const hasActiveFilters = !!search.trim();
 
   async function handleDownload() {
     if (!windowRef.current || !selectedModel) return;
@@ -190,8 +121,6 @@ export default function InteractiveCatalog({ initialCategory }) {
 
   function resetFilters() {
     setSearch("");
-    setFabricFilter("");
-    setColorFilter("");
   }
 
   useEffect(() => {
@@ -275,74 +204,6 @@ export default function InteractiveCatalog({ initialCategory }) {
             </button>
           ))}
         </div>
-
-        {/* فیلتر پیشرفته */}
-        {!loading && allModels.length > 0 && (
-          <div className="mb-8 rounded-2xl border border-secondary/60 bg-card/60 p-5">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2 font-display text-xs font-black text-foreground">
-                <SlidersHorizontal className="h-3.5 w-3.5 text-primary" /> فیلتر پیشرفته
-              </span>
-              {hasActiveFilters && (
-                <button
-                  onClick={resetFilters}
-                  className="flex items-center gap-1.5 font-body text-[11px] text-muted-foreground transition-colors hover:text-primary"
-                >
-                  <RotateCcw className="h-3 w-3" /> پاک کردن همهٔ فیلترها
-                </button>
-              )}
-            </div>
-
-            {availableFabrics.length > 0 && (
-              <div className="mt-4">
-                <p className="mb-2 font-body text-[11px] text-muted-foreground">جنس پارچه</p>
-                <div className="flex gap-2 overflow-x-auto no-scrollbar" dir="rtl">
-                  {availableFabrics.map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setFabricFilter((v) => (v === f ? "" : f))}
-                      className={`shrink-0 rounded-full border px-4 py-1.5 font-body text-xs transition-colors ${
-                        fabricFilter === f
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-secondary/60 text-muted-foreground hover:border-primary/50"
-                      }`}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {availableFamilies.length > 0 && (
-              <div className="mt-4">
-                <p className="mb-2 font-body text-[11px] text-muted-foreground">طیف رنگی</p>
-                <div className="flex flex-wrap gap-2.5">
-                  {COLOR_FAMILIES.filter((f) => availableFamilies.includes(f.key)).map((f) => (
-                    <button
-                      key={f.key}
-                      onClick={() => setColorFilter((v) => (v === f.key ? "" : f.key))}
-                      title={f.label}
-                      className={`flex items-center gap-2 rounded-full border py-1.5 pl-4 pr-1.5 transition-colors ${
-                        colorFilter === f.key
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-secondary/60 text-muted-foreground hover:border-primary/50"
-                      }`}
-                    >
-                      <span
-                        className={`h-6 w-6 rounded-full border ${
-                          colorFilter === f.key ? "border-primary" : "border-secondary/60"
-                        }`}
-                        style={{ backgroundColor: f.hex }}
-                      />
-                      <span className="font-body text-xs">{f.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         <div className="grid gap-8 lg:grid-cols-5">
           {/* پیش‌نمایش روی پنجره */}
