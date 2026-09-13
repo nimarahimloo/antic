@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, Phone, Check, X, SlidersHorizontal, RotateCcw, Heart, Bookmark } from "lucide-react";
+import { Search, Phone, Check, X, SlidersHorizontal, RotateCcw, Heart, Bookmark, Download } from "lucide-react";
+import html2canvas from "html2canvas";
 import VirtualWindow from "@/components/catalog/VirtualWindow";
 import SavedCurtainsDrawer from "@/components/catalog/SavedCurtainsDrawer";
 import { useSavedCurtains } from "@/hooks/useSavedCurtains";
@@ -86,6 +87,8 @@ export default function InteractiveCatalog({ initialCategory }) {
   const [colorOverride, setColorOverride] = useState("");
   const { saved, isSaved, toggleSave, remove, clear } = useSavedCurtains();
   const [savedOpen, setSavedOpen] = useState(false);
+  const windowRef = useRef(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     const cat = CATEGORIES.find((c) => c.slug === selectedCategory);
@@ -163,6 +166,27 @@ export default function InteractiveCatalog({ initialCategory }) {
   );
 
   const hasActiveFilters = !!(search.trim() || fabricFilter || colorFilter);
+
+  async function handleDownload() {
+    if (!windowRef.current || !selectedModel) return;
+    setDownloading(true);
+    try {
+      const canvas = await html2canvas(windowRef.current, {
+        backgroundColor: "#0B0B0B",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const link = document.createElement("a");
+      link.download = `artindecor-${selectedModel.code}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   function resetFilters() {
     setSearch("");
@@ -323,8 +347,18 @@ export default function InteractiveCatalog({ initialCategory }) {
         <div className="grid gap-8 lg:grid-cols-5">
           {/* پیش‌نمایش روی پنجره */}
           <div className="lg:col-span-3">
-            <div className="relative mx-auto max-w-[440px]">
+            <div ref={windowRef} className="relative mx-auto max-w-[440px]">
               <VirtualWindow fabric={previewModel} />
+              {selectedModel && (
+                <button
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  className="absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-background/80 px-3 py-2 backdrop-blur-md transition-all hover:bg-primary hover:text-primary-foreground disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="font-display text-[10px] font-bold">{downloading ? "در حال ذخیره…" : "دانلود تصویر"}</span>
+                </button>
+              )}
               <div className="absolute bottom-4 right-4 z-10 rounded-full bg-background/80 px-4 py-2 backdrop-blur-md">
                 <span className="font-display text-xs font-bold text-primary">{selectedModel ? selectedModel.code : category?.name}</span>
               </div>

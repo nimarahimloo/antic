@@ -23,6 +23,7 @@ import AdminProjects from '@/pages/admin/AdminProjects';
 import AdminCategories from '@/pages/admin/AdminCategories';
 import AdminRequests from '@/pages/admin/AdminRequests';
 import AdminWindowSettings from '@/pages/admin/AdminWindowSettings';
+import AdminBulkUpload from '@/pages/admin/AdminBulkUpload';
 import { useSmoothScroll } from '@/hooks/useSmoothScroll';
 
 const AuthenticatedApp = () => {
@@ -66,6 +67,7 @@ const AuthenticatedApp = () => {
           <Route path="projects" element={<AdminProjects />} />
           <Route path="categories" element={<AdminCategories />} />
           <Route path="window" element={<AdminWindowSettings />} />
+          <Route path="bulk-upload" element={<AdminBulkUpload />} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>

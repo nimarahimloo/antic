@@ -1,12 +1,13 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
-import { LayoutDashboard, Layers, FolderKanban, ListTree, Inbox, ExternalLink, LogOut, Loader2, AppWindow } from "lucide-react";
+import { LayoutDashboard, Layers, FolderKanban, ListTree, Inbox, ExternalLink, LogOut, Loader2, AppWindow, UploadCloud } from "lucide-react";
 
 const MENU = [
   { to: "/admin", label: "داشبورد", icon: LayoutDashboard, end: true },
   { to: "/admin/requests", label: "درخواست‌های مشاوره", icon: Inbox },
   { to: "/admin/models", label: "مدل‌های پرده", icon: Layers },
+  { to: "/admin/bulk-upload", label: "بارگذاری گروهی", icon: UploadCloud },
   { to: "/admin/projects", label: "پروژه‌ها", icon: FolderKanban },
   { to: "/admin/categories", label: "دسته‌بندی‌ها", icon: ListTree },
   { to: "/admin/window", label: "پنجرهٔ مجازی", icon: AppWindow },
