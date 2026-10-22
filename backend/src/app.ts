@@ -6,6 +6,7 @@ import entityRoutes from "./routes/entities.js";
 import uploadRoutes from "./routes/upload.js";
 import functionRoutes from "./routes/functions.js";
 import catalogRoutes from "./routes/catalog.js";
+import orderRoutes from "./routes/orders.js";
 import { HttpError, sendError } from "./lib/errors.js";
 
 const app = express();
@@ -42,6 +43,7 @@ app.use("/api/entities", entityRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/functions", functionRoutes);
 app.use("/api/catalog", catalogRoutes);
+app.use("/api/orders", orderRoutes);
 
 app.use((_req, _res, next) => {
   next(new HttpError(404, "Not found"));

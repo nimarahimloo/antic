@@ -1,11 +1,9 @@
 /**
- * Local cart — localStorage only. Same function names as the former Wix cart helpers
- * so CartContext keeps working without external APIs.
- *
- * Checkout: currently shows a message to contact the store (no payment gateway yet).
+ * Local cart (localStorage) + checkout via /api/orders (Zarinpal).
  */
 
 const CART_KEY = "antic-local-cart";
+const API = import.meta.env.VITE_API_BASE || "/api";
 
 function loadCart() {
   if (typeof window === "undefined") return emptyCart();
@@ -40,10 +38,7 @@ function uid() {
   return `li_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
-const API = import.meta.env.VITE_API_BASE || "/api";
-
 async function fetchProduct(id) {
-  // list and find — or we could add GET by id; use products list admin/public
   const res = await fetch(`${API}/catalog/products?limit=100`);
   if (!res.ok) return null;
   const data = await res.json();
@@ -54,7 +49,7 @@ export async function getCurrentCart() {
   return loadCart();
 }
 
-export async function addToCart(catalogItemId, variantId, quantity = 1, _extras = {}) {
+export async function addToCart(catalogItemId, variantId, quantity = 1) {
   const product = await fetchProduct(catalogItemId);
   if (!product) throw new Error("محصول پیدا نشد.");
 
@@ -97,7 +92,6 @@ export async function addToCart(catalogItemId, variantId, quantity = 1, _extras 
           amount: String(unitAmount * quantity),
           convertedAmount: String(unitAmount * quantity),
         },
-        // helper for UI that still expects formatted strings
         unitFormatted,
       },
       attributes: {
@@ -134,11 +128,38 @@ export async function removeFromCart(lineItemId) {
   return saveCart(cart);
 }
 
-export async function checkout() {
+export function clearCart() {
+  return saveCart(emptyCart());
+}
+
+/**
+ * Start checkout: requires customer info. Returns payment URL (Zarinpal or demo).
+ * @param {{ customerName: string, customerPhone: string, customerEmail?: string, customerAddress?: string, note?: string }}
+ */
+export async function checkout(customer = {}) {
   const cart = loadCart();
   if (!cart.lineItems?.length) throw new Error("سبد خرید خالی است.");
-  // No payment gateway yet — open contact with cart summary
-  const names = cart.lineItems.map((l) => l.name?.original).join("، ");
-  const msg = encodeURIComponent(`سفارش از فروشگاه آنتیک: ${names}`);
-  return `/contact?message=${msg}`;
+
+  if (!customer.customerName || !customer.customerPhone) {
+    // Fall back to dedicated checkout page
+    return "/checkout";
+  }
+
+  const items = cart.lineItems.map((l) => ({
+    productId: l.source?.catalogReference?.catalogItemId,
+    name: l.name?.original || "محصول",
+    quantity: l.quantityInfo?.confirmedQuantity || 1,
+    unitPrice: Number(l.pricing?.unitPrice?.amount || 0),
+    image: l.attributes?.image?.url,
+  }));
+
+  const res = await fetch(`${API}/orders/checkout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...customer, items }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "خطا در ثبت سفارش");
+  if (!data.paymentUrl) throw new Error("آدرس پرداخت دریافت نشد");
+  return data.paymentUrl;
 }
