@@ -19,6 +19,8 @@ import Contact from '@/pages/Contact';
 import Connect from '@/pages/Connect';
 import CurtainDetail from '@/pages/CurtainDetail';
 import DesignConsultant from '@/pages/DesignConsultant';
+import Login from '@/pages/Login';
+import Register from '@/pages/Register';
 import AdminLayout from '@/pages/admin/AdminLayout';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminModels from '@/pages/admin/AdminModels';
@@ -30,7 +32,7 @@ import AdminSettings from '@/pages/admin/AdminSettings';
 import { useSmoothScroll } from '@/hooks/useSmoothScroll';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError } = useAuth();
   useSmoothScroll();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -44,15 +46,14 @@ const AuthenticatedApp = () => {
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      navigateToLogin();
-      return null;
     }
   }
 
   return (
     <CartProvider>
       <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
           <Route path="/shop" element={<Shop />} />
