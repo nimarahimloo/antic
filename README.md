@@ -1,55 +1,55 @@
 # پرده آنتیک (antic)
 
-فرانت‌اند React + Vite + بک‌اند مستقل (بدون هیچ وابستگی به Base44).
+فرانت‌اند React + Vite + بک‌اند Express/Prisma — **بدون وابستگی به Base44، Wix یا CDN خارجی.**
+
+مناسب استقرار روی سرور ایران.
 
 ## معماری
 
 ```
-npm run dev          → Vite :5173  (فرانت)
-backend npm run dev  → API  :3001  (Express + Prisma)
+npm run dev          → Vite :5173
+backend npm run dev  → API  :3001
 Vite proxy: /api و /uploads → backend
 ```
 
-فروشگاه اکسسوری (`/shop`) همچنان از **Wix Headless** استفاده می‌کند (`src/rest/`).  
-مدل‌ها، پروژه‌ها، دسته‌ها، درخواست مشاوره، ادمین و آپلود از **بک‌اند خودمان** می‌آیند.
+| بخش | منبع داده |
+|------|-----------|
+| مدل پرده / پروژه / مشاوره / ادمین | بک‌اند خودت (`/api/entities`) |
+| فروشگاه اکسسوری `/shop` | بک‌اند (`/api/catalog`) |
+| سبد خرید | `localStorage` (بدون درگاه خارجی) |
+| فونت | سیستمی (Tahoma / Vazirmatn اگر روی OS باشد) |
 
-## پیش‌نیاز
+## راه‌اندازی
 
-- Node.js 20+
-
-## راه‌اندازی سریع
-
-### ۱. بک‌اند
+### بک‌اند
 
 ```bash
 cd backend
 cp .env.example .env
 npm install
-npm run db:setup    # prisma generate + db push + seed ادمین
+npm run db:setup   # بعد از هر تغییر schema
 npm run dev
 ```
 
-ادمین پیش‌فرض: `admin@antic.local` / `admin123`
+ادمین: `admin@antic.local` / `admin123`
 
-### ۲. فرانت
+### فرانت
 
 ```bash
-# از ریشه ریپو
 npm install
 npm run dev
 ```
 
-باز کن: http://localhost:5173
+http://localhost:5173 — ورود ادمین: `/login`
 
-ورود ادمین: http://localhost:5173/login
+## استقرار سرور ایران
 
-## Production
+1. `git clone` و `checkout dev`
+2. بک‌اند: `JWT_SECRET`، `CORS_ORIGIN=https://دامنه.ir`، `PUBLIC_BASE_URL=https://دامنه.ir`
+3. `npm run db:setup && npm start` (یا pm2)
+4. فرانت: `npm run build` → nginx روی `dist/` با پروکسی `/api` و `/uploads` به پورت ۳۰۰۱
 
-1. `DATABASE_URL` را به PostgreSQL واقعی تغییر بده.
-2. `JWT_SECRET` را تصادفی و بلند بگذار.
-3. `CORS_ORIGIN` را به دامنه واقعی محدود کن.
-4. فرانت: `npm run build` → سرو `dist/`.
-5. بک‌اند: `npm start`.
+پرداخت آنلاین هنوز وصل نیست؛ checkout سبد به صفحه تماس هدایت می‌شود.
 
 ## لایسنس
 

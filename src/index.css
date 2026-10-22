@@ -5,25 +5,25 @@
 @layer base {
   :root {
     /* لوکس — مشکی و طلایی */
-    --background: 0 0% 4.3%;            /* #0B0B0B مشکی عمیق */
-    --foreground: 38 36% 96%;          /* #F8F5F0 سفید نرم */
-    --card: 0 0% 8.6%;                 /* #161616 مشکی ثانویه */
+    --background: 0 0% 4.3%;
+    --foreground: 38 36% 96%;
+    --card: 0 0% 8.6%;
     --card-foreground: 38 36% 96%;
     --popover: 0 0% 6%;
     --popover-foreground: 38 36% 96%;
-    --primary: 46 67% 47%;             /* #C9A227 طلایی اصلی */
+    --primary: 46 67% 47%;
     --primary-foreground: 0 0% 4.3%;
-    --secondary: 0 0% 16.5%;            /* #2A2A2A خاکستری لوکس */
+    --secondary: 0 0% 16.5%;
     --secondary-foreground: 38 36% 96%;
     --muted: 0 0% 8.6%;
-    --muted-foreground: 38 18% 72%;    /* برنزی مات */
-    --accent: 47 78% 59%;              /* #E8C547 طلایی روشن */
+    --muted-foreground: 38 18% 72%;
+    --accent: 47 78% 59%;
     --accent-foreground: 0 0% 4.3%;
-    --royal-green: 46 67% 47%;         /* طلایی (جایگزین سبز) */
+    --royal-green: 46 67% 47%;
     --royal-green-foreground: 0 0% 4.3%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 38 36% 96%;
-    --border: 0 0% 16.5%;              /* #2A2A2A */
+    --border: 0 0% 16.5%;
     --input: 0 0% 16.5%;
     --ring: 46 67% 47%;
     --chart-1: 46 67% 47%;
@@ -32,9 +32,10 @@
     --chart-4: 38 36% 96%;
     --chart-5: 38 18% 72%;
     --radius: 0.75rem;
-    --font-heading: "Peyda", ui-sans-serif, system-ui, sans-serif;
-    --font-body: "Kalameh", ui-sans-serif, system-ui, sans-serif;
-    --font-display: "Peyda", ui-sans-serif, system-ui, sans-serif;
+    /* بدون CDN: فونت‌های سیستمی فارسی/لاتین */
+    --font-heading: "Vazirmatn", "Tahoma", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    --font-body: "Vazirmatn", "Tahoma", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    --font-display: "Vazirmatn", "Tahoma", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     --gold: #C9A227;
     --gold-light: #E8C547;
@@ -114,7 +115,6 @@
 }
 
 @layer components {
-  /* متن طلایی با گرادیان */
   .text-gold-gradient {
     background: linear-gradient(135deg, #E8C547 0%, #C9A227 45%, #A67C00 100%);
     -webkit-background-clip: text;
@@ -122,13 +122,11 @@
     -webkit-text-fill-color: transparent;
   }
 
-  /* خط طلایی نازک */
   .gold-rule {
     height: 1px;
     background: linear-gradient(90deg, transparent, #C9A227, transparent);
   }
 
-  /* دکمه طلایی */
   .btn-gold {
     @apply inline-flex items-center justify-center gap-2 rounded-full bg-primary px-7 py-3 font-display text-sm font-bold text-primary-foreground transition-all duration-300;
     box-shadow: 0 0 0 0 rgba(201, 162, 39, 0);
@@ -143,7 +141,6 @@
     outline-offset: 2px;
   }
 
-  /* دکمه طرح طلایی */
   .btn-ghost-gold {
     @apply inline-flex items-center justify-center gap-2 rounded-full border border-primary/60 px-7 py-3 font-display text-sm font-bold text-primary transition-all duration-300;
     background: transparent;
@@ -157,7 +154,6 @@
     outline-offset: 2px;
   }
 
-  /* دکمه طرح (جایگزین سبز — اکنون طلایی) */
   .btn-ghost-green {
     @apply inline-flex items-center justify-center gap-2 rounded-full border border-primary/60 px-7 py-3 font-display text-sm font-bold text-primary transition-all duration-300;
     background: transparent;
@@ -171,14 +167,12 @@
     outline-offset: 2px;
   }
 
-  /* نشانه‌گذاری بخش */
   .eyebrow {
     @apply font-display text-xs font-bold uppercase text-primary;
   }
 }
 
 @layer utilities {
-  /* انیمیشن پرده‌وار */
   .animate-curtain {
     animation: curtainReveal 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
@@ -203,7 +197,6 @@
     to { opacity: 1; }
   }
 
-  /* نشت نور هنگام هاور */
   .light-leak {
     position: relative;
     overflow: hidden;
