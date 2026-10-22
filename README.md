@@ -1,61 +1,55 @@
 # پرده آنتیک (antic)
 
-فرانت‌اند React + Vite برای فروشگاه و کاتالوگ تعاملی پرده.
+فرانت‌اند React + Vite + بک‌اند مستقل (بدون هیچ وابستگی به Base44).
 
-**Phase 1 — مستقل از Base44:** وابستگی runtime به `@base44/sdk` و `@base44/vite-plugin` حذف شده. دیتای entityها در حافظه / `localStorage` (mock) نگهداری می‌شود تا UI و ادمین بدون سرور Base44 بالا بیاید.
+## معماری
 
-فروشگاه محصولات اکسسوری همچنان از **Wix Headless REST** (`src/rest/`) استفاده می‌کند.
+```
+npm run dev          → Vite :5173  (فرانت)
+backend npm run dev  → API  :3001  (Express + Prisma)
+Vite proxy: /api و /uploads → backend
+```
+
+فروشگاه اکسسوری (`/shop`) همچنان از **Wix Headless** استفاده می‌کند (`src/rest/`).  
+مدل‌ها، پروژه‌ها، دسته‌ها، درخواست مشاوره، ادمین و آپلود از **بک‌اند خودمان** می‌آیند.
 
 ## پیش‌نیاز
 
 - Node.js 20+
-- npm
 
-## نصب و اجرا
+## راه‌اندازی سریع
+
+### ۱. بک‌اند
 
 ```bash
+cd backend
+cp .env.example .env
+npm install
+npm run db:setup    # prisma generate + db push + seed ادمین
+npm run dev
+```
+
+ادمین پیش‌فرض: `admin@antic.local` / `admin123`
+
+### ۲. فرانت
+
+```bash
+# از ریشه ریپو
 npm install
 npm run dev
 ```
 
-آدرس پیش‌فرض: [http://localhost:5173](http://localhost:5173)
+باز کن: http://localhost:5173
 
-```bash
-npm run build    # خروجی production در dist/
-npm run preview  # پیش‌نمایش build
-```
+ورود ادمین: http://localhost:5173/login
 
-## ساختار مهم
+## Production
 
-| مسیر | توضیح |
-|------|--------|
-| `src/api/base44Client.js` | mock جایگزین Base44 (entities / auth / functions) — Phase 2 با API واقعی عوض می‌شود |
-| `src/rest/` | کلاینت Wix Stores (کاتالوگ و سبد) |
-| `src/pages/` | صفحات عمومی + `/admin` |
-| `src/lib/catalogData.js` | داده استاتیک دسته‌بندی‌های کاتالوگ |
-| `base44/` | اسکیمای entityهای قدیمی (مرجع؛ runtime دیگر به آن وابسته نیست) |
-
-## متغیرهای محیطی (اختیاری)
-
-فایل `.env` در ریشه:
-
-```env
-VITE_APP_ID=antic-local
-VITE_APP_BASE_URL=http://localhost:5173
-# Wix (اگر فروشگاه را به سایت واقعی وصل می‌کنی):
-# در src/rest/wix-config.js مقدار WIX_CLIENT_ID را ست کن
-```
-
-## احراز هویت محلی
-
-در حالت فعلی همیشه یک کاربر dev (`dev@antic.local`) لاگین فرض می‌شود تا صفحات و پنل ادمین بدون ریدایرکت Base44 باز شوند. CRUD ادمین روی mock کار می‌کند و در `localStorage` با پیشوند `antic-mock-` ذخیره می‌شود.
-
-## فاز بعدی (Phase 2)
-
-- بک‌اند مستقل (Express/Prisma یا مشابه)
-- جایگزینی mock با HTTP واقعی
-- auth واقعی (JWT / session)
-- آپلود فایل و توابع generate*
+1. `DATABASE_URL` را به PostgreSQL واقعی تغییر بده.
+2. `JWT_SECRET` را تصادفی و بلند بگذار.
+3. `CORS_ORIGIN` را به دامنه واقعی محدود کن.
+4. فرانت: `npm run build` → سرو `dist/`.
+5. بک‌اند: `npm start`.
 
 ## لایسنس
 

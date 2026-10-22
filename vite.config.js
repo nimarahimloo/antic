@@ -5,7 +5,6 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -16,5 +15,15 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    proxy: {
+      "/api": {
+        target: process.env.VITE_PROXY_TARGET || "http://localhost:3001",
+        changeOrigin: true,
+      },
+      "/uploads": {
+        target: process.env.VITE_PROXY_TARGET || "http://localhost:3001",
+        changeOrigin: true,
+      },
+    },
   },
 });
