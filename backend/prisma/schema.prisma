@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String?
+  role         String   @default("user")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model CurtainModel {
+  id             String   @id @default(cuid())
+  code           String
+  name           String
+  categorySlug   String
+  subcategory    String?
+  fabric         String?
+  color          String?
+  colorCode      String?
+  material       String?
+  texture        String?
+  image          String?
+  installImage   String?
+  installStatus  String?
+  installScore   Float?
+  installReview  String?
+  installPending String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([categorySlug])
+  @@index([code])
+}
+
+model CurtainCategory {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  image         String?
+  order         Int      @default(0)
+  subcategories String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Project {
+  id           String   @id @default(cuid())
+  title        String
+  spaceType    String
+  description  String?
+  location     String?
+  date         String?
+  coverImage   String?
+  images       String?
+  productsUsed String?
+  featured     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([spaceType])
+}
+
+model ConsultationRequest {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  city      String?
+  spaceType String?
+  message   String?
+  reference String?
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model RenderTemplate {
+  id        String   @id @default(cuid())
+  style     String
+  image     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([style])
+}
+
+model InstallReference {
+  id        String   @id @default(cuid())
+  style     String
+  image     String
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([style])
+}
+
+model SavedDesign {
+  id               String   @id @default(cuid())
+  title            String
+  image            String
+  curtainStyle     String?
+  curtainModelId   String?
+  curtainModelCode String?
+  color            String?
+  designerName     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model VirtualWindowSetting {
+  id         String   @id @default(cuid())
+  wallColor  String?
+  frameColor String?
+  railColor  String?
+  viewImage  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
