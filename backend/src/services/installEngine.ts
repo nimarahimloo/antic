@@ -23,7 +23,6 @@ export type RenderInput = {
   maxWidth?: number;
   fabricScale?: number;
   material?: string;
-  /** style key for tile heuristics */
   style?: string;
 };
 
@@ -32,7 +31,6 @@ export type RenderResult = {
   publicPath: string;
   width: number;
   height: number;
-  /** 0–10 quality estimate (coverage, key strength, fold signal) */
   qualityScore: number;
   coverage: number;
 };
@@ -118,7 +116,6 @@ function materialParams(material?: string, logStd?: number) {
   }
 }
 
-/** style-aware vertical hang bias (pattern starts from top of fabric zone) */
 function styleTileFactor(style?: string) {
   switch (style) {
     case "zebra":
@@ -158,7 +155,6 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  // Analyze like browser analyzeTemplate
   let sumLin = 0;
   let nKey = 0;
   let top = info.height;
@@ -199,7 +195,6 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
     top: 1 - top / info.height,
     logStd,
   };
-  // keep last few templates only
   if (templateCache.size > 24) {
     const first = templateCache.keys().next().value;
     if (first) templateCache.delete(first);
@@ -208,53 +203,6 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
   return entry;
 }
 
-function sampleFabBilinear(
-  fd: Buffer,
-  fw: number,
-  fh: number,
-  u: number,
-  v: number
-): [number, number, number] {
-  // u,v in pixel space of fabric tile
-  let x = u % fw;
-  if (x < 0) x += fw;
-  let y = v % fh;
-  if (y < 0) y += fh;
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const x1 = (x0 + 1) % fw;
-  const y1 = (y0 + 1) % fh;
-  const fx = x - x0;
-  const fy = y - y0;
-
-  const at = (xx: number, yy: number) => {
-    const i = (yy * fw + xx) * 4;
-    return [fd[i], fd[i + 1], fd[i + 2]] as const;
-  };
-  const c00 = at(x0, y0);
-  const c10 = at(x1, y0);
-  const c01 = at(x0, y1);
-  const c11 = at(x1, y1);
-
-  const r =
-    c00[0] * (1 - fx) * (1 - fy) +
-    c10[0] * fx * (1 - fy) +
-    c01[0] * (1 - fx) * fy +
-    c11[0] * fx * fy;
-  const g =
-    c00[1] * (1 - fx) * (1 - fy) +
-    c10[1] * fx * (1 - fy) +
-    c01[1] * (1 - fx) * fy +
-    c11[1] * fx * fy;
-  const b =
-    c00[2] * (1 - fx) * (1 - fy) +
-    c10[2] * fx * (1 - fy) +
-    c01[2] * (1 - fx) * fy +
-    c11[2] * fx * fy;
-  return [r, g, b];
-}
-
-// fix typo - I used n11 instead of c11 for blue channel
 function sampleFab(
   fd: Buffer,
   fw: number,
@@ -305,7 +253,6 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const fabMeta = await sharp(fabricBuf).metadata();
   const aspect = (fabMeta.width || 1) / (fabMeta.height || 1);
 
-  // Larger tile for patterned fabrics → less mosaic; cap for RAM
   const fabW = Math.max(128, Math.min(640, Math.round(tpl.w * fabricScale)));
   const fabH = Math.max(128, Math.min(640, Math.round(fabW / aspect)));
 
@@ -315,7 +262,6 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  // Fabric mean in linear space for lighting flatten
   let meanR = 0,
     meanG = 0,
     meanB = 0,
@@ -331,15 +277,11 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   meanG = nF ? meanG / nF : 0.4;
   meanB = nF ? meanB / nF : 0.4;
 
-  // Local average approx: 5x5 box on fabric is expensive; use global mean as LOD substitute
-  // (shader uses mipmap LOD — good enough on server)
-
   const w = tpl.w;
   const h = tpl.h;
   const td = tpl.data;
   const out = Buffer.alloc(w * h * 4);
 
-  // tile size in pixels of output (like uTile in shader)
   const tileX = w * fabricScale * 0.42;
   const tileY = tileX / aspect;
 
@@ -370,10 +312,8 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       keySum += key;
       keyN++;
 
-      // linear shade from green channel
       let s = toLin(pg) / tpl.meanLin;
 
-      // neighbours for gradient + micro detail
       const iL = (y * w + Math.max(0, x - 1)) * 4;
       const iR = (y * w + Math.min(w - 1, x + 1)) * 4;
       const iU = (Math.max(0, y - 1) * w + x) * 4;
@@ -384,78 +324,64 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       const gy = sh(iD) - sh(iU);
       const slope = smoothstep(0.15, 0.9, Math.hypot(gx, gy));
 
-      // micro-fold: local vs neighbourhood
       const blurS = (sh(iL) + sh(iR) + sh(iU) + sh(iD) + s) / 5;
-      s *= Math.pow(clamp01(s / Math.max(blurS, 0.02) / 2 + 0.5), mat.detail); // keep range
+      const micro = clamp01(s / Math.max(blurS, 0.02));
+      s *= Math.pow(Math.min(2, Math.max(0.5, micro)), mat.detail);
       s = Math.pow(Math.max(s, 0), mat.contrast);
 
-      // UV: hang from template top (fabric zone)
-      const px = x;
-      const py = (tpl.top - y / h) * h; // relative to fabric top
-      let u = px / tileX + gx * 0.12;
-      let v = py / tileY;
+      const py = (tpl.top - y / h) * h;
+      const u = x / tileX + gx * 0.12;
+      const v = py / tileY;
 
-      let [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u * fi.width, v * fi.height);
+      const [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u * fi.width, v * fi.height);
 
-      // to linear + flatten lighting toward mean
-      let flr = toLin(fr);
-      let flg = toLin(fg);
-      let flb = toLin(fb);
-      const ratioR = clamp01(flr / Math.max(meanR, 0.003));
-      const ratioG = clamp01(flg / Math.max(meanG, 0.003));
-      const ratioB = clamp01(flb / Math.max(meanB, 0.003));
-      const flatR = meanR * Math.min(1.5, Math.max(0.6, ratioR * 1.05));
-      const flatG = meanG * Math.min(1.5, Math.max(0.6, ratioG * 1.05));
-      const flatB = meanB * Math.min(1.5, Math.max(0.6, ratioB * 1.05));
+      const flr = toLin(fr);
+      const flg = toLin(fg);
+      const flb = toLin(fb);
+      const ratioR = flr / Math.max(meanR, 0.003);
+      const ratioG = flg / Math.max(meanG, 0.003);
+      const ratioB = flb / Math.max(meanB, 0.003);
+      const flatR = meanR * Math.min(1.5, Math.max(0.6, ratioR));
+      const flatG = meanG * Math.min(1.5, Math.max(0.6, ratioG));
+      const flatB = meanB * Math.min(1.5, Math.max(0.6, ratioB));
 
       let cr = flatR * s;
       let cg = flatG * s;
       let cb = flatB * s;
 
       if (mat.id === 1) {
-        // velvet
         const sv = s < 1 ? Math.pow(s, 1.25) : 1 + (s - 1) * 0.45;
-        cr = flatR * sv * (1 + mat.sheen * slope * 0.5);
-        cg = flatG * sv * (1 + mat.sheen * slope * 0.5);
-        cb = flatB * sv * (1 + mat.sheen * slope * 0.5);
+        const mul = sv * (1 + mat.sheen * slope * 0.5);
+        cr = flatR * mul;
+        cg = flatG * mul;
+        cb = flatB * mul;
       } else if (mat.id === 2) {
-        // silk highlight on crowns
         const hl = mat.sheen * smoothstep(1.05, 1.7, s) * 0.5;
         cr = flatR * s + hl * (0.4 * flatR + 0.6);
         cg = flatG * s + hl * (0.4 * flatG + 0.6);
         cb = flatB * s + hl * (0.4 * flatB + 0.6);
       } else if (mat.id === 3) {
-        // sheer: mix daylight
         const light = Math.min(1.6, s);
-        const lr = 1.0 * light;
-        const lg = 0.98 * light;
-        const lb = 0.94 * light;
-        cr = flatR * s * 0.55 + (0.4 * flatR + 0.6) * lr * 0.45;
-        cg = flatG * s * 0.55 + (0.4 * flatG + 0.6) * lg * 0.45;
-        cb = flatB * s * 0.55 + (0.4 * flatB + 0.6) * lb * 0.45;
+        cr = flatR * s * 0.55 + (0.4 * flatR + 0.6) * light * 0.45;
+        cg = flatG * s * 0.55 + (0.4 * flatG + 0.6) * 0.98 * light * 0.45;
+        cb = flatB * s * 0.55 + (0.4 * flatB + 0.6) * 0.94 * light * 0.45;
       }
 
-      // despill background
       const desR = toLin(pr);
       const desG = toLin(Math.min(pg, Math.max(pr, pb)));
       const desB = toLin(pb);
 
-      const outR = desR * (1 - key) + cr * key;
-      const outG = desG * (1 - key) + cg * key;
-      const outB = desB * (1 - key) + cb * key;
-
-      out[i] = toSrgb(outR);
-      out[i + 1] = toSrgb(outG);
-      out[i + 2] = toSrgb(outB);
+      out[i] = toSrgb(desR * (1 - key) + cr * key);
+      out[i + 1] = toSrgb(desG * (1 - key) + cg * key);
+      out[i + 2] = toSrgb(desB * (1 - key) + cb * key);
       out[i + 3] = pa;
     }
   }
 
-  // Quality score 0–10
   const avgKey = keyN ? keySum / keyN : 0;
-  const coverageScore = Math.min(1, tpl.coverage / 0.25) * 4; // up to 4
-  const keyScore = avgKey * 3; // up to 3
-  const foldScore = Math.min(1, tpl.logStd / 0.2) * 3; // up to 3
+  const coverageScore = Math.min(1, tpl.coverage / 0.25) * 4;
+  const keyScore = avgKey * 3;
+  const foldScore = Math.min(1, tpl.logStd / 0.2) * 3;
   const qualityScore = Math.round(Math.min(10, coverageScore + keyScore + foldScore) * 10) / 10;
 
   const fileName = `install-${Date.now()}-${randomUUID().slice(0, 8)}.jpg`;
