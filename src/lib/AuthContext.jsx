@@ -1,13 +1,8 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { base44, clearToken, setToken } from "@/api/base44Client";
 
 const AuthContext = createContext();
 
-/**
- * Phase 1 auth: no Base44 dependency.
- * Always treats the session as a local dev user so public pages and /admin
- * load without login redirects. Phase 2 will wire real JWT/session auth.
- */
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -26,17 +21,21 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
 
-      const publicSettings = await base44.app.getPublicSettings();
-      setAppPublicSettings(publicSettings);
+      try {
+        const publicSettings = await base44.app.getPublicSettings();
+        setAppPublicSettings(publicSettings);
+      } catch (e) {
+        console.warn("Public settings unavailable (backend offline?)", e);
+        setAppPublicSettings({
+          id: "antic",
+          public_settings: { app_name: "پرده آنتیک", locale: "fa" },
+        });
+      }
       setIsLoadingPublicSettings(false);
-
       await checkUserAuth();
     } catch (error) {
       console.error("App state check failed:", error);
-      setAuthError({
-        type: "unknown",
-        message: error.message || "Failed to load app",
-      });
+      setAuthError({ type: "unknown", message: error.message || "Failed to load app" });
       setIsLoadingPublicSettings(false);
       setIsLoadingAuth(false);
       setAuthChecked(true);
@@ -49,8 +48,7 @@ export const AuthProvider = ({ children }) => {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
-    } catch (error) {
-      console.error("User auth check failed:", error);
+    } catch {
       setUser(null);
       setIsAuthenticated(false);
     } finally {
@@ -59,9 +57,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const login = async (email, password) => {
+    const res = await base44.auth.login(email, password);
+    setUser(res.user);
+    setIsAuthenticated(true);
+    setAuthError(null);
+    return res;
+  };
+
+  const register = async (email, password, full_name) => {
+    const res = await base44.auth.register(email, password, full_name);
+    setUser(res.user);
+    setIsAuthenticated(true);
+    setAuthError(null);
+    return res;
+  };
+
   const logout = (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
+    clearToken();
     if (shouldRedirect) {
       base44.auth.logout(window.location.origin + "/");
     } else {
@@ -70,7 +85,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const navigateToLogin = () => {
-    // Local mode: no external login provider.
     base44.auth.redirectToLogin(window.location.href);
   };
 
@@ -84,10 +98,13 @@ export const AuthProvider = ({ children }) => {
         authError,
         appPublicSettings,
         authChecked,
+        login,
+        register,
         logout,
         navigateToLogin,
         checkUserAuth,
         checkAppState,
+        setToken,
       }}
     >
       {children}
