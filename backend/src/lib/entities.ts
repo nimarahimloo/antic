@@ -54,6 +54,22 @@ export function isEntityName(name: string): name is EntityName {
   return name in ENTITY_MAP;
 }
 
+const SORTABLE: Record<string, true> = {
+  createdAt: true,
+  updatedAt: true,
+  name: true,
+  title: true,
+  order: true,
+  code: true,
+  slug: true,
+  categorySlug: true,
+  spaceType: true,
+  status: true,
+  featured: true,
+  style: true,
+  email: true,
+};
+
 export function parseSort(sortBy?: string): Record<string, "asc" | "desc"> {
   if (!sortBy) return { createdAt: "desc" };
   const desc = sortBy.startsWith("-");
@@ -68,6 +84,7 @@ export function parseSort(sortBy?: string): Record<string, "asc" | "desc"> {
     order: "order",
   };
   key = map[key] || key;
+  if (!SORTABLE[key]) return { createdAt: "desc" };
   return { [key]: desc ? "desc" : "asc" };
 }
 
@@ -80,7 +97,9 @@ export function parseFilter(filter: Record<string, unknown> = {}) {
   };
   const where: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(filter)) {
-    if (v === undefined) continue;
+    if (v === undefined || v === null || v === "") continue;
+    // reject nested operators for safety (no $gt injection via filter JSON)
+    if (typeof v === "object") continue;
     where[map[k] || k] = v;
   }
   return where;

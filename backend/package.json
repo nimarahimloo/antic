@@ -9,7 +9,8 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:setup": "prisma generate && prisma db push && tsx prisma/seed.ts"
+    "db:setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
+    "smoke": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",

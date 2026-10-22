@@ -14,15 +14,20 @@ const credsSchema = z.object({
   full_name: z.string().optional(),
 });
 
+function normEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 router.post("/register", async (req, res) => {
   try {
     const body = credsSchema.parse(req.body);
-    const existing = await prisma.user.findUnique({ where: { email: body.email } });
+    const email = normEmail(body.email);
+    const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) throw new HttpError(409, "Email already registered");
 
     const user = await prisma.user.create({
       data: {
-        email: body.email,
+        email,
         passwordHash: await hashPassword(body.password),
         fullName: body.full_name || null,
         role: "user",
@@ -38,7 +43,8 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const body = z.object({ email: z.string().email(), password: z.string() }).parse(req.body);
-    const user = await prisma.user.findUnique({ where: { email: body.email } });
+    const email = normEmail(body.email);
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !(await verifyPassword(body.password, user.passwordHash))) {
       throw new HttpError(401, "Invalid email or password");
     }

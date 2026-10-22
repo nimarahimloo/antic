@@ -56,7 +56,6 @@ const checkoutSchema = z.object({
     .min(1),
 });
 
-/** POST /api/orders/checkout */
 router.post("/checkout", async (req, res) => {
   try {
     const body = checkoutSchema.parse(req.body);
@@ -84,13 +83,14 @@ router.post("/checkout", async (req, res) => {
       },
     });
 
-    // Demo mode: no merchant — mark paid and send result URL
     if (!MERCHANT) {
+      // Unique authority per order (schema has @unique on authority)
+      const demoAuth = `DEMO-${order.id}`;
       await prisma.order.update({
         where: { id: order.id },
-        data: { status: "paid", refId: "DEMO", authority: "DEMO" },
+        data: { status: "paid", refId: `DEMO-${order.id.slice(-6)}`, authority: demoAuth },
       });
-      const demoUrl = `${frontBase()}/checkout/result?orderId=${order.id}&Status=OK&RefID=DEMO`;
+      const demoUrl = `${frontBase()}/checkout/result?orderId=${order.id}&Status=OK&RefID=DEMO-${order.id.slice(-6)}`;
       return res.json({
         orderId: order.id,
         paymentUrl: demoUrl,
@@ -144,7 +144,6 @@ router.post("/checkout", async (req, res) => {
   }
 });
 
-/** GET /api/orders/zarinpal/callback */
 router.get("/zarinpal/callback", async (req, res) => {
   try {
     const orderId = String(req.query.orderId || "");
@@ -174,11 +173,14 @@ router.get("/zarinpal/callback", async (req, res) => {
     }
 
     if (!MERCHANT) {
+      const demoAuth = authority || `DEMO-${orderId}`;
       await prisma.order.update({
         where: { id: orderId },
-        data: { status: "paid", refId: "DEMO", authority: authority || "DEMO" },
+        data: { status: "paid", refId: `DEMO-${orderId.slice(-6)}`, authority: demoAuth },
       });
-      return res.redirect(`${FRONT}/checkout/result?Status=OK&orderId=${orderId}&RefID=DEMO`);
+      return res.redirect(
+        `${FRONT}/checkout/result?Status=OK&orderId=${orderId}&RefID=DEMO-${orderId.slice(-6)}`
+      );
     }
 
     const verifyRes = await fetch(zarinpalApi("verify.json"), {
@@ -215,7 +217,6 @@ router.get("/zarinpal/callback", async (req, res) => {
   }
 });
 
-/** Admin list — must be before /:id */
 router.get("/", requireAdmin, async (_req: AuthedRequest, res) => {
   try {
     const rows = await prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
@@ -236,18 +237,23 @@ router.get("/", requireAdmin, async (_req: AuthedRequest, res) => {
   }
 });
 
-/** Public order lookup */
 router.get("/:id", async (req, res) => {
   try {
     const order = await prisma.order.findUnique({ where: { id: req.params.id } });
     if (!order) throw new HttpError(404, "سفارش پیدا نشد");
+    let items: unknown[] = [];
+    try {
+      items = JSON.parse(order.itemsJson);
+    } catch {
+      items = [];
+    }
     res.json({
       id: order.id,
       status: order.status,
       amountToman: order.amountToman,
       refId: order.refId,
       customerName: order.customerName,
-      items: JSON.parse(order.itemsJson),
+      items,
       createdAt: order.createdAt,
     });
   } catch (err) {

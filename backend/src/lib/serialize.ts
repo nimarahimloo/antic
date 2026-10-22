@@ -32,6 +32,64 @@ const JSON_FIELDS = new Set([
   "products_used",
 ]);
 
+/** Whitelist of writable Prisma fields per entity (camelCase). Prevents Prisma unknown-arg crashes. */
+const ALLOWED: Record<string, Set<string>> = {
+  CurtainModel: new Set([
+    "code",
+    "name",
+    "categorySlug",
+    "subcategory",
+    "fabric",
+    "color",
+    "colorCode",
+    "material",
+    "texture",
+    "image",
+    "installImage",
+    "installStatus",
+    "installScore",
+    "installReview",
+    "installPending",
+    "description",
+  ]),
+  CurtainCategory: new Set(["name", "slug", "description", "image", "order", "subcategories"]),
+  Project: new Set([
+    "title",
+    "spaceType",
+    "description",
+    "location",
+    "date",
+    "coverImage",
+    "images",
+    "productsUsed",
+    "featured",
+  ]),
+  ConsultationRequest: new Set([
+    "name",
+    "phone",
+    "email",
+    "city",
+    "spaceType",
+    "message",
+    "reference",
+    "status",
+  ]),
+  RenderTemplate: new Set(["style", "image"]),
+  InstallReference: new Set(["style", "image", "note"]),
+  SavedDesign: new Set([
+    "title",
+    "image",
+    "curtainStyle",
+    "curtainModelId",
+    "curtainModelCode",
+    "color",
+    "designerName",
+  ]),
+  VirtualWindowSetting: new Set(["wallColor", "frameColor", "railColor", "viewImage"]),
+  // User writes blocked via entities route — not listed for mutation
+  User: new Set([]),
+};
+
 export function toApi(row: AnyRec | null | undefined): AnyRec | null {
   if (!row) return null;
   const out: AnyRec = {};
@@ -67,19 +125,34 @@ export function fromApi(body: AnyRec, entity: string): AnyRec {
     reverse[snake] = camel;
   }
 
+  const allowed = ALLOWED[entity];
   const out: AnyRec = {};
+
   for (const [k, v] of Object.entries(body)) {
-    if (k === "id" || k === "created_date" || k === "updated_date") continue;
-    if (k === "password" || k === "password_hash") continue;
+    if (v === undefined) continue;
+    if (k === "id" || k === "created_date" || k === "updated_date" || k === "createdAt" || k === "updatedAt")
+      continue;
+    if (k === "password" || k === "password_hash" || k === "passwordHash") continue;
+
     const camel = reverse[k] || k;
+    if (allowed && !allowed.has(camel)) continue;
+
     if (JSON_FIELDS.has(camel) || JSON_FIELDS.has(k)) {
       out[camel] = typeof v === "string" ? v : JSON.stringify(v ?? null);
+    } else if (camel === "featured" || camel === "visible" || camel === "inStock") {
+      out[camel] = v === true || v === "true" || v === 1 || v === "1";
+    } else if (camel === "order" || camel === "installScore" || camel === "sortOrder") {
+      const n = Number(v);
+      out[camel] = Number.isFinite(n) ? n : v;
+    } else if (v === null || v === "") {
+      // optional clears
+      out[camel] = null;
     } else {
       out[camel] = v;
     }
   }
 
-  if (entity === "ConsultationRequest" && out.status == null) {
+  if (entity === "ConsultationRequest" && (out.status == null || out.status === "")) {
     out.status = "new";
   }
   if (entity === "Project" && out.featured == null) {

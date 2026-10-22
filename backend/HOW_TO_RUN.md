@@ -1,15 +1,6 @@
 # antic-backend
 
-بک‌اند مستقل پرده آنتیک — جایگزین کامل Base44.
-
-## Stack
-
-- Node.js + Express + Prisma
-- SQLite (لوکال) / می‌توانی `DATABASE_URL` را به PostgreSQL ببری
-- JWT auth + bcrypt
-- آپلود فایل محلی در `uploads/`
-
-## اجرا
+## Setup
 
 ```bash
 cd backend
@@ -20,22 +11,22 @@ npm run dev
 ```
 
 API: http://localhost:3001  
-Health: http://localhost:3001/api/health
+Admin seed: `admin@antic.local` / `admin123`
 
-ادمین پیش‌فرض: `admin@antic.local` / `admin123`
+## Smoke test
 
-## اندپوینت‌ها
+با سرور در حال اجرا:
 
-| مسیر | توضیح |
-|------|--------|
-| `POST /api/auth/login` | ورود |
-| `POST /api/auth/register` | ثبت‌نام |
-| `GET /api/auth/me` | کاربر جاری (Bearer) |
-| `GET/POST /api/entities/:Entity` | CRUD موجودیت‌ها |
-| `GET/PUT/DELETE /api/entities/:Entity/:id` | یک رکورد |
-| `GET /api/entities/:Entity/count` | تعداد |
-| `POST /api/upload` | آپلود (ادمین) |
-| `POST /api/functions/:name` | توابع stub |
-| `GET /api/app/public-settings` | تنظیمات عمومی |
+```bash
+npm run smoke
+# یا
+BASE=http://localhost:3001 npm run smoke
+```
 
-موجودیت‌ها: `CurtainModel`, `CurtainCategory`, `Project`, `ConsultationRequest`, `RenderTemplate`, `InstallReference`, `SavedDesign`, `VirtualWindowSetting`, `User`
+این اسکریپت چک می‌کند: health، login ادمین، entities، مشاوره، کاتالوگ، checkout دمو (دو بار برای unique authority)، سفارش‌ها.
+
+## Production notes
+
+- `JWT_SECRET` را حتماً عوض کنید
+- `CORS_ORIGIN` و `FRONTEND_URL` و `PUBLIC_BASE_URL` را دامنه واقعی بگذارید
+- برای Postgres: در `schema.prisma` provider را `postgresql` کنید و `DATABASE_URL` را ست کنید
