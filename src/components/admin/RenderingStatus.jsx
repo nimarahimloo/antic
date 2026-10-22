@@ -28,7 +28,6 @@ export default function RenderingStatus() {
         setQueue(d.queue || null);
       })
       .catch(() => {
-        // fallback to entity counts
         Promise.all([
           base44.entities.CurtainModel.count({}),
           base44.entities.CurtainModel.count({ install_status: "approved" }),
@@ -50,7 +49,6 @@ export default function RenderingStatus() {
     load();
   }, [load]);
 
-  // poll queue while running
   useEffect(() => {
     if (!queue?.running) return;
     const t = setInterval(() => {
@@ -61,7 +59,7 @@ export default function RenderingStatus() {
           if (!q.running) load();
         })
         .catch(() => {});
-    }, 1500);
+    }, 1200);
     return () => clearInterval(t);
   }, [queue?.running, load]);
 
@@ -76,7 +74,7 @@ export default function RenderingStatus() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "خطا");
-      setMsg(`${data.queued} مدل در صف تولید قرار گرفت.`);
+      setMsg(`${data.queued} مدل در صف موتور v2 قرار گرفت. نمونه‌های با امتیاز بالا خودکار تأیید می‌شوند.`);
       setQueue(data.state);
       load();
     } catch (e) {
@@ -91,7 +89,7 @@ export default function RenderingStatus() {
     { label: "تأییدشده", value: stats?.approved, icon: Check, color: "text-primary" },
     { label: "ردشده", value: stats?.rejected, icon: X, color: "text-destructive" },
     {
-      label: "بدون نمونه نصب",
+      label: "بدون نمونه",
       value: stats?.missingInstall,
       icon: Clock,
       color: "text-muted-foreground",
@@ -102,9 +100,9 @@ export default function RenderingStatus() {
     <div className="rounded-2xl border border-secondary/60 bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-sm font-black text-foreground">موتور داخلی تولید نمونه</h2>
+          <h2 className="font-display text-sm font-black text-foreground">موتور تولید نمونه v2</h2>
           <p className="mt-1 font-body text-xs text-muted-foreground">
-            رایگان · بدون سرویس خارجی · فقط با دستور ادمین
+            دقت بالاتر · کش قالب · امتیاز کیفیت · تأیید خودکار در امتیاز خوب
           </p>
         </div>
         <Link
@@ -129,10 +127,11 @@ export default function RenderingStatus() {
 
       {queue?.running && (
         <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
-          <div className="flex items-center gap-2 font-body text-xs text-primary">
+          <div className="flex flex-wrap items-center gap-2 font-body text-xs text-primary">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            در حال تولید: {queue.processed}/{queue.total}
+            تولید: {queue.processed}/{queue.total}
             {queue.failed ? ` · خطا: ${queue.failed}` : ""}
+            {queue.avgScore != null ? ` · میانگین امتیاز: ${queue.avgScore}` : ""}
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary/60">
             <div
@@ -153,7 +152,7 @@ export default function RenderingStatus() {
           className="inline-flex items-center gap-1.5 rounded-lg border border-primary/50 bg-primary/10 px-3 py-2 font-body text-[11px] text-primary disabled:opacity-40"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-          تولید ۵۰ مدلِ بدون نمونه
+          تولید ۵۰ مدل
         </button>
         <button
           type="button"
@@ -167,23 +166,26 @@ export default function RenderingStatus() {
           type="button"
           disabled={busy || queue?.running}
           onClick={() => {
-            if (window.confirm("همه نمونه‌های موجود دوباره ساخته شوند؟")) {
+            if (window.confirm("فقط نمونه‌های ضعیف/ردشده دوباره ساخته شوند؟")) {
               startBatch({ limit: 100, regenerate: true });
             }
           }}
           className="inline-flex items-center gap-1.5 rounded-lg border border-secondary/70 px-3 py-2 font-body text-[11px] text-muted-foreground disabled:opacity-40"
         >
-          <RefreshCw className="h-3.5 w-3.5" /> بازتولید ۱۰۰تایی
+          <RefreshCw className="h-3.5 w-3.5" /> بازتولید اجباری ۱۰۰
         </button>
       </div>
 
       {msg && <p className="mt-3 font-body text-[11px] text-primary">{msg}</p>}
 
       <p className="mt-4 font-body text-[11px] leading-5 text-muted-foreground">
-        موتور داخلی مثل یک AI رایگان روی سرور خودتان کار می‌کند: قالب سبز هر سبک + عکس پارچه مدل → نمونه نصب.
-        مشتری فقط نمونه‌های <strong>تأییدشده</strong> را می‌بیند. تولید خودکار برای بازدیدکننده خاموش است.
-        {stats?.templates != null && (
-          <> · قالب‌های chroma: <strong>{stats.templates}</strong></>
+        موتور v2 با فضای رنگی خطی، کلیدینگ نرم و نمونه‌برداری دوخطی پارچه کار می‌کند. اگر امتیاز ≥ ۷ باشد
+        نمونه <strong>خودکار تأیید</strong> می‌شود تا مجبور نباشید هی بازتولید بزنید. قالب سبز باکیفیت = دقت بالاتر.
+        {stats?.missingTemplates?.length > 0 && (
+          <>
+            {" "}
+            قالب‌های ناقص: <strong>{stats.missingTemplates.join(", ")}</strong>
+          </>
         )}
       </p>
     </div>
