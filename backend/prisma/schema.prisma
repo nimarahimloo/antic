@@ -130,3 +130,41 @@ model VirtualWindowSetting {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
+
+/// Shop products (accessories) — fully local, replaces Wix Stores
+model Product {
+  id             String   @id @default(cuid())
+  name           String
+  slug           String   @unique
+  description    String?
+  price          Float    @default(0)
+  compareAtPrice Float?
+  currency       String   @default("IRR")
+  image          String?
+  gallery        String?  // JSON string[]
+  categoryId     String?
+  visible        Boolean  @default(true)
+  inStock        Boolean  @default(true)
+  stock          Int      @default(100)
+  ribbon         String?
+  optionsJson    String?  // JSON product options
+  variantsJson   String?  // JSON variants
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([visible])
+}
+
+model ShopCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  image       String?
+  visible     Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
