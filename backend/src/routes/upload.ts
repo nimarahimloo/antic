@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { requireAdmin } from "../middleware/auth.js";
+import { optionalAuth, requireAdmin, type AuthedRequest } from "../middleware/auth.js";
 import { sendError, HttpError } from "../lib/errors.js";
 
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
@@ -19,20 +19,49 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 15 * 1024 * 1024 },
+  limits: { fileSize: 12 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!/^image\/(jpeg|jpg|png|webp|gif)$/i.test(file.mimetype)) {
+      cb(new Error("فقط تصویر مجاز است"));
+      return;
+    }
+    cb(null, true);
+  },
 });
 
 const router = Router();
 
-router.post("/", requireAdmin, upload.single("file"), (req, res) => {
-  try {
-    if (!req.file) throw new HttpError(400, "No file uploaded");
-    // Relative path works via Vite proxy in dev and nginx in production
-    const file_url = `/uploads/${req.file.filename}`;
-    res.json({ file_url });
-  } catch (err) {
-    sendError(res, err);
-  }
+function respondFile(req: AuthedRequest, res: import("express").Response) {
+  if (!req.file) throw new HttpError(400, "No file uploaded");
+  const file_url = `/uploads/${req.file.filename}`;
+  res.json({ file_url });
+}
+
+/** Admin / catalog media */
+router.post("/", requireAdmin, (req, res, next) => {
+  upload.single("file")(req, res, (err) => {
+    if (err) return sendError(res, new HttpError(400, err.message || "Upload failed"));
+    try {
+      respondFile(req as AuthedRequest, res);
+    } catch (e) {
+      sendError(res, e);
+    }
+  });
+});
+
+/**
+ * Public upload for virtual studio (window photo only).
+ * Images only, size-capped. No auth required so customers can try studio.
+ */
+router.post("/public", optionalAuth, (req, res) => {
+  upload.single("file")(req, res, (err) => {
+    if (err) return sendError(res, new HttpError(400, err.message || "Upload failed"));
+    try {
+      respondFile(req as AuthedRequest, res);
+    } catch (e) {
+      sendError(res, e);
+    }
+  });
 });
 
 export default router;

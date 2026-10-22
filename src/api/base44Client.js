@@ -52,7 +52,6 @@ function normalizeList(data) {
 function createEntityApi(name) {
   return {
     async list(sortBy = "-created_date", limit = 100) {
-      // support list({ sort, limit }) legacy
       if (sortBy && typeof sortBy === "object") {
         const opts = sortBy;
         sortBy = opts.sort || opts.sort_by || "-created_date";
@@ -62,10 +61,6 @@ function createEntityApi(name) {
       return normalizeList(await request(`/entities/${name}?${q}`));
     },
 
-    /**
-     * filter(filterObj, sortBy?, limit?)
-     * OR filter(filterObj, { sort, limit, search })
-     */
     async filter(filter = {}, sortBy = "-created_date", limit = 100) {
       let search = "";
       if (sortBy && typeof sortBy === "object") {
@@ -74,7 +69,6 @@ function createEntityApi(name) {
         sortBy = opts.sort || opts.sort_by || "-created_date";
         limit = opts.limit || 100;
       }
-      // strip unsupported mongo operators — keep only scalar fields
       const clean = {};
       for (const [k, v] of Object.entries(filter || {})) {
         if (k.startsWith("$")) continue;
@@ -175,6 +169,25 @@ const agents = {
   },
 };
 
+async function uploadFile(file, publicEndpoint = false) {
+  const token = getToken();
+  const form = new FormData();
+  form.append("file", file);
+  const path = publicEndpoint ? "/upload/public" : "/upload";
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || "Upload failed");
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
 export const base44 = {
   entities,
   agents,
@@ -255,21 +268,13 @@ export const base44 = {
   integrations: {
     Core: {
       async UploadPublicFile({ file }) {
-        const token = getToken();
-        const form = new FormData();
-        form.append("file", file);
-        const res = await fetch(`${API_BASE}/upload`, {
-          method: "POST",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: form,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          const err = new Error(data.error || "Upload failed");
-          err.status = res.status;
-          throw err;
+        // Prefer admin upload if logged in; else public studio endpoint
+        try {
+          if (getToken()) return await uploadFile(file, false);
+        } catch {
+          /* fall through */
         }
-        return data;
+        return uploadFile(file, true);
       },
     },
   },
