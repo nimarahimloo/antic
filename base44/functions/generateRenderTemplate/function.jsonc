@@ -1,0 +1,4 @@
+{
+  "name": "generateRenderTemplate",
+  "entry": "entry.ts"
+}
