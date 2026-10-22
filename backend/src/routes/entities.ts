@@ -27,6 +27,27 @@ function canWrite(meta: ReturnType<typeof getMeta>, user?: { role: string }, isC
   return user?.role === "admin";
 }
 
+/** Text search across CurtainModel string fields (catalog precision). */
+function searchWhere(entity: string, search: string): Record<string, unknown> | null {
+  const q = search.trim();
+  if (!q || entity !== "CurtainModel") return null;
+  // SQLite: case-insensitive via contains mode insensitive when available;
+  // Prisma sqlite supports contains
+  return {
+    OR: [
+      { code: { contains: q } },
+      { name: { contains: q } },
+      { fabric: { contains: q } },
+      { color: { contains: q } },
+      { material: { contains: q } },
+      { texture: { contains: q } },
+      { description: { contains: q } },
+      { categorySlug: { contains: q } },
+      { subcategory: { contains: q } },
+    ],
+  };
+}
+
 router.get("/:Entity/count", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const meta = getMeta(req.params.Entity);
@@ -40,11 +61,15 @@ router.get("/:Entity/count", optionalAuth, async (req: AuthedRequest, res) => {
       }
     }
     for (const [k, v] of Object.entries(req.query)) {
-      if (["filter"].includes(k)) continue;
+      if (["filter", "search"].includes(k)) continue;
       if (typeof v === "string") filter[k] = v;
     }
+    let where: Record<string, unknown> = parseFilter(filter);
+    const search = typeof req.query.search === "string" ? req.query.search : "";
+    const sw = searchWhere(meta.name, search);
+    if (sw) where = Object.keys(where).length ? { AND: [where, sw] } : sw;
     // @ts-expect-error dynamic
-    const n = await meta.model.count({ where: parseFilter(filter) });
+    const n = await meta.model.count({ where });
     res.json({ count: n });
   } catch (err) {
     sendError(res, err);
@@ -65,19 +90,20 @@ router.get("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
       } catch {
         /* */
       }
-    } else if (typeof req.query.q === "string") {
-      try {
-        filter = JSON.parse(req.query.q);
-      } catch {
-        /* */
-      }
     }
     for (const [k, v] of Object.entries(req.query)) {
-      if (["sort_by", "sort", "limit", "skip", "filter", "q"].includes(k)) continue;
+      if (["sort_by", "sort", "limit", "skip", "filter", "q", "search"].includes(k)) continue;
       if (typeof v === "string") filter[k] = v;
     }
 
-    const where = parseFilter(filter);
+    let where: Record<string, unknown> = parseFilter(filter);
+    const search =
+      (typeof req.query.search === "string" && req.query.search) ||
+      (typeof req.query.q === "string" && !String(req.query.q).startsWith("{") ? req.query.q : "") ||
+      "";
+    const sw = searchWhere(meta.name, search);
+    if (sw) where = Object.keys(where).length ? { AND: [where, sw] } : sw;
+
     const orderBy = parseSort(sortBy);
     // @ts-expect-error dynamic
     const rows = await meta.model.findMany({ where, orderBy, take: limit });

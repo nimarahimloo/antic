@@ -2,6 +2,12 @@ import { Check } from "lucide-react";
 import FabricSwatch from "@/components/catalog/FabricSwatch";
 
 export default function CatalogCard({ model, active, onClick }) {
+  // Prefer approved install sample, else fabric photo, else synthetic swatch
+  const thumb =
+    model.install_status === "approved" && model.install_image
+      ? model.install_image
+      : model.image || null;
+
   return (
     <button
       type="button"
@@ -13,11 +19,25 @@ export default function CatalogCard({ model, active, onClick }) {
           : "border-secondary/60 hover:border-primary/60"
       }`}
     >
-      <div className="relative aspect-[4/3] overflow-hidden">
-        <FabricSwatch fabric={model} className="h-full w-full" />
+      <div className="relative aspect-[4/3] overflow-hidden bg-secondary/30">
+        {thumb ? (
+          <img
+            src={thumb}
+            alt={model.code}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <FabricSwatch fabric={model} className="h-full w-full" />
+        )}
         {active && (
           <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <Check className="h-3 w-3" />
+          </span>
+        )}
+        {model.install_status === "approved" && model.install_image && (
+          <span className="absolute bottom-1 left-1 rounded bg-background/85 px-1.5 py-0.5 font-body text-[8px] text-primary">
+            نمونه نصب
           </span>
         )}
       </div>
@@ -32,7 +52,7 @@ export default function CatalogCard({ model, active, onClick }) {
             />
           )}
           <span className="truncate font-body text-[9px] text-muted-foreground">
-            {model.fabric || model.color || "—"}
+            {[model.fabric, model.color].filter(Boolean).join(" · ") || "—"}
           </span>
         </div>
       </div>

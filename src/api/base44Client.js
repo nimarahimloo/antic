@@ -43,20 +43,54 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
   return data;
 }
 
+function normalizeList(data) {
+  if (Array.isArray(data)) return data;
+  if (data?.items && Array.isArray(data.items)) return data.items;
+  return [];
+}
+
 function createEntityApi(name) {
   return {
     async list(sortBy = "-created_date", limit = 100) {
-      const q = new URLSearchParams({ sort_by: sortBy, limit: String(limit) });
-      return request(`/entities/${name}?${q}`);
+      // support list({ sort, limit }) legacy
+      if (sortBy && typeof sortBy === "object") {
+        const opts = sortBy;
+        sortBy = opts.sort || opts.sort_by || "-created_date";
+        limit = opts.limit || 100;
+      }
+      const q = new URLSearchParams({ sort_by: String(sortBy), limit: String(limit) });
+      return normalizeList(await request(`/entities/${name}?${q}`));
     },
+
+    /**
+     * filter(filterObj, sortBy?, limit?)
+     * OR filter(filterObj, { sort, limit, search })
+     */
     async filter(filter = {}, sortBy = "-created_date", limit = 100) {
+      let search = "";
+      if (sortBy && typeof sortBy === "object") {
+        const opts = sortBy;
+        search = opts.search || opts.q || "";
+        sortBy = opts.sort || opts.sort_by || "-created_date";
+        limit = opts.limit || 100;
+      }
+      // strip unsupported mongo operators — keep only scalar fields
+      const clean = {};
+      for (const [k, v] of Object.entries(filter || {})) {
+        if (k.startsWith("$")) continue;
+        if (v !== null && typeof v === "object") continue;
+        if (v === undefined || v === "") continue;
+        clean[k] = v;
+      }
       const q = new URLSearchParams({
-        sort_by: sortBy,
+        sort_by: String(sortBy),
         limit: String(limit),
-        filter: JSON.stringify(filter),
+        filter: JSON.stringify(clean),
       });
-      return request(`/entities/${name}?${q}`);
+      if (search) q.set("search", String(search));
+      return normalizeList(await request(`/entities/${name}?${q}`));
     },
+
     async get(id) {
       return request(`/entities/${name}/${id}`);
     },
@@ -70,7 +104,13 @@ function createEntityApi(name) {
       return request(`/entities/${name}/${id}`, { method: "DELETE" });
     },
     async count(filter = {}) {
-      const q = new URLSearchParams({ filter: JSON.stringify(filter) });
+      const clean = {};
+      for (const [k, v] of Object.entries(filter || {})) {
+        if (k.startsWith("$") || (v !== null && typeof v === "object")) continue;
+        if (v === undefined || v === "") continue;
+        clean[k] = v;
+      }
+      const q = new URLSearchParams({ filter: JSON.stringify(clean) });
       const res = await request(`/entities/${name}/count?${q}`);
       return typeof res === "number" ? res : res.count;
     },
@@ -91,7 +131,6 @@ const ENTITY_NAMES = [
 
 const entities = Object.fromEntries(ENTITY_NAMES.map((n) => [n, createEntityApi(n)]));
 
-/** Local design consultant agent (no Base44) */
 const agents = {
   async createConversation({ agent_name, metadata } = {}) {
     return request("/agents/conversations", {
@@ -111,10 +150,6 @@ const agents = {
       auth: false,
     });
   },
-  /**
-   * Poll-based subscribe (replaces Base44 realtime).
-   * Calls onUpdate with full conversation whenever messages change.
-   */
   subscribeToConversation(id, onUpdate) {
     let stopped = false;
     let lastLen = -1;
@@ -128,7 +163,7 @@ const agents = {
           onUpdate(conv);
         }
       } catch {
-        /* ignore transient */
+        /* */
       }
       if (!stopped) timer = setTimeout(tick, 1200);
     };
