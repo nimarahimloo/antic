@@ -1,12 +1,12 @@
 import { Router } from "express";
-import { optionalAuth } from "../middleware/auth.js";
-import { prisma } from "../lib/prisma.js";
+import { requireAdmin, type AuthedRequest } from "../middleware/auth.js";
 import { HttpError, sendError } from "../lib/errors.js";
-import { renderOneModel } from "../services/renderQueue.js";
+import { renderOneModel, runBatch, getQueueState } from "../services/renderQueue.js";
 
 const router = Router();
 
-router.post("/:name", optionalAuth, async (req, res) => {
+/** All generation functions require admin — never auto for public. */
+router.post("/:name", requireAdmin, async (req: AuthedRequest, res) => {
   try {
     const name = req.params.name;
     const body = req.body || {};
@@ -18,27 +18,27 @@ router.post("/:name", optionalAuth, async (req, res) => {
       return res.json({ data: result });
     }
 
-    if (name === "generateRenderTemplate") {
-      const style = String(body.style || "");
-      if (!style) throw new HttpError(400, "style required");
-      return res.status(501).json({
-        error:
-          "قالب chroma باید یک‌بار از عکس نصب واقعی با پارچه سبز ساخته و آپلود شود. از پنل ادمین → پنجره مجازی → آپلود قالب استفاده کنید.",
-        data: { image: "", style },
-      });
-    }
-
     if (name === "startInstallBatch") {
-      const { runBatch } = await import("../services/renderQueue.js");
       const result = await runBatch({
         regenerate: !!body.regenerate,
-        limit: body.limit ? Number(body.limit) : 500,
+        limit: body.limit ? Number(body.limit) : 200,
       });
-      return res.json({ data: result });
+      return res.json({ data: { ...result, state: getQueueState() } });
+    }
+
+    if (name === "generateRenderTemplate") {
+      return res.status(501).json({
+        error:
+          "قالب سبز را یک‌بار از عکس نصب واقعی آپلود کنید (پنل → پنجره مجازی). تولید خودکار قالب نیاز به عکس مرجع دارد.",
+        data: { image: "", style: body.style || "" },
+      });
     }
 
     res.json({ data: null, error: `Unknown function: ${name}` });
   } catch (err) {
+    if (err instanceof Error && /در حال اجرا/.test(err.message)) {
+      return sendError(res, new HttpError(409, err.message));
+    }
     sendError(res, err);
   }
 });
