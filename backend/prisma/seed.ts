@@ -5,8 +5,8 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 /**
- * دسته‌بندی واقعی فروشگاه از ووکامرس justelea_antic (product_cat)
- * parent=0 → دسته اصلی؛ بقیه زیرمجموعه
+ * دسته‌بندی واقعی از ووکامرس justelea_antic (product_cat)
+ * بدون اکسسوری و زیردسته‌هایش — اکسسوری فقط در بخش فروشگاه جداگانه مدیریت می‌شود
  */
 type WooCat = {
   termId: number;
@@ -15,6 +15,18 @@ type WooCat = {
   parentTermId: number;
   order: number;
 };
+
+/** slugهای اکسسوری که نباید در seed باشند */
+const ACCESSORY_SLUGS = new Set([
+  "accessories",
+  "leather-cord",
+  "finial",
+  "border",
+  "nailhead",
+  "tassel",
+  "fringe",
+  "tieback",
+]);
 
 const WOO_PRODUCT_CATS: WooCat[] = [
   // ── اصلی ──
@@ -31,9 +43,8 @@ const WOO_PRODUCT_CATS: WooCat[] = [
   { termId: 91, name: "مخمل", slug: "velvet", parentTermId: 0, order: 11 },
   { termId: 92, name: "کتان", slug: "cotton", parentTermId: 0, order: 12 },
   { termId: 93, name: "تور", slug: "sheer", parentTermId: 0, order: 13 },
-  { termId: 95, name: "اکسسوری", slug: "accessories", parentTermId: 0, order: 14 },
-  { termId: 2140, name: "پرده آشپزخانه", slug: "kitchen", parentTermId: 0, order: 15 },
-  { termId: 2179, name: "پرده اداری", slug: "office", parentTermId: 0, order: 16 },
+  { termId: 2140, name: "پرده آشپزخانه", slug: "kitchen", parentTermId: 0, order: 14 },
+  { termId: 2179, name: "پرده اداری", slug: "office", parentTermId: 0, order: 15 },
 
   // ── زیر شید (64) ──
   { termId: 65, name: "شید بلک اوت", slug: "shade-blackout", parentTermId: 64, order: 101 },
@@ -60,18 +71,8 @@ const WOO_PRODUCT_CATS: WooCat[] = [
 
   // ── زیر زبرا (86) ──
   { termId: 83, name: "زبرا چاپی", slug: "zebra-printed", parentTermId: 86, order: 601 },
-
-  // ── زیر اکسسوری (95) ──
-  { termId: 2141, name: "بند چرم", slug: "leather-cord", parentTermId: 95, order: 701 },
-  { termId: 2142, name: "قپه", slug: "finial", parentTermId: 95, order: 702 },
-  { termId: 2143, name: "بوردر", slug: "border", parentTermId: 95, order: 703 },
-  { termId: 2144, name: "گل میخ", slug: "nailhead", parentTermId: 95, order: 704 },
-  { termId: 2145, name: "منگوله", slug: "tassel", parentTermId: 95, order: 705 },
-  { termId: 2149, name: "شرابه", slug: "fringe", parentTermId: 95, order: 706 },
-  { termId: 2150, name: "کمر پرده", slug: "tieback", parentTermId: 95, order: 707 },
 ];
 
-/** برای کاتالوگ پرده — فقط دسته‌های اصلی + زیردسته‌ها به‌صورت JSON */
 function buildCurtainCategories() {
   const roots = WOO_PRODUCT_CATS.filter((c) => c.parentTermId === 0);
   return roots.map((root) => {
@@ -85,7 +86,7 @@ function buildCurtainCategories() {
   });
 }
 
-/** نمونه محصولات واقعی از ووکامرس (نمونه export) */
+/** فقط محصولات پرده/پارچه — بدون اکسسوری */
 const SAMPLE_PRODUCTS = [
   {
     name: "پلیسه دستی پرده",
@@ -93,27 +94,6 @@ const SAMPLE_PRODUCTS = [
     categorySlug: "pleated-manual",
     price: 0,
     description: "پلیسه دستی از کاتالوگ فروشگاه",
-  },
-  {
-    name: "قپه پرده دکوراتیو (سرپرده تزئینی)",
-    slug: "decorative-finial",
-    categorySlug: "finial",
-    price: 0,
-    description: "قپه / سرپرده تزئینی",
-  },
-  {
-    name: "بوردر پرده دکوراتیو (نوار تزئینی پرده)",
-    slug: "decorative-border",
-    categorySlug: "border",
-    price: 0,
-    description: "نوار تزئینی پرده",
-  },
-  {
-    name: "گل میخ پرده دکوراتیو",
-    slug: "decorative-nailhead",
-    categorySlug: "nailhead",
-    price: 0,
-    description: "گل میخ دکوراتیو",
   },
   {
     name: "تور قیطان‌دوزی Avin – مناسب دکوراسیون کلاسیک و نئوکلاسیک",
@@ -220,6 +200,46 @@ async function seedAdmin() {
   }
 }
 
+/** پاک کردن اکسسوری و زیردسته‌هایی که قبلاً seed شده بودند */
+async function removeAccessoriesFromDb() {
+  const accessoryShopCats = await prisma.shopCategory.findMany({
+    where: { slug: { in: [...ACCESSORY_SLUGS] } },
+  });
+  const accessoryIds = accessoryShopCats.map((c) => c.id);
+
+  if (accessoryIds.length) {
+    // detach products from accessory categories
+    await prisma.product.updateMany({
+      where: { categoryId: { in: accessoryIds } },
+      data: { categoryId: null },
+    });
+    await prisma.shopCategory.deleteMany({
+      where: { id: { in: accessoryIds } },
+    });
+    console.log(`Removed ${accessoryIds.length} accessory shop categories`);
+  }
+
+  await prisma.curtainCategory.deleteMany({
+    where: { slug: { in: [...ACCESSORY_SLUGS] } },
+  });
+
+  // محصولات نمونه اکسسوری قبلی
+  await prisma.product.deleteMany({
+    where: {
+      slug: {
+        in: [
+          "decorative-finial",
+          "decorative-border",
+          "decorative-nailhead",
+          "gold-metal-ring",
+          "steel-curtain-rod",
+          "velvet-tieback",
+        ],
+      },
+    },
+  });
+}
+
 async function seedCurtainCategories() {
   const cats = buildCurtainCategories();
   for (const c of cats) {
@@ -238,11 +258,10 @@ async function seedCurtainCategories() {
       },
     });
   }
-  console.log(`Curtain categories: ${cats.length} (from WooCommerce product_cat)`);
+  console.log(`Curtain categories: ${cats.length} (بدون اکسسوری)`);
 }
 
 async function seedShopCategories() {
-  // parents first
   const sorted = [...WOO_PRODUCT_CATS].sort((a, b) => {
     if (a.parentTermId === 0 && b.parentTermId !== 0) return -1;
     if (a.parentTermId !== 0 && b.parentTermId === 0) return 1;
@@ -276,7 +295,7 @@ async function seedShopCategories() {
     });
     termToId.set(c.termId, row.id);
   }
-  console.log(`Shop categories: ${sorted.length}`);
+  console.log(`Shop categories: ${sorted.length} (بدون اکسسوری)`);
   return termToId;
 }
 
@@ -312,7 +331,7 @@ async function seedProducts(termToId: Map<number, string>) {
       },
     });
   }
-  console.log(`Shop products (sample from Woo): ${SAMPLE_PRODUCTS.length}`);
+  console.log(`Shop products (sample): ${SAMPLE_PRODUCTS.length}`);
 }
 
 async function seedModels() {
@@ -342,12 +361,13 @@ async function seedVirtualWindow() {
 
 async function main() {
   await seedAdmin();
+  await removeAccessoriesFromDb();
   await seedCurtainCategories();
   const termToId = await seedShopCategories();
   await seedProducts(termToId);
   await seedModels();
   await seedVirtualWindow();
-  console.log("Seed complete — WooCommerce categories loaded.");
+  console.log("Seed complete — accessories removed from seeder.");
 }
 
 main()
