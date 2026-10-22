@@ -1,0 +1,162 @@
+/**
+ * فونت‌های محلی پرده آنتیک
+ * مسیر فایل‌ها: public/fonts/{yekan-bakh|kalameh|peyda}/*.woff2
+ *
+ * نقش‌ها:
+ *  - Yekan Bakh  → body / متن UI
+ *  - Kalameh     → display / تیترهای لوکس
+ *  - Peyda       → heading / دکمه‌ها و برچسب‌ها
+ */
+
+/* ─── یکان بخ (اعداد فارسی) ─── */
+@font-face {
+  font-family: "Yekan Bakh";
+  src: url("/fonts/yekan-bakh/YekanBakh-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Yekan Bakh";
+  src: url("/fonts/yekan-bakh/YekanBakh-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Yekan Bakh";
+  src: url("/fonts/yekan-bakh/YekanBakh-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ─── کلمه (اعداد فارسی) — همه وزن‌ها ─── */
+@font-face {
+  font-family: "Kalameh";
+  src: url("/fonts/kalameh/Kalameh-Thin.woff2") format("woff2");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kalameh";
+  src: url("/fonts/kalameh/Kalameh-ExtraLight.woff2") format("woff2");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kalameh";
+  src: url("/fonts/kalameh/Kalameh-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kalameh";
+  src: url("/fonts/kalameh/Kalameh-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kalameh";
+  src: url("/fonts/kalameh/Kalameh-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kalameh";
+  src: url("/fonts/kalameh/Kalameh-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kalameh";
+  src: url("/fonts/kalameh/Kalameh-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kalameh";
+  src: url("/fonts/kalameh/Kalameh-ExtraBold.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kalameh";
+  src: url("/fonts/kalameh/Kalameh-Black.woff2") format("woff2");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ─── پیدا — همه وزن‌ها ─── */
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/peyda/Peyda-Thin.woff2") format("woff2");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/peyda/Peyda-ExtraLight.woff2") format("woff2");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/peyda/Peyda-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/peyda/Peyda-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/peyda/Peyda-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/peyda/Peyda-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/peyda/Peyda-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/peyda/Peyda-ExtraBold.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/peyda/Peyda-Black.woff2") format("woff2");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
