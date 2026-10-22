@@ -24,6 +24,13 @@ const COLOR_PRESETS = [
   "#8C6A3F", "#3B352C", "#D4C5A9", "#F0EDE5",
 ];
 
+function motionLabel(style) {
+  if (style === "zebra") return "بالا/پایین نوارها (زنجیر)";
+  if (["shade", "double", "roman", "roller", "pleated-manual", "pleated-chain", "pleated-sheer"].includes(style))
+    return "بالا / پایین کردن پرده";
+  return "باز / بسته کردن پرده";
+}
+
 export default function WindowCurtainStudio() {
   const [photoUrl, setPhotoUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -41,9 +48,8 @@ export default function WindowCurtainStudio() {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
-    base44.entities.CurtainModel
-      .filter({}, { sort: "-created_date", limit: 24 })
-      .then((data) => setModels(data?.items || []))
+    base44.entities.CurtainModel.list("-created_date", 48)
+      .then((data) => setModels(Array.isArray(data) ? data : data?.items || []))
       .catch(() => setModels([]));
   }, []);
 
@@ -54,17 +60,19 @@ export default function WindowCurtainStudio() {
     setSavedMsg(null);
     try {
       const compressed = await compressImage(file, { maxDim: 1280, quality: 0.82, maxBytes: 3_500_000 });
-      const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file: compressed });
-      const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri, expires_in: 86400 });
-      setPhotoUrl(signed_url);
+      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+      setPhotoUrl(file_url);
     } catch {
-      // fallback: تلاش مستقیم با فایل اصلی اگر فشرده‌سازی شکست خورد
       try {
-        const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file });
-        const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri, expires_in: 86400 });
-        setPhotoUrl(signed_url);
+        const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
+        setPhotoUrl(file_url);
       } catch {
-        setSavedMsg({ type: "error", text: "بارگذاری عکس ناموفق بود. ابعاد یا حجم عکس را بررسی کنید." });
+        // last resort: local object URL so studio still works offline
+        setPhotoUrl(URL.createObjectURL(file));
+        setSavedMsg({
+          type: "error",
+          text: "آپلود سرور ناموفق بود؛ پیش‌نمایش موقت محلی فعال شد.",
+        });
         setTimeout(() => setSavedMsg(null), 5000);
       }
     } finally {
@@ -84,7 +92,13 @@ export default function WindowCurtainStudio() {
     setSaving(true);
     try {
       const dataUrl = await compositeDesign(photoUrl, {
-        style: selectedStyle, color, openness, width, height, x: posX, y: posY,
+        style: selectedStyle,
+        color,
+        openness,
+        width,
+        height,
+        x: posX,
+        y: posY,
         fabricImage: selectedModel?.image || null,
       });
       const blob = await (await fetch(dataUrl)).blob();
@@ -96,7 +110,8 @@ export default function WindowCurtainStudio() {
         : `طرح پرده ${STUDIO_STYLES.find((s) => s.slug === selectedStyle)?.name || ""}`;
 
       await base44.entities.SavedDesign.create({
-        title, image: file_url,
+        title,
+        image: file_url,
         curtain_style: selectedStyle,
         curtain_model_id: selectedModel?.id || "",
         curtain_model_code: selectedModel?.code || "",
@@ -116,7 +131,13 @@ export default function WindowCurtainStudio() {
     if (!photoUrl) return;
     try {
       const dataUrl = await compositeDesign(photoUrl, {
-        style: selectedStyle, color, openness, width, height, x: posX, y: posY,
+        style: selectedStyle,
+        color,
+        openness,
+        width,
+        height,
+        x: posX,
+        y: posY,
         fabricImage: selectedModel?.image || null,
       });
       const blob = await (await fetch(dataUrl)).blob();
@@ -130,16 +151,11 @@ export default function WindowCurtainStudio() {
         });
         return;
       }
-    } catch { /* fallback below */ }
+    } catch {
+      /* fallback */
+    }
 
     try {
-      const dataUrl = await compositeDesign(photoUrl, {
-        style: selectedStyle, color, openness, width, height, x: posX, y: posY,
-        fabricImage: selectedModel?.image || null,
-      });
-      const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], `design-${Date.now()}.png`, { type: "image/png" });
-      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
       const shareUrl = window.location.origin + "/#studio";
       if (navigator.share) {
         await navigator.share({ title: "طرح پرده من در پرده آنتیک", url: shareUrl });
@@ -154,7 +170,6 @@ export default function WindowCurtainStudio() {
     }
   };
 
-  // وقتی مدل انتخاب شده، سبک و رنگ از مدل می‌آید — فیلدهای اضافی پنهان می‌شوند
   const modelMode = !!selectedModel;
 
   return (
@@ -165,17 +180,21 @@ export default function WindowCurtainStudio() {
           پرده را روی <span className="text-gold-gradient">پنجره خودتان</span> ببینید
         </h3>
         <p className="mt-1.5 font-body text-xs leading-6 text-muted-foreground">
-          عکس پنجره‌تان را آپلود کنید، مدل پرده را انتخاب کنید و نتیجه را ذخیره یا اشتراک‌گذاری کنید.
+          عکس پنجره‌تان را بگذارید، مدل/کد پارچهٔ کاتالوگ را انتخاب کنید، باز یا بالا ببرید و نتیجه را ذخیره کنید.
         </p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-5 lg:gap-6">
-        {/* پیش‌نمایش */}
         <div className="lg:col-span-3">
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-background">
             {photoUrl ? (
               <>
-                <img src={photoUrl} alt="پنجره شما" className="absolute inset-0 h-full w-full object-cover" crossOrigin="anonymous" />
+                <img
+                  src={photoUrl}
+                  alt="پنجره شما"
+                  className="absolute inset-0 h-full w-full object-cover"
+                  crossOrigin="anonymous"
+                />
                 <CurtainOverlay
                   style={selectedStyle}
                   color={color}
@@ -187,7 +206,10 @@ export default function WindowCurtainStudio() {
                   fabricImage={selectedModel?.image || null}
                 />
                 <button
-                  onClick={() => { setPhotoUrl(null); setSelectedModel(null); }}
+                  onClick={() => {
+                    setPhotoUrl(null);
+                    setSelectedModel(null);
+                  }}
                   className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-background/80 text-muted-foreground hover:text-destructive"
                   aria-label="حذف عکس"
                 >
@@ -205,11 +227,18 @@ export default function WindowCurtainStudio() {
                     </div>
                     <div>
                       <p className="font-display text-sm font-bold text-foreground">عکس پنجره خود را آپلود کنید</p>
-                      <p className="mt-1 font-body text-xs text-muted-foreground">JPG یا PNG — فشرده‌سازی خودکار</p>
+                      <p className="mt-1 font-body text-xs text-muted-foreground">JPG یا PNG — از دوربین گوشی هم می‌شود</p>
                     </div>
                   </>
                 )}
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUpload} disabled={uploading} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleUpload}
+                  disabled={uploading}
+                />
               </label>
             )}
           </div>
@@ -240,12 +269,10 @@ export default function WindowCurtainStudio() {
           )}
         </div>
 
-        {/* کنترل‌ها — ساده‌شده */}
         <div className="space-y-4 lg:col-span-2">
-          {/* انتخاب مدل پرده — اصلی‌ترین کنترل */}
           {models.length > 0 && (
             <div>
-              <p className="mb-2 font-body text-xs text-muted-foreground">انتخاب مدل پرده</p>
+              <p className="mb-2 font-body text-xs text-muted-foreground">انتخاب مدل از کاتالوگ (کد محصول)</p>
               <div className="max-h-36 overflow-y-auto rounded-xl border border-secondary/60 bg-background/50 p-2">
                 <div className="grid grid-cols-3 gap-1.5">
                   {models.map((m) => (
@@ -273,7 +300,6 @@ export default function WindowCurtainStudio() {
             </div>
           )}
 
-          {/* سبک و رنگ — فقط در حالت دستی (بدون مدل) */}
           {!modelMode && (
             <>
               <div>
@@ -323,10 +349,15 @@ export default function WindowCurtainStudio() {
             </>
           )}
 
-          {/* میزان بازشدن — همیشه قابل تنظیم */}
-          <SliderControl label="میزان بازشدن پرده" value={Math.round(openness * 100)} suffix="%" min={0} max={90} onChange={(v) => setOpenness(v / 100)} />
+          <SliderControl
+            label={motionLabel(selectedStyle)}
+            value={Math.round(openness * 100)}
+            suffix="%"
+            min={0}
+            max={90}
+            onChange={(v) => setOpenness(v / 100)}
+          />
 
-          {/* تنظیمات دقیق موقعیت — قابل جمع شدن */}
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="flex w-full items-center gap-2 font-body text-xs text-muted-foreground transition-colors hover:text-primary"
@@ -346,7 +377,11 @@ export default function WindowCurtainStudio() {
 
           {modelMode && (
             <button
-              onClick={() => { setSelectedModel(null); setSelectedStyle("drape"); setColor("#C9A227"); }}
+              onClick={() => {
+                setSelectedModel(null);
+                setSelectedStyle("drape");
+                setColor("#C9A227");
+              }}
               className="w-full rounded-lg border border-secondary/60 py-2 font-body text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
             >
               حذف انتخاب مدل — تنظیم دستی
@@ -363,7 +398,10 @@ function SliderControl({ label, value, suffix, min, max, onChange }) {
     <div>
       <div className="flex items-center justify-between">
         <label className="font-body text-xs text-muted-foreground">{label}</label>
-        <span className="font-mono text-[10px] text-primary" dir="ltr">{value}{suffix}</span>
+        <span className="font-mono text-[10px] text-primary" dir="ltr">
+          {value}
+          {suffix}
+        </span>
       </div>
       <input
         type="range"
