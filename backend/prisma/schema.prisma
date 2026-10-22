@@ -131,7 +131,6 @@ model VirtualWindowSetting {
   updatedAt  DateTime @updatedAt
 }
 
-/// Shop products (accessories) — fully local, replaces Wix Stores
 model Product {
   id             String   @id @default(cuid())
   name           String
@@ -141,14 +140,14 @@ model Product {
   compareAtPrice Float?
   currency       String   @default("IRR")
   image          String?
-  gallery        String?  // JSON string[]
+  gallery        String?
   categoryId     String?
   visible        Boolean  @default(true)
   inStock        Boolean  @default(true)
   stock          Int      @default(100)
   ribbon         String?
-  optionsJson    String?  // JSON product options
-  variantsJson   String?  // JSON variants
+  optionsJson    String?
+  variantsJson   String?
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -167,4 +166,26 @@ model ShopCategory {
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+/// سفارش فروشگاه — پرداخت زرین‌پال
+model Order {
+  id              String   @id @default(cuid())
+  status          String   @default("pending") // pending | paid | failed | cancelled
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  customerAddress String?
+  itemsJson       String   // JSON line items
+  amountToman     Int      // مجموع به تومان
+  amountRial      Int      // برای زرین‌پال (تومان × ۱۰)
+  authority       String?  @unique
+  refId           String?
+  gateway         String   @default("zarinpal")
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@index([customerPhone])
 }
