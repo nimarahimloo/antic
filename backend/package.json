@@ -10,6 +10,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
+    "db:import-woo": "node scripts/import-woocommerce-sql.mjs",
     "smoke": "node scripts/smoke-test.mjs",
     "render:batch": "tsx scripts/run-batch.ts"
   },
@@ -21,7 +22,7 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.0",
-    "sharp": "^0.35.5",
+    "sharp": "^0.33.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -34,12 +35,5 @@
     "prisma": "^6.5.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
-  },
-  "allowScripts": {
-    "@prisma/client@6.19.3": true,
-    "prisma@6.12.0": true,
-    "sharp@0.35.5": true,
-    "esbuild@0.28.2": true,
-    "@prisma/engines@6.12.0": true
   }
 }
