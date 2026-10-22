@@ -10,7 +10,8 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
-    "smoke": "node scripts/smoke-test.mjs"
+    "smoke": "node scripts/smoke-test.mjs",
+    "render:batch": "tsx scripts/run-batch.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
@@ -20,6 +21,7 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.0",
+    "sharp": "^0.33.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {

@@ -9,6 +9,7 @@ import catalogRoutes from "./routes/catalog.js";
 import orderRoutes from "./routes/orders.js";
 import agentRoutes from "./routes/agents.js";
 import mcpRoutes from "./routes/mcp.js";
+import renderRoutes from "./routes/render.js";
 import { HttpError, sendError } from "./lib/errors.js";
 
 const app = express();
@@ -39,7 +40,8 @@ app.get("/api/app/public-settings", (_req, res) => {
       ai: {
         design_consultant: "local-catalog",
         mcp: true,
-        image_generation: false,
+        install_engine: "server-chroma-composite",
+        image_generation_external: false,
       },
     },
   });
@@ -53,6 +55,7 @@ app.use("/api/catalog", catalogRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/agents", agentRoutes);
 app.use("/api/mcp", mcpRoutes);
+app.use("/api/render", renderRoutes);
 
 app.use((_req, _res, next) => {
   next(new HttpError(404, "Not found"));
