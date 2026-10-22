@@ -27,6 +27,31 @@ function canWrite(meta: ReturnType<typeof getMeta>, user?: { role: string }, isC
   return user?.role === "admin";
 }
 
+// Count BEFORE /:id so "count" is not treated as an id
+router.get("/:Entity/count", optionalAuth, async (req: AuthedRequest, res) => {
+  try {
+    const meta = getMeta(req.params.Entity);
+    if (!canRead(meta, req.user)) throw new HttpError(403, "Forbidden");
+    let filter: Record<string, unknown> = {};
+    if (typeof req.query.filter === "string") {
+      try {
+        filter = JSON.parse(req.query.filter);
+      } catch {
+        /* */
+      }
+    }
+    for (const [k, v] of Object.entries(req.query)) {
+      if (["filter"].includes(k)) continue;
+      if (typeof v === "string") filter[k] = v;
+    }
+    // @ts-expect-error dynamic
+    const n = await meta.model.count({ where: parseFilter(filter) });
+    res.json({ count: n });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
 router.get("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const meta = getMeta(req.params.Entity);
@@ -36,9 +61,17 @@ router.get("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
     const limit = Math.min(Number(req.query.limit) || 100, 500);
     let filter: Record<string, unknown> = {};
     if (typeof req.query.filter === "string") {
-      try { filter = JSON.parse(req.query.filter); } catch { /* */ }
+      try {
+        filter = JSON.parse(req.query.filter);
+      } catch {
+        /* */
+      }
     } else if (typeof req.query.q === "string") {
-      try { filter = JSON.parse(req.query.q); } catch { /* */ }
+      try {
+        filter = JSON.parse(req.query.q);
+      } catch {
+        /* */
+      }
     }
     for (const [k, v] of Object.entries(req.query)) {
       if (["sort_by", "sort", "limit", "skip", "filter", "q"].includes(k)) continue;
@@ -50,26 +83,6 @@ router.get("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
     // @ts-expect-error dynamic delegate
     const rows = await meta.model.findMany({ where, orderBy, take: limit });
     res.json(toApiList(rows));
-  } catch (err) {
-    sendError(res, err);
-  }
-});
-
-router.get("/:Entity/count", optionalAuth, async (req: AuthedRequest, res) => {
-  try {
-    const meta = getMeta(req.params.Entity);
-    if (!canRead(meta, req.user)) throw new HttpError(403, "Forbidden");
-    let filter: Record<string, unknown> = {};
-    if (typeof req.query.filter === "string") {
-      try { filter = JSON.parse(req.query.filter); } catch { /* */ }
-    }
-    for (const [k, v] of Object.entries(req.query)) {
-      if (["filter"].includes(k)) continue;
-      if (typeof v === "string") filter[k] = v;
-    }
-    // @ts-expect-error dynamic
-    const n = await meta.model.count({ where: parseFilter(filter) });
-    res.json({ count: n });
   } catch (err) {
     sendError(res, err);
   }

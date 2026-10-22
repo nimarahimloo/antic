@@ -2,6 +2,12 @@ import React, { createContext, useState, useContext, useEffect } from "react";
 import { base44, clearToken, setToken } from "@/api/base44Client";
 
 const AuthContext = createContext();
+const TOKEN_KEY = "antic_access_token";
+
+function hasStoredToken() {
+  if (typeof window === "undefined") return false;
+  return !!window.localStorage.getItem(TOKEN_KEY);
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -45,10 +51,17 @@ export const AuthProvider = ({ children }) => {
   const checkUserAuth = async () => {
     try {
       setIsLoadingAuth(true);
+      // Avoid noisy 401 for anonymous visitors
+      if (!hasStoredToken()) {
+        setUser(null);
+        setIsAuthenticated(false);
+        return;
+      }
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
     } catch {
+      clearToken();
       setUser(null);
       setIsAuthenticated(false);
     } finally {

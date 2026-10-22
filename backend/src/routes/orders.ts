@@ -6,18 +6,34 @@ import { requireAdmin, type AuthedRequest } from "../middleware/auth.js";
 
 const router = Router();
 
-const MERCHANT = process.env.ZARINPAL_MERCHANT_ID || "";
-const SANDBOX = process.env.ZARINPAL_SANDBOX === "true" || !MERCHANT;
-const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || "http://localhost:3001";
-const FRONT_BASE = process.env.FRONTEND_URL || process.env.CORS_ORIGIN?.split(",")[0] || "http://localhost:5173";
+function merchantId() {
+  return process.env.ZARINPAL_MERCHANT_ID || "";
+}
+
+function isSandbox() {
+  const m = merchantId();
+  return process.env.ZARINPAL_SANDBOX === "true" || !m;
+}
+
+function publicBase() {
+  return process.env.PUBLIC_BASE_URL || "http://localhost:3001";
+}
+
+function frontBase() {
+  return (
+    process.env.FRONTEND_URL ||
+    process.env.CORS_ORIGIN?.split(",")[0]?.trim() ||
+    "http://localhost:5173"
+  );
+}
 
 function zarinpalApi(path: string) {
-  const host = SANDBOX ? "https://sandbox.zarinpal.com" : "https://api.zarinpal.com";
+  const host = isSandbox() ? "https://sandbox.zarinpal.com" : "https://api.zarinpal.com";
   return `${host}/pg/v4/payment/${path}`;
 }
 
 function startPayUrl(authority: string) {
-  const host = SANDBOX ? "https://sandbox.zarinpal.com" : "https://www.zarinpal.com";
+  const host = isSandbox() ? "https://sandbox.zarinpal.com" : "https://www.zarinpal.com";
   return `${host}/pg/StartPay/${authority}`;
 }
 
@@ -40,14 +56,18 @@ const checkoutSchema = z.object({
     .min(1),
 });
 
-/** POST /api/orders/checkout — create order + Zarinpal authority */
+/** POST /api/orders/checkout */
 router.post("/checkout", async (req, res) => {
   try {
     const body = checkoutSchema.parse(req.body);
-    const amountToman = body.items.reduce((s, i) => s + Math.round(i.unitPrice) * i.quantity, 0);
+    const amountToman = body.items.reduce(
+      (s, i) => s + Math.round(i.unitPrice) * i.quantity,
+      0
+    );
     if (amountToman < 1000) throw new HttpError(400, "مبلغ سفارش خیلی کم است.");
 
     const amountRial = amountToman * 10;
+    const MERCHANT = merchantId();
 
     const order = await prisma.order.create({
       data: {
@@ -64,14 +84,13 @@ router.post("/checkout", async (req, res) => {
       },
     });
 
-    // بدون مرچنت: حالت دمو — مستقیم به صفحه موفقیت شبیه‌سازی
-    if (!MERCHANT || SANDBOX && MERCHANT === "test") {
-      // still try sandbox if merchant set
-    }
-
+    // Demo mode: no merchant — mark paid and send result URL
     if (!MERCHANT) {
-      // Dev without gateway: mark paid path via demo callback
-      const demoUrl = `${FRONT_BASE}/checkout/result?orderId=${order.id}&Status=OK&Authority=DEMO`;
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { status: "paid", refId: "DEMO", authority: "DEMO" },
+      });
+      const demoUrl = `${frontBase()}/checkout/result?orderId=${order.id}&Status=OK&RefID=DEMO`;
       return res.json({
         orderId: order.id,
         paymentUrl: demoUrl,
@@ -80,7 +99,7 @@ router.post("/checkout", async (req, res) => {
       });
     }
 
-    const callbackUrl = `${PUBLIC_BASE}/api/orders/zarinpal/callback?orderId=${order.id}`;
+    const callbackUrl = `${publicBase()}/api/orders/zarinpal/callback?orderId=${order.id}`;
 
     const zpRes = await fetch(zarinpalApi("request.json"), {
       method: "POST",
@@ -125,30 +144,32 @@ router.post("/checkout", async (req, res) => {
   }
 });
 
-/** GET /api/orders/zarinpal/callback — verify & redirect to frontend */
+/** GET /api/orders/zarinpal/callback */
 router.get("/zarinpal/callback", async (req, res) => {
   try {
     const orderId = String(req.query.orderId || "");
     const status = String(req.query.Status || req.query.status || "");
     const authority = String(req.query.Authority || req.query.authority || "");
+    const FRONT = frontBase();
+    const MERCHANT = merchantId();
 
     if (!orderId) {
-      return res.redirect(`${FRONT_BASE}/checkout/result?Status=NOK`);
+      return res.redirect(`${FRONT}/checkout/result?Status=NOK`);
     }
 
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order) {
-      return res.redirect(`${FRONT_BASE}/checkout/result?Status=NOK&orderId=${orderId}`);
+      return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${orderId}`);
     }
 
     if (status !== "OK") {
       await prisma.order.update({ where: { id: orderId }, data: { status: "cancelled" } });
-      return res.redirect(`${FRONT_BASE}/checkout/result?Status=NOK&orderId=${orderId}`);
+      return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${orderId}`);
     }
 
     if (order.status === "paid") {
       return res.redirect(
-        `${FRONT_BASE}/checkout/result?Status=OK&orderId=${orderId}&RefID=${order.refId || ""}`
+        `${FRONT}/checkout/result?Status=OK&orderId=${orderId}&RefID=${order.refId || ""}`
       );
     }
 
@@ -157,7 +178,7 @@ router.get("/zarinpal/callback", async (req, res) => {
         where: { id: orderId },
         data: { status: "paid", refId: "DEMO", authority: authority || "DEMO" },
       });
-      return res.redirect(`${FRONT_BASE}/checkout/result?Status=OK&orderId=${orderId}&RefID=DEMO`);
+      return res.redirect(`${FRONT}/checkout/result?Status=OK&orderId=${orderId}&RefID=DEMO`);
     }
 
     const verifyRes = await fetch(zarinpalApi("verify.json"), {
@@ -182,38 +203,19 @@ router.get("/zarinpal/callback", async (req, res) => {
         data: { status: "paid", refId, authority: authority || order.authority },
       });
       return res.redirect(
-        `${FRONT_BASE}/checkout/result?Status=OK&orderId=${orderId}&RefID=${refId}`
+        `${FRONT}/checkout/result?Status=OK&orderId=${orderId}&RefID=${refId}`
       );
     }
 
     await prisma.order.update({ where: { id: orderId }, data: { status: "failed" } });
-    return res.redirect(`${FRONT_BASE}/checkout/result?Status=NOK&orderId=${orderId}`);
+    return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${orderId}`);
   } catch (err) {
     console.error(err);
-    return res.redirect(`${FRONT_BASE}/checkout/result?Status=NOK`);
+    return res.redirect(`${frontBase()}/checkout/result?Status=NOK`);
   }
 });
 
-/** GET /api/orders/:id — public lookup by id (for result page) */
-router.get("/:id", async (req, res) => {
-  try {
-    const order = await prisma.order.findUnique({ where: { id: req.params.id } });
-    if (!order) throw new HttpError(404, "سفارش پیدا نشد");
-    res.json({
-      id: order.id,
-      status: order.status,
-      amountToman: order.amountToman,
-      refId: order.refId,
-      customerName: order.customerName,
-      items: JSON.parse(order.itemsJson),
-      createdAt: order.createdAt,
-    });
-  } catch (err) {
-    sendError(res, err);
-  }
-});
-
-/** Admin list */
+/** Admin list — must be before /:id */
 router.get("/", requireAdmin, async (_req: AuthedRequest, res) => {
   try {
     const rows = await prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
@@ -229,6 +231,25 @@ router.get("/", requireAdmin, async (_req: AuthedRequest, res) => {
         createdAt: o.createdAt,
       }))
     );
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+/** Public order lookup */
+router.get("/:id", async (req, res) => {
+  try {
+    const order = await prisma.order.findUnique({ where: { id: req.params.id } });
+    if (!order) throw new HttpError(404, "سفارش پیدا نشد");
+    res.json({
+      id: order.id,
+      status: order.status,
+      amountToman: order.amountToman,
+      refId: order.refId,
+      customerName: order.customerName,
+      items: JSON.parse(order.itemsJson),
+      createdAt: order.createdAt,
+    });
   } catch (err) {
     sendError(res, err);
   }

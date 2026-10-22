@@ -23,12 +23,12 @@ const upload = multer({
 });
 
 const router = Router();
-const publicBase = () => process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 3001}`;
 
 router.post("/", requireAdmin, upload.single("file"), (req, res) => {
   try {
     if (!req.file) throw new HttpError(400, "No file uploaded");
-    const file_url = `${publicBase()}/uploads/${req.file.filename}`;
+    // Relative path works via Vite proxy in dev and nginx in production
+    const file_url = `/uploads/${req.file.filename}`;
     res.json({ file_url });
   } catch (err) {
     sendError(res, err);

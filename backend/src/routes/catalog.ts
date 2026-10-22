@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { sendError, HttpError } from "../lib/errors.js";
-import { optionalAuth, requireAdmin, type AuthedRequest } from "../middleware/auth.js";
+import { requireAdmin, type AuthedRequest } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -21,7 +21,6 @@ function formatPrice(amount: number, currency = "IRR") {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
 }
 
-/** Shape product like former Wix catalog so frontend hooks stay stable */
 function toStoreProduct(row: {
   id: string;
   name: string;
@@ -127,7 +126,6 @@ function toStoreCategory(row: {
   };
 }
 
-// GET /api/catalog/products?categoryId=&sort=&search=&limit=&cursor=
 router.get("/products", async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 24, 100);
@@ -168,20 +166,21 @@ router.get("/products", async (req, res) => {
   }
 });
 
-router.get("/products/slug/:slug", async (req, res) => {
+// count before slug/:slug for clarity
+router.get("/products/count", async (_req, res) => {
   try {
-    const row = await prisma.product.findUnique({ where: { slug: req.params.slug } });
-    if (!row || !row.visible) return res.json({ product: null });
-    res.json({ product: toStoreProduct(row) });
+    const count = await prisma.product.count({ where: { visible: true } });
+    res.json({ count });
   } catch (err) {
     sendError(res, err);
   }
 });
 
-router.get("/products/count", async (_req, res) => {
+router.get("/products/slug/:slug", async (req, res) => {
   try {
-    const count = await prisma.product.count({ where: { visible: true } });
-    res.json({ count });
+    const row = await prisma.product.findUnique({ where: { slug: req.params.slug } });
+    if (!row || !row.visible) return res.json({ product: null });
+    res.json({ product: toStoreProduct(row) });
   } catch (err) {
     sendError(res, err);
   }
@@ -199,7 +198,6 @@ router.get("/categories", async (_req, res) => {
   }
 });
 
-// Admin CRUD for products
 router.get("/admin/products", requireAdmin, async (_req: AuthedRequest, res) => {
   try {
     const rows = await prisma.product.findMany({ orderBy: { updatedAt: "desc" } });
@@ -212,6 +210,7 @@ router.get("/admin/products", requireAdmin, async (_req: AuthedRequest, res) => 
 router.post("/admin/products", requireAdmin, async (req: AuthedRequest, res) => {
   try {
     const b = req.body || {};
+    if (!b.name) throw new HttpError(400, "name is required");
     const row = await prisma.product.create({
       data: {
         name: b.name,
@@ -246,7 +245,8 @@ router.put("/admin/products/:id", requireAdmin, async (req: AuthedRequest, res) 
       if (b[k] !== undefined) data[k] = b[k];
     }
     if (b.price !== undefined) data.price = Number(b.price);
-    if (b.compareAtPrice !== undefined) data.compareAtPrice = b.compareAtPrice == null ? null : Number(b.compareAtPrice);
+    if (b.compareAtPrice !== undefined)
+      data.compareAtPrice = b.compareAtPrice == null ? null : Number(b.compareAtPrice);
     if (b.visible !== undefined) data.visible = !!b.visible;
     if (b.inStock !== undefined) data.inStock = !!b.inStock;
     if (b.stock !== undefined) data.stock = Number(b.stock);
@@ -274,6 +274,7 @@ router.delete("/admin/products/:id", requireAdmin, async (req: AuthedRequest, re
 router.post("/admin/categories", requireAdmin, async (req: AuthedRequest, res) => {
   try {
     const b = req.body || {};
+    if (!b.name) throw new HttpError(400, "name is required");
     const row = await prisma.shopCategory.create({
       data: {
         name: b.name,
