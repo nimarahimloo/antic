@@ -1,55 +1,54 @@
 # پرده آنتیک (antic)
 
-فرانت‌اند React + Vite + بک‌اند Express/Prisma — **بدون وابستگی به Base44، Wix یا CDN خارجی.**
+فرانت React + Vite + بک‌اند Express/Prisma — **بدون Base44 / Wix / CDN خارجی.**
 
-مناسب استقرار روی سرور ایران.
+## قابلیت‌های جدید
 
-## معماری
-
-```
-npm run dev          → Vite :5173
-backend npm run dev  → API  :3001
-Vite proxy: /api و /uploads → backend
-```
-
-| بخش | منبع داده |
-|------|-----------|
-| مدل پرده / پروژه / مشاوره / ادمین | بک‌اند خودت (`/api/entities`) |
-| فروشگاه اکسسوری `/shop` | بک‌اند (`/api/catalog`) |
-| سبد خرید | `localStorage` (بدون درگاه خارجی) |
-| فونت | سیستمی (Tahoma / Vazirmatn اگر روی OS باشد) |
+- فروشگاه و سبد محلی
+- **پنل ادمین:** محصولات فروشگاه + سفارش‌ها
+- **پرداخت زرین‌پال** (یا حالت دمو بدون Merchant ID)
+- صفحات `/checkout` و `/checkout/result`
 
 ## راه‌اندازی
 
-### بک‌اند
-
 ```bash
+git pull origin dev
+
 cd backend
 cp .env.example .env
 npm install
-npm run db:setup   # بعد از هر تغییر schema
+npm run db:setup   # schema + seed
 npm run dev
+
+# ترمینال دیگر
+cd .. && npm install && npm run dev
 ```
 
-ادمین: `admin@antic.local` / `admin123`
+ادمین: `admin@antic.local` / `admin123` → `/login` → `/admin`
 
-### فرانت
+### زرین‌پال (`backend/.env`)
 
-```bash
-npm install
-npm run dev
+```env
+ZARINPAL_MERCHANT_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+ZARINPAL_SANDBOX="true"   # false برای پروداکشن
+FRONTEND_URL="https://your-domain.ir"
+PUBLIC_BASE_URL="https://your-domain.ir"   # یا آدرس API اگر جداست
 ```
 
-http://localhost:5173 — ورود ادمین: `/login`
+اگر `ZARINPAL_MERCHANT_ID` خالی باشد، checkout در **حالت دمو** مستقیم به صفحه نتیجه موفق می‌رود (بدون درگاه واقعی).
 
-## استقرار سرور ایران
+مبالغ فروشگاه به **تومان** است؛ برای زرین‌پال به ریال (`×۱۰`) تبدیل می‌شود.
 
-1. `git clone` و `checkout dev`
-2. بک‌اند: `JWT_SECRET`، `CORS_ORIGIN=https://دامنه.ir`، `PUBLIC_BASE_URL=https://دامنه.ir`
-3. `npm run db:setup && npm start` (یا pm2)
-4. فرانت: `npm run build` → nginx روی `dist/` با پروکسی `/api` و `/uploads` به پورت ۳۰۰۱
+## مسیرهای مهم
 
-پرداخت آنلاین هنوز وصل نیست؛ checkout سبد به صفحه تماس هدایت می‌شود.
+| مسیر | نقش |
+|------|------|
+| `/shop` | فروشگاه |
+| `/checkout` | اطلاعات مشتری + پرداخت |
+| `/admin/products` | CRUD محصولات |
+| `/admin/orders` | لیست سفارش‌ها |
+| `POST /api/orders/checkout` | ایجاد سفارش + لینک پرداخت |
+| `GET /api/orders/zarinpal/callback` | بازگشت از درگاه |
 
 ## لایسنس
 
