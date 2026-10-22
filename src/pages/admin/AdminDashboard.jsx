@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Layers, FolderKanban, ListTree, Inbox, ArrowLeft } from "lucide-react";
+import RenderingStatus from "@/components/admin/RenderingStatus";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -49,6 +50,10 @@ export default function AdminDashboard() {
             <p className="mt-1 font-body text-[11px] text-muted-foreground">{c.label}</p>
           </Link>
         ))}
+      </div>
+
+      <div className="mt-8">
+        <RenderingStatus />
       </div>
 
       <div className="mt-8 rounded-2xl border border-secondary/60 bg-card">
