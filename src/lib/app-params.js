@@ -1,28 +1,29 @@
-import { getAccessToken } from '@base44/sdk';
-
-const isNode = typeof window === 'undefined';
+/**
+ * App params without @base44/sdk.
+ * Env vars are optional; local mock does not need a real app id.
+ */
+const isNode = typeof window === "undefined";
 
 const isClearAccessTokenRequested = () =>
-	!isNode && new URLSearchParams(window.location.search).get("clear_access_token") === 'true';
+  !isNode && new URLSearchParams(window.location.search).get("clear_access_token") === "true";
 
 const clearStoredAccessToken = () => {
-	window.localStorage.removeItem('base44_access_token');
-	window.localStorage.removeItem('token');
-}
+  window.localStorage.removeItem("base44_access_token");
+  window.localStorage.removeItem("token");
+};
 
 const getAppParams = () => {
-	if (isClearAccessTokenRequested()) {
-		clearStoredAccessToken();
-	}
-	return {
-		appId: import.meta.env.VITE_BASE44_APP_ID,
-		token: getAccessToken(),
-		functionsVersion: import.meta.env.VITE_BASE44_FUNCTIONS_VERSION,
-		appBaseUrl: import.meta.env.VITE_BASE44_APP_BASE_URL,
-	}
-}
-
+  if (isClearAccessTokenRequested()) {
+    clearStoredAccessToken();
+  }
+  return {
+    appId: import.meta.env.VITE_APP_ID || "antic-local",
+    token: null,
+    functionsVersion: import.meta.env.VITE_FUNCTIONS_VERSION || "local",
+    appBaseUrl: import.meta.env.VITE_APP_BASE_URL || (typeof window !== "undefined" ? window.location.origin : ""),
+  };
+};
 
 export const appParams = {
-	...getAppParams()
-}
+  ...getAppParams(),
+};
