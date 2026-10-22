@@ -1,26 +1,20 @@
 # فونت‌های محلی پرده آنتیک
 
-ساختار:
-
 ```
 public/fonts/
-  yekan-bakh/     # متن UI (body)
-    YekanBakh-Regular.woff2
-    YekanBakh-SemiBold.woff2
-    YekanBakh-Bold.woff2
-  kalameh/        # تیتر لوکس (display) — همه وزن‌ها
-    Kalameh-Thin.woff2 … Kalameh-Black.woff2
-  peyda/          # heading / دکمه‌ها — همه وزن‌ها
-    Peyda-Thin.woff2 … Peyda-Black.woff2
+  yekan-bakh/   # body
+  kalameh/      # display
+  peyda/        # heading
 ```
 
-نصب:
+نصب سریع:
 
 ```bash
-# از زیپ مرتب‌شده یا fonts.zip خام
-chmod +x scripts/install-fonts.sh
-./scripts/install-fonts.sh /path/to/fonts.zip
+# از زیپ مرتب‌شده (دانلود از چت یا artifacts)
+unzip antic-fonts-organized.zip -d public/fonts
+
+# یا از fonts-b64 داخل ریپو (اگر push شده باشد)
+bash scripts/decode-fonts.sh
 ```
 
-تعریف CSS: `src/styles/fonts.css`  
-اتصال فرانت: `src/main.jsx` → import fonts.css
+فرانت از `src/styles/fonts.css` لود می‌کند.

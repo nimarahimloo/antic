@@ -1,14 +1,11 @@
 /**
- * فونت‌های محلی پرده آنتیک
- * مسیر فایل‌ها: public/fonts/{yekan-bakh|kalameh|peyda}/*.woff2
+ * فونت‌های محلی — فایل‌ها در public/fonts/
+ * بعد از: bash scripts/decode-fonts.sh
  *
- * نقش‌ها:
- *  - Yekan Bakh  → body / متن UI
- *  - Kalameh     → display / تیترهای لوکس
- *  - Peyda       → heading / دکمه‌ها و برچسب‌ها
+ * نقش: Yekan Bakh = body | Peyda = heading | Kalameh = display
  */
 
-/* ─── یکان بخ (اعداد فارسی) ─── */
+/* ─── یکان بخ ─── */
 @font-face {
   font-family: "Yekan Bakh";
   src: url("/fonts/yekan-bakh/YekanBakh-Regular.woff2") format("woff2");
@@ -31,7 +28,7 @@
   font-display: swap;
 }
 
-/* ─── کلمه (اعداد فارسی) — همه وزن‌ها ─── */
+/* ─── کلمه ─── */
 @font-face {
   font-family: "Kalameh";
   src: url("/fonts/kalameh/Kalameh-Thin.woff2") format("woff2");
@@ -96,7 +93,7 @@
   font-display: swap;
 }
 
-/* ─── پیدا — همه وزن‌ها ─── */
+/* ─── پیدا ─── */
 @font-face {
   font-family: "Peyda";
   src: url("/fonts/peyda/Peyda-Thin.woff2") format("woff2");
