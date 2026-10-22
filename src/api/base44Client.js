@@ -91,8 +91,58 @@ const ENTITY_NAMES = [
 
 const entities = Object.fromEntries(ENTITY_NAMES.map((n) => [n, createEntityApi(n)]));
 
+/** Local design consultant agent (no Base44) */
+const agents = {
+  async createConversation({ agent_name, metadata } = {}) {
+    return request("/agents/conversations", {
+      method: "POST",
+      body: { agent_name: agent_name || "design_consultant", metadata },
+      auth: false,
+    });
+  },
+  async getConversation(id) {
+    return request(`/agents/conversations/${id}`, { auth: false });
+  },
+  async addMessage(conversation, message) {
+    const id = typeof conversation === "string" ? conversation : conversation.id;
+    return request(`/agents/conversations/${id}/messages", {
+      method: "POST",
+      body: message,
+      auth: false,
+    });
+  },
+  /**
+   * Poll-based subscribe (replaces Base44 realtime).
+   * Calls onUpdate with full conversation whenever messages change.
+   */
+  subscribeToConversation(id, onUpdate) {
+    let stopped = false;
+    let lastLen = -1;
+    const tick = async () => {
+      if (stopped) return;
+      try {
+        const conv = await agents.getConversation(id);
+        const len = conv.messages?.length ?? 0;
+        if (len !== lastLen) {
+          lastLen = len;
+          onUpdate(conv);
+        }
+      } catch {
+        /* ignore transient */
+      }
+      if (!stopped) timer = setTimeout(tick, 1200);
+    };
+    let timer = setTimeout(tick, 400);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  },
+};
+
 export const base44 = {
   entities,
+  agents,
 
   auth: {
     async me() {
@@ -113,7 +163,8 @@ export const base44 = {
     loginWithProvider(provider, returnTo) {
       console.warn("[antic] OAuth provider not configured:", provider);
       if (typeof window !== "undefined") {
-        window.location.href = "/login" + (returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "");
+        window.location.href =
+          "/login" + (returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "");
       }
     },
     async register(emailOrOpts, password, full_name) {

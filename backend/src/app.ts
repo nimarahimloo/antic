@@ -7,6 +7,8 @@ import uploadRoutes from "./routes/upload.js";
 import functionRoutes from "./routes/functions.js";
 import catalogRoutes from "./routes/catalog.js";
 import orderRoutes from "./routes/orders.js";
+import agentRoutes from "./routes/agents.js";
+import mcpRoutes from "./routes/mcp.js";
 import { HttpError, sendError } from "./lib/errors.js";
 
 const app = express();
@@ -34,6 +36,11 @@ app.get("/api/app/public-settings", (_req, res) => {
     public_settings: {
       app_name: "پرده آنتیک",
       locale: "fa",
+      ai: {
+        design_consultant: "local-catalog",
+        mcp: true,
+        image_generation: false,
+      },
     },
   });
 });
@@ -44,6 +51,8 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/functions", functionRoutes);
 app.use("/api/catalog", catalogRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/agents", agentRoutes);
+app.use("/api/mcp", mcpRoutes);
 
 app.use((_req, _res, next) => {
   next(new HttpError(404, "Not found"));
