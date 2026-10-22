@@ -1,7 +1,20 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
-import { LayoutDashboard, Layers, FolderKanban, ListTree, Inbox, ExternalLink, LogOut, Loader2, AppWindow, Settings } from "lucide-react";
+import {
+  LayoutDashboard,
+  Layers,
+  FolderKanban,
+  ListTree,
+  Inbox,
+  ExternalLink,
+  LogOut,
+  Loader2,
+  AppWindow,
+  Settings,
+  ShoppingBag,
+  Package,
+} from "lucide-react";
 
 const MENU = [
   { to: "/admin", label: "داشبورد", icon: LayoutDashboard, end: true },
@@ -9,8 +22,10 @@ const MENU = [
   { to: "/admin/models", label: "مدل‌های پرده", icon: Layers },
   { to: "/admin/projects", label: "پروژه‌ها", icon: FolderKanban },
   { to: "/admin/categories", label: "دسته‌بندی‌ها", icon: ListTree },
+  { to: "/admin/products", label: "محصولات فروشگاه", icon: ShoppingBag },
+  { to: "/admin/orders", label: "سفارش‌ها", icon: Package },
   { to: "/admin/window", label: "پنجرهٔ مجازی", icon: AppWindow },
-  { to: "/admin/settings", label: "تنظیمات و API", icon: Settings },
+  { to: "/admin/settings", label: "تنظیمات", icon: Settings },
 ];
 
 export default function AdminLayout() {
@@ -31,7 +46,12 @@ export default function AdminLayout() {
         <p className="font-body text-sm leading-7 text-muted-foreground">
           این بخش فقط برای مدیران سایت قابل دسترسی است.
         </p>
-        <Link to="/" className="btn-gold">بازگشت به سایت</Link>
+        <Link to="/login" className="btn-gold">
+          ورود
+        </Link>
+        <Link to="/" className="btn-ghost-gold">
+          بازگشت به سایت
+        </Link>
       </div>
     );
   }
@@ -54,7 +74,7 @@ export default function AdminLayout() {
               <ExternalLink className="h-3.5 w-3.5" /> مشاهده سایت
             </Link>
             <button
-              onClick={() => base44.auth.logout()}
+              onClick={() => base44.auth.logout(window.location.origin + "/")}
               className="flex items-center gap-1.5 font-body text-xs text-muted-foreground transition-colors hover:text-destructive"
             >
               <LogOut className="h-3.5 w-3.5" /> خروج

@@ -21,6 +21,8 @@ import CurtainDetail from '@/pages/CurtainDetail';
 import DesignConsultant from '@/pages/DesignConsultant';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
+import Checkout from '@/pages/Checkout';
+import CheckoutResult from '@/pages/CheckoutResult';
 import AdminLayout from '@/pages/admin/AdminLayout';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminModels from '@/pages/admin/AdminModels';
@@ -29,6 +31,8 @@ import AdminCategories from '@/pages/admin/AdminCategories';
 import AdminRequests from '@/pages/admin/AdminRequests';
 import AdminWindowSettings from '@/pages/admin/AdminWindowSettings';
 import AdminSettings from '@/pages/admin/AdminSettings';
+import AdminProducts from '@/pages/admin/AdminProducts';
+import AdminOrders from '@/pages/admin/AdminOrders';
 import { useSmoothScroll } from '@/hooks/useSmoothScroll';
 
 const AuthenticatedApp = () => {
@@ -66,6 +70,8 @@ const AuthenticatedApp = () => {
           <Route path="/connect" element={<Connect />} />
           <Route path="/curtain/:id" element={<CurtainDetail />} />
           <Route path="/consultant" element={<DesignConsultant />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/checkout/result" element={<CheckoutResult />} />
         </Route>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
@@ -73,6 +79,8 @@ const AuthenticatedApp = () => {
           <Route path="models" element={<AdminModels />} />
           <Route path="projects" element={<AdminProjects />} />
           <Route path="categories" element={<AdminCategories />} />
+          <Route path="products" element={<AdminProducts />} />
+          <Route path="orders" element={<AdminOrders />} />
           <Route path="window" element={<AdminWindowSettings />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
@@ -81,7 +89,6 @@ const AuthenticatedApp = () => {
     </CartProvider>
   );
 };
-
 
 function App() {
   return (
