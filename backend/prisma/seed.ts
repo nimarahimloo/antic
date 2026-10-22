@@ -4,298 +4,200 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-/** دسته‌های کامل کاتالوگ (هم‌تراز src/lib/catalogData.js) */
-const CURTAIN_CATEGORIES = [
+/**
+ * دسته‌بندی واقعی فروشگاه از ووکامرس justelea_antic (product_cat)
+ * parent=0 → دسته اصلی؛ بقیه زیرمجموعه
+ */
+type WooCat = {
+  termId: number;
+  name: string;
+  slug: string;
+  parentTermId: number;
+  order: number;
+};
+
+const WOO_PRODUCT_CATS: WooCat[] = [
+  // ── اصلی ──
+  { termId: 64, name: "شید", slug: "shade", parentTermId: 0, order: 1 },
+  { termId: 68, name: "رومن", slug: "roman", parentTermId: 0, order: 2 },
+  { termId: 70, name: "پلیسه", slug: "pleated", parentTermId: 0, order: 3 },
+  { termId: 76, name: "ترک پنل", slug: "turk-panel", parentTermId: 0, order: 4 },
+  { termId: 77, name: "پرده کرکره‌ای", slug: "roller", parentTermId: 0, order: 5 },
+  { termId: 81, name: "پرده کوبیسم", slug: "cubism", parentTermId: 0, order: 6 },
+  { termId: 82, name: "پرده چاپی", slug: "printed", parentTermId: 0, order: 7 },
+  { termId: 85, name: "پرده اورسی", slug: "aurora", parentTermId: 0, order: 8 },
+  { termId: 86, name: "پرده زبرا", slug: "zebra", parentTermId: 0, order: 9 },
+  { termId: 90, name: "حریر", slug: "silk", parentTermId: 0, order: 10 },
+  { termId: 91, name: "مخمل", slug: "velvet", parentTermId: 0, order: 11 },
+  { termId: 92, name: "کتان", slug: "cotton", parentTermId: 0, order: 12 },
+  { termId: 93, name: "تور", slug: "sheer", parentTermId: 0, order: 13 },
+  { termId: 95, name: "اکسسوری", slug: "accessories", parentTermId: 0, order: 14 },
+  { termId: 2140, name: "پرده آشپزخانه", slug: "kitchen", parentTermId: 0, order: 15 },
+  { termId: 2179, name: "پرده اداری", slug: "office", parentTermId: 0, order: 16 },
+
+  // ── زیر شید (64) ──
+  { termId: 65, name: "شید بلک اوت", slug: "shade-blackout", parentTermId: 64, order: 101 },
+  { termId: 66, name: "شید اسکرین", slug: "shade-screen", parentTermId: 64, order: 102 },
+  { termId: 67, name: "دبل شید", slug: "double-shade", parentTermId: 64, order: 103 },
+  { termId: 80, name: "مینی شید", slug: "mini-shade", parentTermId: 64, order: 104 },
+
+  // ── زیر رومن (68) ──
+  { termId: 69, name: "شید رومن", slug: "shade-roman", parentTermId: 68, order: 201 },
+
+  // ── زیر پلیسه (70) ──
+  { termId: 71, name: "پلیسه دستی", slug: "pleated-manual", parentTermId: 70, order: 301 },
+  { termId: 72, name: "پلیسه زنجیری", slug: "pleated-chain", parentTermId: 70, order: 302 },
+  { termId: 73, name: "پلیسه تاچ", slug: "pleated-touch", parentTermId: 70, order: 303 },
+  { termId: 74, name: "پلیسه شب و روز", slug: "pleated-day-night", parentTermId: 70, order: 304 },
+  { termId: 75, name: "توری پلیسه", slug: "pleated-mesh", parentTermId: 70, order: 305 },
+
+  // ── زیر کرکره‌ای (77) ──
+  { termId: 78, name: "کرکره چوبی", slug: "wooden-blind", parentTermId: 77, order: 401 },
+  { termId: 79, name: "کرکره فلزی / آلومینیومی", slug: "metal-blind", parentTermId: 77, order: 402 },
+
+  // ── زیر چاپی (82) ──
+  { termId: 84, name: "هازان چاپی", slug: "printed-hazan", parentTermId: 82, order: 501 },
+
+  // ── زیر زبرا (86) ──
+  { termId: 83, name: "زبرا چاپی", slug: "zebra-printed", parentTermId: 86, order: 601 },
+
+  // ── زیر اکسسوری (95) ──
+  { termId: 2141, name: "بند چرم", slug: "leather-cord", parentTermId: 95, order: 701 },
+  { termId: 2142, name: "قپه", slug: "finial", parentTermId: 95, order: 702 },
+  { termId: 2143, name: "بوردر", slug: "border", parentTermId: 95, order: 703 },
+  { termId: 2144, name: "گل میخ", slug: "nailhead", parentTermId: 95, order: 704 },
+  { termId: 2145, name: "منگوله", slug: "tassel", parentTermId: 95, order: 705 },
+  { termId: 2149, name: "شرابه", slug: "fringe", parentTermId: 95, order: 706 },
+  { termId: 2150, name: "کمر پرده", slug: "tieback", parentTermId: 95, order: 707 },
+];
+
+/** برای کاتالوگ پرده — فقط دسته‌های اصلی + زیردسته‌ها به‌صورت JSON */
+function buildCurtainCategories() {
+  const roots = WOO_PRODUCT_CATS.filter((c) => c.parentTermId === 0);
+  return roots.map((root) => {
+    const children = WOO_PRODUCT_CATS.filter((c) => c.parentTermId === root.termId);
+    return {
+      name: root.name,
+      slug: root.slug,
+      order: root.order,
+      subcategories: children.map((ch) => ({ name: ch.name, slug: ch.slug })),
+    };
+  });
+}
+
+/** نمونه محصولات واقعی از ووکامرس (نمونه export) */
+const SAMPLE_PRODUCTS = [
   {
-    name: "رومن",
-    slug: "roman",
-    order: 1,
-    subcategories: [
-      { name: "ساده", slug: "plain" },
-      { name: "طرح‌دار", slug: "patterned" },
-      { name: "بلک‌اوت", slug: "blackout" },
-    ],
+    name: "پلیسه دستی پرده",
+    slug: "pleated-manual-curtain",
+    categorySlug: "pleated-manual",
+    price: 0,
+    description: "پلیسه دستی از کاتالوگ فروشگاه",
   },
   {
-    name: "شید",
-    slug: "shade",
-    order: 2,
-    subcategories: [
-      { name: "بلک‌اوت", slug: "blackout" },
-      { name: "اسکرین", slug: "screen" },
-      { name: "هارمونی", slug: "harmony" },
-      { name: "ساده", slug: "plain" },
-    ],
+    name: "قپه پرده دکوراتیو (سرپرده تزئینی)",
+    slug: "decorative-finial",
+    categorySlug: "finial",
+    price: 0,
+    description: "قپه / سرپرده تزئینی",
   },
   {
-    name: "دبل شید",
-    slug: "double-shade",
-    order: 3,
-    subcategories: [
-      { name: "روز/شب", slug: "day-night" },
-      { name: "دو لایه", slug: "double-layer" },
-    ],
+    name: "بوردر پرده دکوراتیو (نوار تزئینی پرده)",
+    slug: "decorative-border",
+    categorySlug: "border",
+    price: 0,
+    description: "نوار تزئینی پرده",
   },
   {
-    name: "پلیسه",
-    slug: "pleated",
-    order: 4,
-    subcategories: [
-      { name: "دستی", slug: "manual" },
-      { name: "زنجیری", slug: "chain" },
-    ],
+    name: "گل میخ پرده دکوراتیو",
+    slug: "decorative-nailhead",
+    categorySlug: "nailhead",
+    price: 0,
+    description: "گل میخ دکوراتیو",
   },
   {
-    name: "کرکره‌ای",
-    slug: "roller",
-    order: 5,
-    subcategories: [
-      { name: "ساده", slug: "plain" },
-      { name: "طرح‌دار", slug: "patterned" },
-    ],
+    name: "تور قیطان‌دوزی Avin – مناسب دکوراسیون کلاسیک و نئوکلاسیک",
+    slug: "avin-sheer-braid",
+    categorySlug: "sheer",
+    price: 0,
+    description: "تور قیطان‌دوزی Avin",
   },
   {
-    name: "زبرا",
-    slug: "zebra",
-    order: 6,
-    subcategories: [
-      { name: "ساده", slug: "plain" },
-      { name: "طرح‌دار", slug: "patterned" },
-    ],
+    name: "تور پرده Jonas ترک – عرض ۳ متر، پایین سرب‌دار و ضد دید",
+    slug: "jonas-sheer-turkey",
+    categorySlug: "sheer",
+    price: 0,
+    description: "تور Jonas ترک — عرض ۳ متر",
   },
   {
-    name: "چاپی",
-    slug: "printed",
-    order: 7,
-    subcategories: [
-      { name: "ساده", slug: "plain" },
-      { name: "طرح‌دار", slug: "patterned" },
-      { name: "دیجیتال", slug: "digital" },
-    ],
-  },
-  {
-    name: "اورسی",
-    slug: "aurora",
-    order: 8,
-    subcategories: [
-      { name: "ساده", slug: "plain" },
-      { name: "دو لایه", slug: "double-layer" },
-    ],
-  },
-  {
-    name: "ترک پنل",
-    slug: "turk-panel",
-    order: 9,
-    subcategories: [
-      { name: "افقی", slug: "horizontal" },
-      { name: "عمودی", slug: "vertical" },
-    ],
-  },
-  {
-    name: "کوبیسم",
-    slug: "cubism",
-    order: 10,
-    subcategories: [
-      { name: "هندسی", slug: "geometric" },
-      { name: "انتزاعی", slug: "abstract" },
-    ],
-  },
-  {
-    name: "پرده استخری",
-    slug: "outdoor",
-    order: 11,
-    subcategories: [
-      { name: "ساده", slug: "plain" },
-      { name: "کرکره‌ای", slug: "roller" },
-    ],
-  },
-  {
-    name: "پرده کنترلی",
-    slug: "motorized",
-    order: 12,
-    subcategories: [
-      { name: "موتوردار", slug: "motor" },
-      { name: "هوشمند", slug: "smart" },
-    ],
-  },
-  {
-    name: "اکسسوری",
-    slug: "accessories",
-    order: 13,
-    subcategories: [
-      { name: "نیوار", slug: "tieback" },
-      { name: "حلقه", slug: "ring" },
-      { name: "چوب", slug: "rod" },
-    ],
-  },
-  {
-    name: "توری پلیسه",
-    slug: "pleated-mesh",
-    order: 14,
-    subcategories: [
-      { name: "ثابت", slug: "fixed" },
-      { name: "متحرک", slug: "movable" },
-    ],
-  },
-  {
-    name: "تور",
-    slug: "sheer",
-    order: 15,
-    subcategories: [
-      { name: "ساده", slug: "plain" },
-      { name: "طرح‌دار", slug: "patterned" },
-    ],
-  },
-  {
-    name: "حریر",
-    slug: "silk",
-    order: 16,
-    subcategories: [
-      { name: "ساده", slug: "plain" },
-      { name: "طرح‌دار", slug: "patterned" },
-    ],
-  },
-  {
-    name: "مخمل",
-    slug: "velvet",
-    order: 17,
-    subcategories: [
-      { name: "ساده", slug: "plain" },
-      { name: "طرح‌دار", slug: "patterned" },
-    ],
-  },
-  {
-    name: "کتان",
-    slug: "cotton",
-    order: 18,
-    subcategories: [
-      { name: "ساده", slug: "plain" },
-      { name: "طرح‌دار", slug: "patterned" },
-    ],
+    name: "تور پرده Benis ترک (بریلنت) – عرض ۳ متر، ضد چروک و پایین سرب‌دار",
+    slug: "benis-sheer-turkey",
+    categorySlug: "sheer",
+    price: 0,
+    description: "تور Benis ترک (بریلنت)",
   },
 ];
 
-/** نمونه مدل برای هر دسته اصلی — تا کاتالوگ خالی نباشد */
 const SAMPLE_MODELS = [
   {
-    code: "RM-101",
-    name: "رومن کلاسیک کرم",
-    categorySlug: "roman",
-    subcategory: "plain",
-    fabric: "کتان",
-    color: "کرم",
-    colorCode: "#E8DCC8",
-    material: "cotton",
-    texture: "صاف",
-    description: "رومن ساده مناسب نشیمن؛ جمع‌شدن مرتب افقی.",
-  },
-  {
-    code: "SH-201",
-    name: "شید بلک‌اوت ذغالی",
+    code: "SH-001",
+    name: "شید بلک‌اوت",
     categorySlug: "shade",
-    subcategory: "blackout",
+    subcategory: "shade-blackout",
     fabric: "بلک‌اوت",
     color: "ذغالی",
     colorCode: "#3B352C",
     material: "cotton",
     texture: "مات",
-    description: "کنترل کامل نور برای اتاق خواب.",
+    description: "شید بلک‌اوت از کاتالوگ فروشگاه",
   },
   {
-    code: "ZB-301",
-    name: "زبرا نقره‌ای",
-    categorySlug: "zebra",
-    subcategory: "plain",
-    fabric: "پلی‌استر",
-    color: "نقره‌ای",
-    colorCode: "#B8B8B8",
-    material: "cotton",
-    texture: "نوار",
-    description: "نوار پارچه و تور؛ تنظیم نور با زنجیر.",
-  },
-  {
-    code: "PL-401",
-    name: "پلیسه دستی سفید",
+    code: "PL-001",
+    name: "پلیسه دستی",
     categorySlug: "pleated",
-    subcategory: "manual",
+    subcategory: "pleated-manual",
     fabric: "پلیسه",
     color: "سفید",
     colorCode: "#F0EDE5",
     material: "cotton",
     texture: "آکاردئون",
-    description: "پلیسه دستی داخل فریم.",
+    description: "پلیسه دستی",
   },
   {
-    code: "DR-501",
-    name: "پرده کلاسیک طلایی",
-    categorySlug: "printed",
-    subcategory: "plain",
-    fabric: "مخمل",
-    color: "طلایی",
-    colorCode: "#C9A227",
-    material: "velvet",
-    texture: "پرزدار",
-    description: "چین عمودی نرم روی میله؛ مناسب پذیرایی.",
-  },
-  {
-    code: "WV-601",
-    name: "اورسی موجی بژ",
-    categorySlug: "aurora",
-    subcategory: "plain",
-    fabric: "کتان",
-    color: "بژ",
-    colorCode: "#D4C5A9",
+    code: "ZB-001",
+    name: "پرده زبرا",
+    categorySlug: "zebra",
+    subcategory: "zebra-printed",
+    fabric: "پلی‌استر",
+    color: "نقره‌ای",
+    colorCode: "#B8B8B8",
     material: "cotton",
-    texture: "موج",
-    description: "موج S منظم اورسی.",
+    texture: "نوار",
+    description: "زبرا / زبرا چاپی",
   },
   {
-    code: "PN-701",
-    name: "ترک پنل طوسی",
-    categorySlug: "turk-panel",
-    subcategory: "vertical",
-    fabric: "اسکرین",
-    color: "طوسی",
-    colorCode: "#6B6B6B",
+    code: "RM-001",
+    name: "رومن",
+    categorySlug: "roman",
+    subcategory: "shade-roman",
+    fabric: "کتان",
+    color: "کرم",
+    colorCode: "#E8DCC8",
     material: "cotton",
     texture: "صاف",
-    description: "پنل‌های صاف روی ریل سقفی.",
+    description: "رومن کلاسیک",
   },
   {
-    code: "VL-801",
-    name: "مخمل سبز زیتونی",
-    categorySlug: "velvet",
-    subcategory: "plain",
-    fabric: "مخمل",
-    color: "زیتونی",
-    colorCode: "#6B7B5A",
-    material: "velvet",
-    texture: "پرزدار",
-    description: "عمق رنگ مخمل برای فضای رسمی.",
-  },
-  {
-    code: "SK-901",
-    name: "حریر شیری",
-    categorySlug: "silk",
-    subcategory: "plain",
-    fabric: "حریر",
-    color: "شیری",
-    colorCode: "#F8F5F0",
-    material: "silk",
-    texture: "براق",
-    description: "لایه رویین شفاف و لوکس.",
-  },
-  {
-    code: "SH-902",
-    name: "تور سفید",
+    code: "TR-001",
+    name: "تور",
     categorySlug: "sheer",
-    subcategory: "plain",
+    subcategory: "",
     fabric: "تور",
     color: "سفید",
     colorCode: "#FAFAFA",
     material: "sheer",
     texture: "توری",
-    description: "لایه شفاف برای نرم کردن نور.",
+    description: "تور پرده",
   },
 ];
 
@@ -318,8 +220,9 @@ async function seedAdmin() {
   }
 }
 
-async function seedCategories() {
-  for (const c of CURTAIN_CATEGORIES) {
+async function seedCurtainCategories() {
+  const cats = buildCurtainCategories();
+  for (const c of cats) {
     await prisma.curtainCategory.upsert({
       where: { slug: c.slug },
       create: {
@@ -335,13 +238,87 @@ async function seedCategories() {
       },
     });
   }
-  console.log(`Curtain categories: ${CURTAIN_CATEGORIES.length}`);
+  console.log(`Curtain categories: ${cats.length} (from WooCommerce product_cat)`);
+}
+
+async function seedShopCategories() {
+  // parents first
+  const sorted = [...WOO_PRODUCT_CATS].sort((a, b) => {
+    if (a.parentTermId === 0 && b.parentTermId !== 0) return -1;
+    if (a.parentTermId !== 0 && b.parentTermId === 0) return 1;
+    return a.order - b.order;
+  });
+
+  const termToId = new Map<number, string>();
+
+  for (const c of sorted) {
+    const parentName =
+      c.parentTermId !== 0
+        ? WOO_PRODUCT_CATS.find((x) => x.termId === c.parentTermId)?.name
+        : null;
+    const description = parentName ? `زیرمجموعه: ${parentName}` : null;
+
+    const row = await prisma.shopCategory.upsert({
+      where: { slug: c.slug },
+      create: {
+        name: c.name,
+        slug: c.slug,
+        description,
+        visible: true,
+        order: c.order,
+      },
+      update: {
+        name: c.name,
+        description,
+        order: c.order,
+        visible: true,
+      },
+    });
+    termToId.set(c.termId, row.id);
+  }
+  console.log(`Shop categories: ${sorted.length}`);
+  return termToId;
+}
+
+async function seedProducts(termToId: Map<number, string>) {
+  const slugToCatId = new Map<string, string>();
+  for (const c of WOO_PRODUCT_CATS) {
+    const id = termToId.get(c.termId);
+    if (id) slugToCatId.set(c.slug, id);
+  }
+
+  let n = 0;
+  for (const p of SAMPLE_PRODUCTS) {
+    const categoryId = slugToCatId.get(p.categorySlug) || null;
+    await prisma.product.upsert({
+      where: { slug: p.slug },
+      create: {
+        name: p.name,
+        slug: p.slug,
+        description: p.description,
+        price: p.price,
+        currency: "IRR",
+        categoryId,
+        visible: true,
+        inStock: true,
+        stock: 50,
+        sortOrder: ++n,
+      },
+      update: {
+        name: p.name,
+        description: p.description,
+        categoryId,
+        visible: true,
+      },
+    });
+  }
+  console.log(`Shop products (sample from Woo): ${SAMPLE_PRODUCTS.length}`);
 }
 
 async function seedModels() {
   const count = await prisma.curtainModel.count();
   if (count > 0) {
-    console.log(`Curtain models already present (${count}) — skip sample models`);
+    console.log(`Curtain models already present (${count}) — skip samples`);
     return;
   }
   for (const m of SAMPLE_MODELS) {
@@ -350,82 +327,27 @@ async function seedModels() {
   console.log(`Sample curtain models: ${SAMPLE_MODELS.length}`);
 }
 
-async function seedShop() {
-  const shopCats = [
-    { name: "حلقه و میله", slug: "rings-rods", order: 1 },
-    { name: "نیوار", slug: "tiebacks", order: 2 },
-    { name: "فینیس", slug: "finials", order: 3 },
-  ];
-  for (const c of shopCats) {
-    await prisma.shopCategory.upsert({
-      where: { slug: c.slug },
-      create: c,
-      update: { name: c.name, order: c.order },
+async function seedVirtualWindow() {
+  const n = await prisma.virtualWindowSetting.count();
+  if (n === 0) {
+    await prisma.virtualWindowSetting.create({
+      data: {
+        wallColor: "#75634f",
+        frameColor: "#3b352c",
+        railColor: "#C9A227",
+      },
     });
   }
-  const ring = await prisma.shopCategory.findUnique({ where: { slug: "rings-rods" } });
-
-  const productCount = await prisma.product.count();
-  if (productCount === 0) {
-    await prisma.product.createMany({
-      data: [
-        {
-          name: "حلقه فلزی طلایی",
-          slug: "gold-metal-ring",
-          description: "<p>حلقه پرده فلزی با پوشش طلایی — مناسب پرده‌های کلاسیک.</p>",
-          price: 185000,
-          compareAtPrice: 220000,
-          currency: "IRR",
-          categoryId: ring?.id || null,
-          visible: true,
-          inStock: true,
-          stock: 50,
-          ribbon: "پرفروش",
-          sortOrder: 1,
-        },
-        {
-          name: "میله پرده استیل",
-          slug: "steel-curtain-rod",
-          description: "<p>میله استیل ضدزنگ، قطر ۲.۵ سانتی‌متر، قابل برش.</p>",
-          price: 890000,
-          currency: "IRR",
-          categoryId: ring?.id || null,
-          visible: true,
-          inStock: true,
-          stock: 20,
-          sortOrder: 2,
-        },
-        {
-          name: "نیوار مخملی",
-          slug: "velvet-tieback",
-          description: "<p>نیوار مخمل با منگوله تزئینی.</p>",
-          price: 320000,
-          currency: "IRR",
-          visible: true,
-          inStock: true,
-          stock: 30,
-          sortOrder: 3,
-        },
-      ],
-    });
-    console.log("Sample shop products seeded");
-  }
-
-  await prisma.virtualWindowSetting.create({
-    data: {
-      wallColor: "#75634f",
-      frameColor: "#3b352c",
-      railColor: "#C9A227",
-    },
-  }).catch(() => {});
 }
 
 async function main() {
   await seedAdmin();
-  await seedCategories();
+  await seedCurtainCategories();
+  const termToId = await seedShopCategories();
+  await seedProducts(termToId);
   await seedModels();
-  await seedShop();
-  console.log("Seed complete.");
+  await seedVirtualWindow();
+  console.log("Seed complete — WooCommerce categories loaded.");
 }
 
 main()
