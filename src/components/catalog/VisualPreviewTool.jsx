@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import VirtualWindow from "@/components/catalog/VirtualWindow";
 import { DEFAULT_SETTINGS } from "@/components/catalog/windowStyles";
 import { RotateCcw } from "lucide-react";
@@ -38,7 +38,9 @@ function ColorControl({ label, value, onChange, presets }) {
     <div>
       <div className="flex items-center justify-between">
         <p className="font-body text-xs text-muted-foreground">{label}</p>
-        <span className="font-mono text-[10px] text-muted-foreground/70" dir="ltr">{value.toUpperCase()}</span>
+        <span className="font-mono text-[10px] text-muted-foreground/70" dir="ltr">
+          {value.toUpperCase()}
+        </span>
       </div>
       <div className="mt-2 flex items-center gap-2.5">
         <input
@@ -85,6 +87,8 @@ export default function VisualPreviewTool({ fabric }) {
     [wallColor, frameColor, railColor]
   );
 
+  const onOpenChange = useCallback((v) => setOpen(v), []);
+
   const reset = () => {
     setWallColor(DEFAULT_SETTINGS.wall_color);
     setFrameColor(DEFAULT_SETTINGS.frame_color);
@@ -103,7 +107,7 @@ export default function VisualPreviewTool({ fabric }) {
             پرده را در <span className="text-gold-gradient">فضای خانه خود</span> ببینید
           </h3>
           <p className="mt-1.5 font-body text-xs leading-6 text-muted-foreground">
-            رنگ دیوار و چارچوب پنجره‌تان را تنظیم کنید تا طرح نهایی پرده را در محیط واقعی تصور کنید.
+            روی پرده بکشید تا باز یا بالا شود؛ رنگ دیوار و چارچوب را تنظیم کنید.
           </p>
         </div>
         <button
@@ -115,16 +119,16 @@ export default function VisualPreviewTool({ fabric }) {
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-5 lg:gap-6">
-        {/* پیش‌نمایش */}
         <div className="lg:col-span-3">
-          <VirtualWindow fabric={fabric} settings={settings} open={open} scale={0.7} />
-          {/* اسلایدر بازشدن */}
+          <VirtualWindow fabric={fabric} settings={settings} open={open} scale={0.7} onOpenChange={onOpenChange} />
           <div className="mt-4 rounded-xl border border-border bg-background/50 p-4">
             <div className="flex items-center justify-between">
               <label className="font-body text-xs text-muted-foreground">
-                {isZebra ? "هم‌پوشانی نوارها" : "میزان بازشدن پرده"}
+                {isZebra ? "بالا / پایین نوارها" : "میزان بازشدن / جمع شدن"}
               </label>
-              <span className="font-mono text-[10px] text-primary" dir="ltr">{Math.round(open * 100)}%</span>
+              <span className="font-mono text-[10px] text-primary" dir="ltr">
+                {Math.round(open * 100)}%
+              </span>
             </div>
             <input
               type="range"
@@ -134,15 +138,19 @@ export default function VisualPreviewTool({ fabric }) {
               value={open}
               onChange={(e) => setOpen(Number(e.target.value))}
               className="mt-3 block w-full accent-primary"
-              aria-label={isZebra ? "هم‌پوشانی نوارها" : "میزان بازشدن پرده"}
+              aria-label="میزان بازشدن پرده"
             />
           </div>
         </div>
 
-        {/* کنترل‌ها */}
         <div className="space-y-5 lg:col-span-2">
           <ColorControl label="رنگ دیوار" value={wallColor} onChange={setWallColor} presets={WALL_PRESETS} />
-          <ColorControl label="رنگ چارچوب پنجره" value={frameColor} onChange={setFrameColor} presets={FRAME_PRESETS} />
+          <ColorControl
+            label="رنگ چارچوب پنجره"
+            value={frameColor}
+            onChange={setFrameColor}
+            presets={FRAME_PRESETS}
+          />
           <ColorControl label="رنگ ریل و میله" value={railColor} onChange={setRailColor} presets={RAIL_PRESETS} />
         </div>
       </div>
