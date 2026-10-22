@@ -4,27 +4,38 @@ import { requireAdmin, type AuthedRequest } from "../middleware/auth.js";
 import { HttpError, sendError } from "../lib/errors.js";
 import { getQueueState, renderOneModel, runBatch } from "../services/renderQueue.js";
 import { prisma } from "../lib/prisma.js";
+import { ALL_STYLE_KEYS, STYLE_META, resolveStyle, guessMaterial } from "../lib/curtainStyles.js";
 
 const router = Router();
 
-/**
- * Public: ONLY returns cached image — never generates.
- * Generation is admin-only (batch / one / functions.invoke).
- */
+/** Public: cached only — no generation */
 router.get("/install/:modelId", async (req, res) => {
   try {
     const model = await prisma.curtainModel.findUnique({ where: { id: req.params.modelId } });
     if (!model) throw new HttpError(404, "Model not found");
+    const style = resolveStyle(model);
     res.json({
       install_image: model.installImage || null,
       status: model.installStatus || null,
       fabric_image: model.image || null,
-      // client may fall back to live WebGL preview if null
+      style,
+      style_label: STYLE_META[style]?.label,
+      material: guessMaterial(model),
       generated: Boolean(model.installImage),
     });
   } catch (err) {
     sendError(res, err);
   }
+});
+
+/** Public: taxonomy for admin UI / docs */
+router.get("/styles", (_req, res) => {
+  res.json({
+    styles: ALL_STYLE_KEYS.map((k) => ({
+      key: k,
+      ...STYLE_META[k],
+    })),
+  });
 });
 
 router.post("/batch", requireAdmin, async (req: AuthedRequest, res) => {
@@ -67,34 +78,47 @@ router.post("/one", requireAdmin, async (req: AuthedRequest, res) => {
 
 router.get("/stats", requireAdmin, async (_req, res) => {
   try {
-    const total = await prisma.curtainModel.count();
-    const withFabric = await prisma.curtainModel.count({
-      where: { NOT: [{ image: null }, { image: "" }] },
-    });
-    // sqlite-friendly counts
     const models = await prisma.curtainModel.findMany({
-      select: { image: true, installImage: true, installStatus: true },
+      select: {
+        image: true,
+        installImage: true,
+        installStatus: true,
+        categorySlug: true,
+        subcategory: true,
+      },
     });
     let withInstall = 0,
       approved = 0,
       rejected = 0,
       fabric = 0;
+    const byStyle: Record<string, { total: number; withInstall: number }> = {};
     for (const m of models) {
       if (m.image) fabric++;
       if (m.installImage) withInstall++;
       if (m.installStatus === "approved") approved++;
       if (m.installStatus === "rejected") rejected++;
+      const st = resolveStyle(m);
+      if (!byStyle[st]) byStyle[st] = { total: 0, withInstall: 0 };
+      byStyle[st].total++;
+      if (m.installImage) byStyle[st].withInstall++;
     }
-    const templates = await prisma.renderTemplate.count();
+    const templateRows = await prisma.renderTemplate.findMany({
+      select: { style: true },
+    });
+    const templateStyles = new Set(templateRows.map((t) => t.style));
+    const missingTemplates = ALL_STYLE_KEYS.filter((k) => !templateStyles.has(k));
+
     res.json({
-      total,
+      total: models.length,
       withFabric: fabric,
       withInstall,
       approved,
       rejected,
       pendingReview: withInstall - approved - rejected,
       missingInstall: fabric - withInstall,
-      templates,
+      templates: templateRows.length,
+      missingTemplates,
+      byStyle,
       queue: getQueueState(),
     });
   } catch (err) {
