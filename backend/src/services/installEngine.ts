@@ -1,12 +1,14 @@
 /**
  * High-accuracy local install engine (no external AI).
- * Soft chroma key + fabric pattern preserve (0.82) + brand watermark.
+ * Soft chroma key + fabric pattern preserve + brand watermark.
+ * Template geometry defines install form (roman / pleated / shade…);
+ * fabric photo defines color, weave, and print scale.
  */
 
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
-import { resolveStyle, guessMaterial } from "../lib/curtainStyles.js";
+import { resolveStyle, guessMaterial, styleTileFactor } from "../lib/curtainStyles.js";
 import { applyBrandWatermark } from "./brandWatermark.js";
 
 export type RenderInput = {
@@ -109,24 +111,6 @@ function materialParams(material?: string, logStd?: number) {
   }
 }
 
-function styleTileFactor(style?: string) {
-  switch (style) {
-    case "zebra":
-      return 0.95;
-    case "roman":
-      return 0.9;
-    case "shade":
-    case "double":
-      return 0.88;
-    case "roller":
-      return 0.85;
-    case "panel":
-      return 0.92;
-    default:
-      return 1;
-  }
-}
-
 async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCache> {
   const cacheKey = `${src}::${maxWidth}`;
   const hit = templateCache.get(cacheKey);
@@ -209,9 +193,21 @@ function sampleFab(fd: Buffer, fw: number, fh: number, u: number, v: number): [n
   const i10 = (y0 * fw + x1) * 4;
   const i01 = (y1 * fw + x0) * 4;
   const i11 = (y1 * fw + x1) * 4;
-  const r = fd[i00] * (1 - fx) * (1 - fy) + fd[i10] * fx * (1 - fy) + fd[i01] * (1 - fx) * fy + fd[i11] * fx * fy;
-  const g = fd[i00 + 1] * (1 - fx) * (1 - fy) + fd[i10 + 1] * fx * (1 - fy) + fd[i01 + 1] * (1 - fx) * fy + fd[i11 + 1] * fx * fy;
-  const b = fd[i00 + 2] * (1 - fx) * (1 - fy) + fd[i10 + 2] * fx * (1 - fy) + fd[i01 + 2] * (1 - fx) * fy + fd[i11 + 2] * fx * fy;
+  const r =
+    fd[i00] * (1 - fx) * (1 - fy) +
+    fd[i10] * fx * (1 - fy) +
+    fd[i01] * (1 - fx) * fy +
+    fd[i11] * fx * fy;
+  const g =
+    fd[i00 + 1] * (1 - fx) * (1 - fy) +
+    fd[i10 + 1] * fx * (1 - fy) +
+    fd[i01 + 1] * (1 - fx) * fy +
+    fd[i11 + 1] * fx * fy;
+  const b =
+    fd[i00 + 2] * (1 - fx) * (1 - fy) +
+    fd[i10 + 2] * fx * (1 - fy) +
+    fd[i01 + 2] * (1 - fx) * fy +
+    fd[i11 + 2] * fx * fy;
   return [r, g, b];
 }
 
@@ -220,7 +216,9 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const maxWidth = input.maxWidth || Number(process.env.RENDER_MAX_WIDTH) || 1400;
   const tpl = await decodeTemplate(input.templatePathOrUrl, maxWidth);
   const mat = materialParams(input.material, tpl.logStd);
-  const fabricScale = (input.fabricScale ?? mat.tile) * styleTileFactor(input.style);
+  // Prefer explicit fabricScale, else material tile × mechanism factor (aligned with frontend)
+  const fabricScale =
+    input.fabricScale ?? mat.tile * styleTileFactor(input.style);
 
   const fabricBuf = await loadBuffer(input.fabricPathOrUrl);
   const fabMeta = await sharp(fabricBuf).metadata();
@@ -235,7 +233,10 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  let meanR = 0, meanG = 0, meanB = 0, nF = 0;
+  let meanR = 0,
+    meanG = 0,
+    meanB = 0,
+    nF = 0;
   for (let i = 0; i < fd.length; i += 4) {
     if (fd[i + 3] < 16) continue;
     meanR += toLin(fd[i]);
@@ -259,14 +260,22 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
-      const pr = td[i], pg = td[i + 1], pb = td[i + 2], pa = td[i + 3];
-      const rn = pr / 255, gn = pg / 255, bn = pb / 255;
+      const pr = td[i],
+        pg = td[i + 1],
+        pb = td[i + 2],
+        pa = td[i + 3];
+      const rn = pr / 255,
+        gn = pg / 255,
+        bn = pb / 255;
       const gdom = gn - Math.max(rn, bn);
       const sat = gn / Math.max(rn + gn + bn, 1e-3);
       const key = smoothstep(0.035, 0.14, gdom) * smoothstep(0.26, 0.4, sat);
 
       if (key < 0.006) {
-        out[i] = pr; out[i + 1] = pg; out[i + 2] = pb; out[i + 3] = pa;
+        out[i] = pr;
+        out[i + 1] = pg;
+        out[i + 2] = pb;
+        out[i + 3] = pa;
         continue;
       }
 
@@ -294,7 +303,9 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       const v = py / (tileY * compress) + gy * warp * 0.28;
       const [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u * fi.width, v * fi.height);
 
-      const flr = toLin(fr), flg = toLin(fg), flb = toLin(fb);
+      const flr = toLin(fr),
+        flg = toLin(fg),
+        flb = toLin(fb);
       const ratioR = Math.min(1.35, Math.max(0.75, flr / Math.max(meanR, 0.004)));
       const ratioG = Math.min(1.35, Math.max(0.75, flg / Math.max(meanG, 0.004)));
       const ratioB = Math.min(1.35, Math.max(0.75, flb / Math.max(meanB, 0.004)));
@@ -303,12 +314,16 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       const flatB = flb * 0.82 + meanB * ratioB * 0.18;
 
       const ao = mat.ao != null ? 1 - (1 - smoothstep(0.25, 1.15, s)) * mat.ao * 0.78 : 1;
-      let cr = flatR * s * ao, cg = flatG * s * ao, cb = flatB * s * ao;
+      let cr = flatR * s * ao,
+        cg = flatG * s * ao,
+        cb = flatB * s * ao;
 
       if (mat.id === 1) {
         const sv = s < 1 ? Math.pow(s, 1.25) : 1 + (s - 1) * 0.45;
         const mul = sv * (1 + mat.sheen * slope * 0.5);
-        cr = flatR * mul; cg = flatG * mul; cb = flatB * mul;
+        cr = flatR * mul;
+        cg = flatG * mul;
+        cb = flatB * mul;
       } else if (mat.id === 2) {
         const hl = mat.sheen * smoothstep(1.05, 1.7, s) * 0.5;
         cr = flatR * s + hl * (0.4 * flatR + 0.6);
