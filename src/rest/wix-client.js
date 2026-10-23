@@ -1,6 +1,5 @@
 /**
- * Wix client removed — project is fully self-hosted.
- * Kept as a no-op module so any leftover import does not break the build.
+ * Legacy stub — Wix integration was removed. Use /api/catalog and /api/orders.
  */
 export const WIX_CLIENT_ID = "";
 export const WIX_API_BASE = "";
