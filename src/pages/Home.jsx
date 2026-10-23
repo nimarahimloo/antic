@@ -3,9 +3,9 @@ import CategoryCarousel from "@/components/sections/CategoryCarousel";
 import PremiumShowcase from "@/components/sections/PremiumShowcase";
 import FabricCollection from "@/components/sections/FabricCollection";
 import CatalogTeaser from "@/components/sections/CatalogTeaser";
-import StudioSection from "@/components/sections/StudioSection";
 import ContactCTA from "@/components/sections/ContactCTA";
 
+/** استودیوی آپلود پنجره موقتاً غیرفعال — تمرکز روی کاتالوگ و نمونه نصب */
 export default function Home() {
   return (
     <div className="bg-background">
@@ -14,7 +14,6 @@ export default function Home() {
       <PremiumShowcase />
       <FabricCollection />
       <CatalogTeaser />
-      <StudioSection />
       <ContactCTA />
     </div>
   );
