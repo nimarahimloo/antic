@@ -81,7 +81,7 @@ export default function Header() {
               <Link
                 key={item.label}
                 to={item.to}
-                className="="border-b border-secondary/40 py-3 font-body text-sm text-foreground/85"
+                className="border-b border-secondary/40 py-3 font-body text-sm text-foreground/85"
               >
                 {item.label}
               </Link>
