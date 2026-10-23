@@ -6,7 +6,6 @@ import { buildConsultantReply, type ChatMessage } from "../lib/consultant.js";
 
 const router = Router();
 
-/** In-memory conversations (restart clears). Enough for local/dev consultant. */
 type Conversation = {
   id: string;
   agent_name: string;
@@ -18,7 +17,6 @@ type Conversation = {
 
 const store = new Map<string, Conversation>();
 
-// prune old (>24h)
 function prune() {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   for (const [id, c] of store) {
@@ -45,7 +43,9 @@ router.post("/conversations", async (req, res) => {
         {
           role: "assistant",
           content:
-            "سلام، من مشاور طراحی پرده آنتیک هستم. بگو فضات چیه (نشیمن، خواب، اداری)، چقدر نور می‌خوای، و سبک دکوراسیونت چطوره تا از کاتالوگ واقعی برات مدل پیشنهاد بدم.",
+            "سلام، من مشاور طراحی پرده آنتیک هستم و به کاتالوگ زنده (دیتابیس) وصلم. " +
+            "بگو فضات چیه (نشیمن، خواب، آشپزخانه، اداری)، چقدر نور می‌خوای، و سبک دکوراسیونت چطوره " +
+            "تا از مدل‌های واقعی برات پیشنهاد بدم. می‌تونی بپرسی: سبک‌ها چیه؟ / زبرا دارید؟ / قیمت چطوره؟",
         },
       ],
       createdAt: Date.now(),
@@ -84,16 +84,27 @@ router.post("/conversations/:id/messages", async (req, res) => {
     conv.updatedAt = Date.now();
 
     if (body.role === "user") {
-      const reply = await buildConsultantReply(body.content);
+      const history = conv.messages.slice(0, -1);
+      const { text, meta } = await buildConsultantReply(body.content, history);
       conv.messages.push({
         role: "assistant",
-        content: reply,
+        content: text,
         tool_calls: [
           {
             status: "completed",
-            display_projection: { label: "کاتالوگ بررسی شد" },
-            arguments_string: JSON.stringify({ query: body.content.slice(0, 120) }),
-            results: JSON.stringify({ source: "local-catalog" }),
+            display_projection: {
+              label:
+                meta.intent === "greeting"
+                  ? "آماده مشاوره"
+                  : meta.intent === "recommend" || meta.intent === "search_models"
+                    ? "کاتالوگ بررسی شد"
+                    : "پاسخ از کاتالوگ محلی",
+            },
+            arguments_string: JSON.stringify({
+              query: body.content.slice(0, 120),
+              intent: meta.intent,
+            }),
+            results: JSON.stringify(meta),
           },
         ],
       });
