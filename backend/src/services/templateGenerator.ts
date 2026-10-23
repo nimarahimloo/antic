@@ -1,7 +1,7 @@
 /**
- * Product-shot chroma templates — match catalog photography quality.
- * Beige wall, white frame, headrail, folds, chain. Green only on fabric
- * so installEngine can map real fabric swatches with fold lighting.
+ * Per-mechanism product-shot chroma templates.
+ * Each CurtainStyleKey has its own geometry, folds, and hardware
+ * (rod vs cassette, chain side, fold axis, panel count).
  */
 import fs from "fs";
 import path from "path";
@@ -19,16 +19,13 @@ const H = 1600;
 function clamp(v: number, a = 0, b = 255) {
   return v < a ? a : v > b ? b : v | 0;
 }
-
 function clamp01(v: number) {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }
-
 function smoothstep(e0: number, e1: number, x: number) {
   const t = clamp01((x - e0) / (e1 - e0));
   return t * t * (3 - 2 * t);
 }
-
 function setPx(data: Buffer, width: number, x: number, y: number, r: number, g: number, b: number, a = 255) {
   if (x < 0 || y < 0 || x >= width) return;
   const i = (y * width + x) * 4;
@@ -38,14 +35,9 @@ function setPx(data: Buffer, width: number, x: number, y: number, r: number, g: 
   data[i + 2] = b;
   data[i + 3] = a;
 }
-
 function greenShade(shade: number): [number, number, number] {
   const s = clamp01(shade);
-  return [
-    Math.round(22 + s * 32),
-    Math.round(118 + s * 110),
-    Math.round(30 + s * 28),
-  ];
+  return [Math.round(22 + s * 32), Math.round(118 + s * 110), Math.round(30 + s * 28)];
 }
 
 function paintWallAndFloor(data: Buffer, width: number, height: number) {
@@ -68,9 +60,7 @@ function paintWallAndFloor(data: Buffer, width: number, height: number) {
     }
   }
   for (let y = floorY - 10; y < floorY; y++) {
-    for (let x = 0; x < width; x++) {
-      setPx(data, width, x, y, 232, 226, 216);
-    }
+    for (let x = 0; x < width; x++) setPx(data, width, x, y, 232, 226, 216);
   }
 }
 
@@ -81,12 +71,10 @@ function paintWhiteFrame(data: Buffer, width: number, height: number, box: Frame
   for (let y = fy0 - frame; y < fy1 + Math.floor(frame * 0.35); y++) {
     for (let x = fx0 - frame; x < fx1 + frame; x++) {
       if (x < 0 || x >= width || y < 0 || y >= height) continue;
-      const inInner = x >= fx0 && x < fx1 && y >= fy0 && y < fy1;
-      if (inInner) continue;
+      if (x >= fx0 && x < fx1 && y >= fy0 && y < fy1) continue;
       const dx = Math.min(x - (fx0 - frame), fx1 + frame - x);
       const dy = Math.min(y - (fy0 - frame), fy1 + frame * 0.35 - y);
-      const edge = Math.min(dx, dy);
-      const shade = 0.92 + 0.08 * smoothstep(0, 8, edge);
+      const shade = 0.92 + 0.08 * smoothstep(0, 8, Math.min(dx, dy));
       const c = Math.round(248 * shade);
       setPx(data, width, x, y, c, c, Math.round(c * 0.99));
     }
@@ -100,16 +88,12 @@ function paintWhiteFrame(data: Buffer, width: number, height: number, box: Frame
   }
   const mid = Math.floor((fx0 + fx1) / 2);
   for (let y = fy0; y < fy1; y++) {
-    for (let x = mid - 8; x < mid + 8; x++) {
-      setPx(data, width, x, y, 250, 250, 248);
-    }
+    for (let x = mid - 8; x < mid + 8; x++) setPx(data, width, x, y, 250, 250, 248);
   }
   const hy = Math.floor(fy0 + (fy1 - fy0) * 0.48);
   for (const hx of [mid - 22, mid + 14]) {
     for (let y = hy; y < hy + 28; y++) {
-      for (let x = hx; x < hx + 8; x++) {
-        setPx(data, width, x, y, 240, 240, 238);
-      }
+      for (let x = hx; x < hx + 8; x++) setPx(data, width, x, y, 240, 240, 238);
     }
   }
   for (let y = fy1; y < fy1 + 18 && y < height; y++) {
@@ -121,7 +105,7 @@ function paintWhiteFrame(data: Buffer, width: number, height: number, box: Frame
   }
 }
 
-function paintHeadrail(data: Buffer, width: number, height: number, x0: number, x1: number, y0: number, y1: number) {
+function paintCassette(data: Buffer, width: number, height: number, x0: number, x1: number, y0: number, y1: number) {
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
       if (x < 0 || x >= width || y < 0 || y >= height) continue;
@@ -138,6 +122,28 @@ function paintHeadrail(data: Buffer, width: number, height: number, x0: number, 
   }
 }
 
+function paintRod(data: Buffer, width: number, height: number, x0: number, x1: number, y: number) {
+  const rodY0 = y - 6;
+  const rodY1 = y + 6;
+  for (let yy = rodY0; yy < rodY1; yy++) {
+    for (let x = x0; x < x1; x++) {
+      if (x < 0 || x >= width || yy < 0 || yy >= height) continue;
+      const t = (yy - rodY0) / Math.max(1, rodY1 - rodY0);
+      const c = Math.round(200 - t * 25);
+      setPx(data, width, x, yy, c, Math.round(c * 0.92), Math.round(c * 0.55));
+    }
+  }
+  for (const fx of [x0 - 8, x1 + 8]) {
+    for (let yy = y - 10; yy < y + 10; yy++) {
+      for (let xx = fx - 10; xx < fx + 10; xx++) {
+        const dx = xx - fx;
+        const dy = yy - y;
+        if (dx * dx + dy * dy < 100) setPx(data, width, xx, yy, 190, 170, 90);
+      }
+    }
+  }
+}
+
 function paintChain(data: Buffer, width: number, height: number, x: number, y0: number, y1: number) {
   for (let y = y0; y < y1; y++) {
     const bead = Math.floor((y - y0) / 7) % 2 === 0;
@@ -149,31 +155,37 @@ function paintChain(data: Buffer, width: number, height: number, x: number, y0: 
     }
   }
   for (let y = y1; y < Math.min(height, y1 + 10); y++) {
-    for (let dx = -4; dx <= 4; dx++) {
-      setPx(data, width, x + dx, y, 248, 248, 245);
+    for (let dx = -4; dx <= 4; dx++) setPx(data, width, x + dx, y, 248, 248, 245);
+  }
+}
+
+function paintBottomBar(data: Buffer, width: number, height: number, x0: number, x1: number, y: number) {
+  for (let yy = y; yy < y + 10 && yy < height; yy++) {
+    for (let x = x0; x < x1; x++) {
+      if (x < 0 || x >= width) continue;
+      setPx(data, width, x, yy, 235, 235, 230);
     }
   }
 }
 
-function paintRomanGreen(data: Buffer, width: number, height: number, x0: number, y0: number, x1: number, y1: number) {
+function paintRoman(data: Buffer, w: number, h: number, x0: number, y0: number, x1: number, y1: number) {
   const rw = Math.max(1, x1 - x0);
   const rh = Math.max(1, y1 - y0);
-  const foldZoneStart = 0.62;
-  const foldCount = 4;
+  const foldStart = 0.62;
+  const folds = 4;
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
       const u = (x - x0) / rw;
       const v = (y - y0) / rh;
-      let shade = 0.72;
-      if (v < foldZoneStart) {
+      let shade: number;
+      if (v < foldStart) {
         shade = 0.62 + 0.22 * Math.sin(u * Math.PI);
         shade *= 0.94 + 0.06 * Math.sin(v * Math.PI * 3);
       } else {
-        const fv = (v - foldZoneStart) / (1 - foldZoneStart);
-        const fi = Math.min(foldCount - 1, Math.floor(fv * foldCount));
-        const local = (fv - fi / foldCount) * foldCount;
-        const crest = Math.sin(local * Math.PI);
-        shade = 0.22 + 0.68 * crest;
+        const fv = (v - foldStart) / (1 - foldStart);
+        const fi = Math.min(folds - 1, Math.floor(fv * folds));
+        const local = (fv - fi / folds) * folds;
+        shade = 0.22 + 0.68 * Math.sin(local * Math.PI);
         shade *= 0.9 + 0.1 * Math.sin(u * Math.PI * 2.4 + fi);
       }
       const side = Math.min(u, 1 - u);
@@ -183,84 +195,138 @@ function paintRomanGreen(data: Buffer, width: number, height: number, x0: number
         if (v > wave) continue;
         shade *= 0.7;
       }
-      shade = clamp01(shade);
-      const [r, g, b] = greenShade(shade);
-      setPx(data, width, x, y, r, g, b);
+      const [r, g, b] = greenShade(clamp01(shade));
+      setPx(data, w, x, y, r, g, b);
     }
   }
 }
 
-function paintPleatedGreen(data: Buffer, width: number, height: number, x0: number, y0: number, x1: number, y1: number, dense = true) {
+function paintZebra(data: Buffer, w: number, h: number, x0: number, y0: number, x1: number, y1: number) {
   const rw = Math.max(1, x1 - x0);
   const rh = Math.max(1, y1 - y0);
-  const bands = dense ? 48 : 22;
+  const bands = 16;
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
       const u = (x - x0) / rw;
       const v = (y - y0) / rh;
-      const bi = Math.floor(v * bands);
-      const local = v * bands - bi;
-      const ridge = Math.sin(local * Math.PI);
-      let shade = 0.28 + 0.62 * ridge;
-      const stitch = Math.abs(((u * 6) % 1) - 0.5);
-      if (stitch < 0.04) shade *= 0.85;
+      const band = Math.floor(v * bands) % 2;
+      let shade = band ? 0.82 : 0.28;
+      shade += 0.04 * Math.sin(u * Math.PI * 2);
+      shade *= 0.9 + 0.1 * Math.sin(u * Math.PI);
+      const [r, g, b] = greenShade(clamp01(shade));
+      setPx(data, w, x, y, r, g, b);
+    }
+  }
+}
+
+function paintPleated(
+  data: Buffer,
+  w: number,
+  h: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  opts: { dense?: boolean; sheer?: boolean } = {}
+) {
+  const rw = Math.max(1, x1 - x0);
+  const rh = Math.max(1, y1 - y0);
+  const bands = opts.dense === false ? 20 : 48;
+  const sheerBoost = opts.sheer ? 0.12 : 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const u = (x - x0) / rw;
+      const v = (y - y0) / rh;
+      const local = v * bands - Math.floor(v * bands);
+      let shade = 0.28 + 0.62 * Math.sin(local * Math.PI) + sheerBoost;
+      const stitch = Math.abs(((u * 5) % 1) - 0.5);
+      if (stitch < 0.035) shade *= 0.82;
       shade *= 0.88 + 0.12 * Math.sin(u * Math.PI);
       const side = Math.min(u, 1 - u);
       shade *= 0.82 + 0.18 * Math.min(1, side * 8);
-      shade = clamp01(shade);
-      const [r, g, b] = greenShade(shade);
-      setPx(data, width, x, y, r, g, b);
+      const [r, g, b] = greenShade(clamp01(shade));
+      setPx(data, w, x, y, r, g, b);
     }
   }
 }
 
-function paintBandsGreen(data: Buffer, width: number, height: number, x0: number, y0: number, x1: number, y1: number) {
+function paintRoller(data: Buffer, w: number, h: number, x0: number, y0: number, x1: number, y1: number) {
+  const rw = Math.max(1, x1 - x0);
+  const rh = Math.max(1, y1 - y0);
+  const slats = 28;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const u = (x - x0) / rw;
+      const v = (y - y0) / rh;
+      const local = v * slats - Math.floor(v * slats);
+      let shade = 0.35 + 0.55 * (1 - local);
+      shade *= 0.9 + 0.1 * Math.sin(u * Math.PI);
+      if (local < 0.08) shade *= 0.55;
+      const [r, g, b] = greenShade(clamp01(shade));
+      setPx(data, w, x, y, r, g, b);
+    }
+  }
+}
+
+function paintShade(data: Buffer, w: number, h: number, x0: number, y0: number, x1: number, y1: number) {
   const rw = Math.max(1, x1 - x0);
   const rh = Math.max(1, y1 - y0);
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
       const u = (x - x0) / rw;
       const v = (y - y0) / rh;
-      const band = Math.floor(v * 14) % 2;
-      let shade = band ? 0.78 : 0.34;
-      shade += 0.05 * Math.sin(u * Math.PI * 3);
-      shade *= 0.88 + 0.12 * Math.sin(u * Math.PI);
-      shade = clamp01(shade);
-      const [r, g, b] = greenShade(shade);
-      setPx(data, width, x, y, r, g, b);
-    }
-  }
-}
-
-function paintFlatGreen(data: Buffer, width: number, height: number, x0: number, y0: number, x1: number, y1: number) {
-  const rw = Math.max(1, x1 - x0);
-  const rh = Math.max(1, y1 - y0);
-  for (let y = y0; y < y1; y++) {
-    for (let x = x0; x < x1; x++) {
-      const u = (x - x0) / rw;
-      const v = (y - y0) / rh;
-      let shade = 0.58 + 0.18 * Math.sin(u * Math.PI) + 0.06 * Math.sin(v * Math.PI * 2);
+      let shade = 0.58 + 0.2 * Math.sin(u * Math.PI) + 0.05 * Math.sin(v * Math.PI * 2);
       const side = Math.min(u, 1 - u, v, 1 - v);
       shade *= 0.85 + 0.15 * Math.min(1, side * 10);
-      shade = clamp01(shade);
-      const [r, g, b] = greenShade(shade);
-      setPx(data, width, x, y, r, g, b);
+      const [r, g, b] = greenShade(clamp01(shade));
+      setPx(data, w, x, y, r, g, b);
     }
   }
 }
 
-function paintVerticalGreen(data: Buffer, width: number, height: number, x0: number, y0: number, x1: number, y1: number) {
+function paintPanel(data: Buffer, w: number, h: number, x0: number, y0: number, x1: number, y1: number) {
+  const total = x1 - x0;
+  const gap = Math.floor(total * 0.04);
+  const pw = Math.floor((total - gap * 2) / 3);
+  const starts = [x0, x0 + pw + gap, x0 + 2 * (pw + gap)];
+  for (const sx of starts) paintShade(data, w, h, sx, y0, sx + pw, y1);
+}
+
+function paintDrape(data: Buffer, w: number, h: number, x0: number, y0: number, x1: number, y1: number) {
+  const mid = Math.floor((x0 + x1) / 2);
+  const gap = 12;
+  for (const [L, R] of [
+    [x0, mid - gap],
+    [mid + gap, x1],
+  ] as const) {
+    const rw = Math.max(1, R - L);
+    const rh = Math.max(1, y1 - y0);
+    for (let y = y0; y < y1; y++) {
+      for (let x = L; x < R; x++) {
+        const u = (x - L) / rw;
+        const v = (y - y0) / rh;
+        let shade = 0.4 + 0.4 * Math.sin(u * Math.PI * 6) + 0.08 * Math.sin(u * Math.PI * 18);
+        shade *= 0.88 + 0.12 * (1 - Math.abs(v - 0.45) * 0.4);
+        if (v < 0.08) shade *= 0.75 + 0.25 * (v / 0.08);
+        const [r, g, b] = greenShade(clamp01(shade));
+        setPx(data, w, x, y, r, g, b);
+      }
+    }
+  }
+}
+
+function paintWave(data: Buffer, w: number, h: number, x0: number, y0: number, x1: number, y1: number) {
   const rw = Math.max(1, x1 - x0);
   const rh = Math.max(1, y1 - y0);
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
       const u = (x - x0) / rw;
       const v = (y - y0) / rh;
-      let shade = 0.42 + 0.38 * Math.sin(u * Math.PI * 7) + 0.08 * Math.sin(u * Math.PI * 21);
-      shade *= 0.88 + 0.12 * (1 - Math.abs(v - 0.5) * 0.35);
-      shade = clamp01(shade);
-      const [r, g, b] = greenShade(shade);
-      setPx(data, width, x, y, r, g, b);
+      let shade = 0.42 + 0.42 * Math.sin(u * Math.PI * 5);
+      shade *= 0.9 + 0.1 * (1 - Math.abs(v - 0.5) * 0.3);
+      if (v < 0.06) shade *= 0.8;
+      const [r, g, b] = greenShade(clamp01(shade));
+      setPx(data, w, x, y, r, g, b);
     }
   }
 }
@@ -289,46 +355,68 @@ export async function generateChromaTemplate(
   const fabricR = box.fx1 - 4;
   const fabricT = box.fy0 + 2;
   const fabricB = box.fy1 - 2;
-  const mid = Math.floor((fabricL + fabricR) / 2);
-
   const railY0 = fabricT - 28;
   const railY1 = fabricT + 4;
-  paintHeadrail(data, W, H, fabricL - 20, fabricR + 20, railY0, railY1);
 
   switch (style) {
     case "roman":
-      paintRomanGreen(data, W, H, fabricL, fabricT + 6, fabricR, fabricB);
+      paintCassette(data, W, H, fabricL - 20, fabricR + 20, railY0, railY1);
+      paintRoman(data, W, H, fabricL, fabricT + 6, fabricR, fabricB);
       paintChain(data, W, H, fabricR + 14, railY1, Math.floor(fabricB - 40));
       break;
-    case "pleated-manual":
-    case "pleated-chain":
-    case "pleated-sheer":
-      paintPleatedGreen(data, W, H, fabricL, fabricT + 4, fabricR, fabricB, true);
-      paintChain(data, W, H, fabricL - 18, railY1, Math.floor(fabricB - 20));
-      break;
     case "zebra":
-      paintBandsGreen(data, W, H, fabricL, fabricT + 4, fabricR, fabricB);
+      paintCassette(data, W, H, fabricL - 20, fabricR + 20, railY0, railY1);
+      paintZebra(data, W, H, fabricL, fabricT + 4, fabricR, fabricB);
       paintChain(data, W, H, fabricR + 14, railY1, Math.floor(fabricB - 30));
       break;
-    case "shade":
-    case "double":
-      paintFlatGreen(data, W, H, fabricL, fabricT + 4, fabricR, Math.floor(fabricT + (fabricB - fabricT) * 0.62));
-      paintChain(data, W, H, fabricR + 14, railY1, Math.floor(fabricB - 80));
+    case "pleated-manual":
+      paintCassette(data, W, H, fabricL - 16, fabricR + 16, railY0, railY1);
+      paintPleated(data, W, H, fabricL, fabricT + 4, fabricR, fabricB, { dense: true });
       break;
+    case "pleated-chain":
+      paintCassette(data, W, H, fabricL - 16, fabricR + 16, railY0, railY1);
+      paintPleated(data, W, H, fabricL, fabricT + 4, fabricR, fabricB, { dense: true });
+      paintChain(data, W, H, fabricL - 18, railY1, Math.floor(fabricB - 20));
+      break;
+    case "pleated-sheer":
+      paintCassette(data, W, H, fabricL - 16, fabricR + 16, railY0, railY1);
+      paintPleated(data, W, H, fabricL, fabricT + 4, fabricR, fabricB, { dense: true, sheer: true });
+      paintChain(data, W, H, fabricL - 18, railY1, Math.floor(fabricB - 20));
+      break;
+    case "shade": {
+      paintCassette(data, W, H, fabricL - 20, fabricR + 20, railY0, railY1);
+      const drop = Math.floor(fabricT + (fabricB - fabricT) * 0.62);
+      paintShade(data, W, H, fabricL, fabricT + 4, fabricR, drop);
+      paintBottomBar(data, W, H, fabricL, fabricR, drop);
+      paintChain(data, W, H, fabricR + 14, railY1, drop + 20);
+      break;
+    }
+    case "double": {
+      paintCassette(data, W, H, fabricL - 22, fabricR + 22, railY0, railY1);
+      paintPleated(data, W, H, fabricL + 6, fabricT + 4, fabricR - 6, fabricB, { dense: true, sheer: true });
+      const drop = Math.floor(fabricT + (fabricB - fabricT) * 0.55);
+      paintShade(data, W, H, fabricL, fabricT + 4, fabricR, drop);
+      paintBottomBar(data, W, H, fabricL, fabricR, drop);
+      paintChain(data, W, H, fabricR + 14, railY1, drop + 20);
+      break;
+    }
     case "roller":
-      paintPleatedGreen(data, W, H, fabricL, fabricT + 4, fabricR, fabricB, false);
+      paintCassette(data, W, H, fabricL - 16, fabricR + 16, railY0, railY1);
+      paintRoller(data, W, H, fabricL, fabricT + 4, fabricR, fabricB);
       paintChain(data, W, H, fabricL - 18, railY1, Math.floor(fabricB - 20));
       break;
     case "panel":
-      paintFlatGreen(data, W, H, fabricL, fabricT, fabricL + Math.floor((fabricR - fabricL) * 0.3), fabricB);
-      paintFlatGreen(data, W, H, mid - Math.floor((fabricR - fabricL) * 0.14), fabricT, mid + Math.floor((fabricR - fabricL) * 0.14), fabricB);
-      paintFlatGreen(data, W, H, fabricR - Math.floor((fabricR - fabricL) * 0.3), fabricT, fabricR, fabricB);
+      paintCassette(data, W, H, fabricL - 10, fabricR + 10, fabricT - 14, fabricT + 2);
+      paintPanel(data, W, H, fabricL, fabricT + 4, fabricR, fabricB + 20);
+      break;
+    case "wave":
+      paintRod(data, W, H, fabricL - 40, fabricR + 40, fabricT - 8);
+      paintWave(data, W, H, fabricL - 20, fabricT, fabricR + 20, fabricB + 40);
       break;
     case "drape":
-    case "wave":
     default:
-      paintVerticalGreen(data, W, H, fabricL - 30, fabricT - 4, mid - 6, fabricB + 30);
-      paintVerticalGreen(data, W, H, mid + 6, fabricT - 4, fabricR + 30, fabricB + 30);
+      paintRod(data, W, H, fabricL - 50, fabricR + 50, fabricT - 10);
+      paintDrape(data, W, H, fabricL - 40, fabricT, fabricR + 40, fabricB + 50);
       break;
   }
 
