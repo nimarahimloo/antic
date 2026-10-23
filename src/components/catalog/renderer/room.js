@@ -34,22 +34,78 @@ export function buildRoom(scene, settings) {
   view.position.set(0, 1.76, -.40); room.add(view);
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.22), new THREE.MeshPhysicalMaterial({ color: '#e6ede8', transparent: true, opacity: .045, roughness: .08, metalness: .1, side: THREE.DoubleSide, depthWrite: false }));
   glass.position.set(0, 1.76, -.18); room.add(glass);
-  // Small matte ceramic on the ledge establishes scale and receives the same window light.
-  const ceramic = new THREE.MeshStandardMaterial({ color: '#d3cdbc', roughness: .88 });
-  const profile = [new THREE.Vector2(.058, 0), new THREE.Vector2(.09, .025), new THREE.Vector2(.10, .13), new THREE.Vector2(.057, .20), new THREE.Vector2(.034, .23)];
+  const ceramic = new THREE.MeshStandardMaterial({ color: '#d7d0c4', roughness: .28, metalness: .08 });
+  const profile = [new THREE.Vector2(.02, 0), new THREE.Vector2(.08, .02), new THREE.Vector2(.11, .08), new THREE.Vector2(.09, .16), new THREE.Vector2(.05, .22), new THREE.Vector2(.03, .24)];
   const vase = new THREE.Mesh(new THREE.LatheGeometry(profile, 40), ceramic);
   vase.position.set(-.89, .585, .12); vase.castShadow = vase.receiveShadow = true; room.add(vase);
   cylinder(room, .024, .004, [-.89, .819, .12], new THREE.MeshStandardMaterial({ color: '#514c42', roughness: 1 }));
   return { room, view };
 }
 
-export async function   loadView(view, url) {
-  const image = await sampleImage(url || 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1400&q=85');
-  const texture = new THREE.Texture(image); texture.colorSpace = THREE.SRGBColorSpace; texture.needsUpdate = true;
-  // Crop photograph without stretching the aspect ratio.
-  if (image.width > image.height) { texture.repeat.x = image.height / image.width; texture.offset.x = (1 - texture.repeat.x) / 2; }
-  else { texture.repeat.y = image.width / image.height; texture.offset.y = (1 - texture.repeat.y) / 2; }
-  view.material.map = texture; view.material.color.set('#ffffff'); view.material.needsUpdate = true;
+/** Local procedural outdoor view — no external CDN (Unsplash/base44). */
+function makeOutdoorCanvas() {
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 1024;
+  const ctx = c.getContext('2d');
+  const sky = ctx.createLinearGradient(0, 0, 0, 520);
+  sky.addColorStop(0, '#8eb8e8');
+  sky.addColorStop(0.55, '#c5daf0');
+  sky.addColorStop(1, '#e8eef5');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, 1024, 520);
+  ctx.fillStyle = '#7a9a6a';
+  ctx.beginPath();
+  ctx.moveTo(0, 480);
+  for (let x = 0; x <= 1024; x += 40) {
+    ctx.lineTo(x, 420 + Math.sin(x * 0.01) * 28 + Math.sin(x * 0.03) * 12);
+  }
+  ctx.lineTo(1024, 520); ctx.lineTo(0, 520); ctx.fill();
+  ctx.fillStyle = '#5f7d52';
+  ctx.beginPath();
+  ctx.moveTo(0, 520);
+  for (let x = 0; x <= 1024; x += 28) {
+    ctx.lineTo(x, 470 + Math.sin(x * 0.02 + 1) * 35);
+  }
+  ctx.lineTo(1024, 640); ctx.lineTo(0, 640); ctx.fill();
+  const ground = ctx.createLinearGradient(0, 640, 0, 1024);
+  ground.addColorStop(0, '#9aab88');
+  ground.addColorStop(1, '#6d7a5c');
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, 640, 1024, 384);
+  ctx.fillStyle = 'rgba(45,70,40,0.55)';
+  for (const [tx, ty, r] of [[180, 500, 90], [420, 480, 110], [700, 510, 95], [900, 490, 80]]) {
+    ctx.beginPath();
+    ctx.ellipse(tx, ty, r * 0.7, r, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  return c;
+}
+
+export async function loadView(view, url) {
+  let image = null;
+  if (url) {
+    try {
+      image = await sampleImage(url);
+    } catch {
+      image = null;
+    }
+  }
+  if (!image) {
+    image = makeOutdoorCanvas();
+  }
+  const texture = new THREE.Texture(image);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  if (image.width > image.height) {
+    texture.repeat.x = image.height / image.width;
+    texture.offset.x = (1 - texture.repeat.x) / 2;
+  } else if (image.height > image.width) {
+    texture.repeat.y = image.width / image.height;
+    texture.offset.y = (1 - texture.repeat.y) / 2;
+  }
+  view.material.map = texture;
+  view.material.color.set('#ffffff');
+  view.material.needsUpdate = true;
 }
 
 export function lighting(scene) {
