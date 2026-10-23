@@ -26,7 +26,7 @@ export default function CatalogTeaser() {
             <div className="relative aspect-[4/3] overflow-hidden rounded-3xl border border-secondary/60 bg-card">
               <div className="absolute inset-3 overflow-hidden rounded-2xl border border-primary/20">
                 <img
-                  src="https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/4c8e23e61_generated_image.png"
+                  src="/images/migrated/4c8e23e61_generated_image.png"
                   alt="پرده مخمل"
                   className="h-full w-full object-cover"
                 />
