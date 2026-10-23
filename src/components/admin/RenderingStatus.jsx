@@ -77,7 +77,7 @@ export default function RenderingStatus() {
 
   async function ensureTemplatesFirst() {
     try {
-      const res = await fetch(`${API}/render/template/all-categories", {
+      const res = await fetch(`${API}/render/template/all-categories`, {
         method: "POST",
         headers: authHeaders(),
         body: "{}",
@@ -89,7 +89,6 @@ export default function RenderingStatus() {
       if (!res.ok) throw new Error(data.error || "ساخت قالب دسته‌ها ناموفق");
       return data.count ?? 0;
     } catch (e) {
-      // non-fatal — batch may still work if templates exist
       console.warn(e);
       return 0;
     }
@@ -134,7 +133,7 @@ export default function RenderingStatus() {
             ". نمونه‌های با امتیاز بالا خودکار تأیید می‌شوند."
         );
       }
-      setQueue(data.state || getEmptyQueue());
+      setQueue(data.state || { running: false, processed: 0, failed: 0, total: 0 });
       load();
     } catch (e) {
       setErr(e.message || "خطا در شروع تولید");
@@ -142,10 +141,6 @@ export default function RenderingStatus() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function getEmptyQueue() {
-    return { running: false, processed: 0, failed: 0, total: 0 };
   }
 
   const cards = [
@@ -251,10 +246,19 @@ export default function RenderingStatus() {
       {err && <p className="mt-3 font-body text-[11px] text-destructive">{err}</p>}
 
       <p className="mt-4 font-body text-[11px] leading-5 text-muted-foreground">
-        مدل باید عکس پارچه داشته باشد و برای دسته‌اش قالب نصب وجود داشته باشد. با زدن batch، قالب همه
-        دسته‌ها اول به‌روز می‌شود.
-        {stats?.templates != null && <> · قالب‌های ثبت‌شده: <strong>{stats.templates}</strong></>}
-        {stats?.withFabric != null && <> · با پارچه: <strong>{stats.withFabric}</strong></>}
+        مدل باید عکس پارچه داشته باشد. با زدن batch، قالب همه دسته‌ها اول به‌روز می‌شود.
+        {stats?.templates != null && (
+          <>
+            {" "}
+            · قالب‌ها: <strong>{stats.templates}</strong>
+          </>
+        )}
+        {stats?.withFabric != null && (
+          <>
+            {" "}
+            · با پارچه: <strong>{stats.withFabric}</strong>
+          </>
+        )}
       </p>
     </div>
   );

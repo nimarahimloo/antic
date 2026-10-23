@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Loader2, Upload } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { compressImage } from "@/lib/compressImage";
 
 const API = import.meta.env.VITE_API_BASE || "/api";
 
@@ -32,6 +34,7 @@ export default function AdminProducts() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(() => {
@@ -74,6 +77,23 @@ export default function AdminProducts() {
     });
     setEditing(p);
     setError("");
+  }
+
+  async function uploadImage(file) {
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const compressed = await compressImage(file);
+      const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+      const url = res?.file_url || res?.url;
+      if (!url) throw new Error("آپلود ناموفق");
+      setForm((f) => ({ ...f, image: url }));
+    } catch (e) {
+      setError(e.message || "آپلود تصویر ناموفق بود");
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function save(e) {
@@ -137,7 +157,7 @@ export default function AdminProducts() {
             {loading ? "…" : `${rows.length} محصول`}
           </p>
         </div>
-        <button onClick={openNew} className="btn-gold">
+        <button type="button" onClick={openNew} className="btn-gold">
           <Plus className="h-4 w-4" /> افزودن
         </button>
       </div>
@@ -177,10 +197,18 @@ export default function AdminProducts() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => openEdit(p)} className="rounded-lg border border-secondary/70 p-2">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(p)}
+                        className="rounded-lg border border-secondary/70 p-2"
+                      >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => remove(p)} className="rounded-lg border border-secondary/70 p-2">
+                      <button
+                        type="button"
+                        onClick={() => remove(p)}
+                        className="rounded-lg border border-secondary/70 p-2"
+                      >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -193,11 +221,15 @@ export default function AdminProducts() {
       </div>
 
       {editing !== null && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4" onClick={() => setEditing(null)}>
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4"
+          onClick={() => setEditing(null)}
+        >
           <form
             onSubmit={save}
             onClick={(e) => e.stopPropagation()}
             className="mx-auto my-8 max-w-xl rounded-3xl border border-secondary/60 bg-card p-6"
+            noValidate
           >
             <div className="mb-6 flex items-center justify-between">
               <h3 className="font-display text-lg font-black">
@@ -210,53 +242,123 @@ export default function AdminProducts() {
             <div className="grid gap-4">
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">نام</label>
-                <input className={input} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+                <input
+                  className={input}
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">اسلاگ (URL)</label>
-                <input className={input} dir="ltr" value={form.slug} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))} />
+                <label className="mb-1 block text-xs text-muted-foreground">اسلاگ</label>
+                <input
+                  className={input}
+                  dir="ltr"
+                  value={form.slug}
+                  onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground">قیمت (تومان)</label>
-                  <input className={input} type="number" value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} />
+                  <input
+                    className={input}
+                    type="number"
+                    value={form.price}
+                    onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground">قیمت قبل</label>
-                  <input className={input} type="number" value={form.compareAtPrice} onChange={(e) => setForm((f) => ({ ...f, compareAtPrice: e.target.value }))} />
+                  <input
+                    className={input}
+                    type="number"
+                    value={form.compareAtPrice}
+                    onChange={(e) => setForm((f) => ({ ...f, compareAtPrice: e.target.value }))}
+                  />
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">آدرس تصویر</label>
-                <input className={input} dir="ltr" value={form.image} onChange={(e) => setForm((f) => ({ ...f, image: e.target.value }))} />
+                <label className="mb-1 block text-xs text-muted-foreground">تصویر</label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
+                    {form.image ? (
+                      <img src={form.image} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <Upload className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 px-3 py-2 text-xs text-primary">
+                    {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    {uploading ? "آپلود…" : form.image ? "تعویض" : "انتخاب تصویر"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = "";
+                        uploadImage(f);
+                      }}
+                    />
+                  </label>
+                  {form.image && (
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground"
+                      onClick={() => setForm((f) => ({ ...f, image: "" }))}
+                    >
+                      حذف
+                    </button>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">دسته</label>
-                <select className={input} value={form.categoryId} onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}>
+                <select
+                  className={input}
+                  value={form.categoryId}
+                  onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+                >
                   <option value="">—</option>
                   {cats.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">توضیح</label>
-                <textarea className={`${input} resize-none`} rows={3} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+                <textarea
+                  className={`${input} resize-none`}
+                  rows={3}
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                />
               </div>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 text-xs">
-                  <input type="checkbox" checked={form.visible} onChange={(e) => setForm((f) => ({ ...f, visible: e.target.checked }))} />
+                  <input
+                    type="checkbox"
+                    checked={form.visible}
+                    onChange={(e) => setForm((f) => ({ ...f, visible: e.target.checked }))}
+                  />
                   نمایش در فروشگاه
                 </label>
                 <label className="flex items-center gap-2 text-xs">
-                  <input type="checkbox" checked={form.inStock} onChange={(e) => setForm((f) => ({ ...f, inStock: e.target.checked }))} />
+                  <input
+                    type="checkbox"igurative
+                    checked={form.inStock}
+                    onChange={(e) => setForm((f) => ({ ...f, inStock: e.target.checked }))}
+                  />
                   موجود
                 </label>
               </div>
             </div>
             {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
             <div className="mt-6 flex gap-3">
-              <button type="submit" disabled={saving} className="btn-gold flex-1 justify-center">
+              <button type="submit" disabled={saving || uploading} className="btn-gold flex-1 justify-center">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
               </button>
               <button type="button" onClick={() => setEditing(null)} className="btn-ghost-gold">
