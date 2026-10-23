@@ -1,12 +1,9 @@
 import { useSearchParams } from "react-router-dom";
 import InteractiveCatalog from "@/components/sections/InteractiveCatalog";
-import StudioSection from "@/components/sections/StudioSection";
 
 /**
- * کاتالوگ عمومی = یک مسیر اصلی:
- *   انتخاب مدل → نمایش نصب (عکس سرور تأییدشده یا قالب chroma + پارچه)
- *
- * استودیو پایین صفحه ابزار جداست: عکس پنجرهٔ خود مشتری (اختیاری).
+ * کاتالوگ = فقط انتخاب مدل + نمونه نصب (هم‌تراز ادمین).
+ * استودیوی آپلود پنجره موقتاً غیرفعال است.
  */
 export default function Catalog() {
   const [params] = useSearchParams();
@@ -21,16 +18,13 @@ export default function Catalog() {
             کاتالوگ <span className="text-gold-gradient">پارچه و نصب</span>
           </h1>
           <p className="mt-4 max-w-2xl font-body text-sm leading-7 text-muted-foreground">
-            مدل را از دسته‌ها انتخاب کنید. تصویر بزرگ همان <strong>نمونه نصب</strong> است: عکس پارچهٔ
-            واقعی مدل روی فرم نصب همان دسته (رومن، پلیسه، شید، …) — نه رندر کارتونی جدا.
+            مدل را انتخاب کنید؛ تصویر بزرگ همان نمونه نصب تأییدشده از پنل ادمین است — پارچهٔ واقعی روی فرم
+            همان دسته.
           </p>
         </div>
       </section>
 
       <InteractiveCatalog initialCategory={initialCategory} />
-
-      {/* ابزار جدا — ربطی به پیش‌نمایش کاتالوگ بالا ندارد */}
-      <StudioSection />
     </div>
   );
 }

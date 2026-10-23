@@ -1,13 +1,5 @@
 /**
- * ماتریس سبک‌های نصب پرده آنتیک
- *
- * هر مدل کاتالوگ با این ابعاد توصیف می‌شود:
- *  1) mechanism / style  → قالب chroma یا نمونه نصب واقعی (یک عکس برای آن سازوکار)
- *  2) fabric image       → رنگ، طرح، بافت پارچه از ورق کاتالوگ
- *  3) material profile   → رفتار نور (مخمل / ابریشم / تور / نخی)
- *
- * کیفیت هدف: عکس محصول مثل رومن نیمه‌بالا، پلیسه روی دو لنگه، پلیسه کاست‌دار.
- * هر سازوکار فرم نصب جدا دارد — قالب سبز باید همان هندسه را داشته باشد.
+ * ماتریس سبک‌های نصب — هم‌تراز فرانت curtainStyleResolve.js
  */
 
 export type CurtainStyleKey =
@@ -27,64 +19,19 @@ export const STYLE_META: Record<
   CurtainStyleKey,
   { label: string; mount: string; note: string }
 > = {
-  drape: {
-    label: "پرده کلاسیک / چین‌دار",
-    mount: "میله با پایه و سرریل",
-    note: "دو پنل، چین عمودی نرم، مناسب نشیمن و کلاسیک",
-  },
-  wave: {
-    label: "اورسی موجی",
-    mount: "میله / ریل موج",
-    note: "موج S منظم‌تر از کلاسیک",
-  },
-  panel: {
-    label: "ترک پنل",
-    mount: "ریل سقفی",
-    note: "پنل‌های صاف جدا از هم",
-  },
-  roman: {
-    label: "رومن",
-    mount: "کاست + چین افقی",
-    note: "چین افقی طبقه‌ای — مثل نمونه Roman80 نیمه‌بالا",
-  },
-  zebra: {
-    label: "زبرا",
-    mount: "داخل فریم + کاست",
-    note: "نوار پارچه/تور متناوب",
-  },
-  "pleated-manual": {
-    label: "پلیسه دستی",
-    mount: "داخل فریم / لنگه پنجره",
-    note: "آکاردئون افقی ریز — مثل نصب روی دو لنگه (PX2607)",
-  },
-  "pleated-chain": {
-    label: "پلیسه زنجیری / کاست",
-    mount: "کاست بیرونی + زنجیر",
-    note: "پلیسه تمام‌عرض با کاست و زنجیر — مثل PNF1210",
-  },
-  "pleated-sheer": {
-    label: "پلیسه توری",
-    mount: "کاست + زنجیر",
-    note: "پلیسه شفاف، عبور نور",
-  },
-  shade: {
-    label: "شید",
-    mount: "کاست بیرونی",
-    note: "سطح صاف، کنترل نور",
-  },
-  double: {
-    label: "دبل شید",
-    mount: "کاست بیرونی",
-    note: "دو لایه زمینه + تور",
-  },
-  roller: {
-    label: "کرکره",
-    mount: "کاست + اسلات",
-    note: "تیغه‌های افقی فلزی/چوبی",
-  },
+  drape: { label: "پرده کلاسیک / چین‌دار", mount: "میله", note: "دو پنل چین‌دار" },
+  wave: { label: "اورسی موجی", mount: "ریل موج", note: "موج S" },
+  panel: { label: "ترک پنل", mount: "ریل سقفی", note: "پنل صاف" },
+  roman: { label: "رومن", mount: "کاست", note: "چین افقی / نیمه‌بالا" },
+  zebra: { label: "زبرا", mount: "کاست", note: "نوار متناوب" },
+  "pleated-manual": { label: "پلیسه دستی", mount: "لنگه", note: "آکاردئون افقی" },
+  "pleated-chain": { label: "پلیسه زنجیری", mount: "کاست+زنجیر", note: "تمام‌عرض" },
+  "pleated-sheer": { label: "پلیسه توری", mount: "کاست", note: "شفاف" },
+  shade: { label: "شید", mount: "کاست", note: "سطح صاف" },
+  double: { label: "دبل شید", mount: "کاست", note: "دو لایه" },
+  roller: { label: "کرکره", mount: "کاست", note: "تیغه" },
 };
 
-/** category_slug (+ subcategory) → style قالب */
 export function resolveStyle(model: {
   categorySlug?: string | null;
   subcategory?: string | null;
@@ -112,7 +59,8 @@ export function resolveStyle(model: {
   if (cat === "shade-blackout" || cat === "shade-screen" || cat === "mini-shade" || cat === "shade")
     return "shade";
   if (/roller|کرکره|blind|wooden-blind|metal-blind/.test(hay) || cat === "roller") return "roller";
-  if (cat === "turk-panel" || cat === "panel" || /ترک.?پنل/.test(hay)) return "panel";
+  if (cat === "turk-panel" || cat === "panel" || cat === "track-panel" || /ترک.?پنل/.test(hay))
+    return "panel";
   if (cat === "aurora" || cat === "wave" || /اورسی|موج/.test(hay)) return "wave";
 
   const map: Record<string, CurtainStyleKey> = {
@@ -163,28 +111,33 @@ export function guessMaterial(model: {
   return "cotton";
 }
 
-/** Fabric tile factor — keep in sync with frontend styleFabricScale */
+/**
+ * سهم عرض ناحیه پارچه که یک تصویر پارچه می‌پوشاند (~1 = یک‌بار پهن).
+ * هم‌تراز frontend styleFabricScale.
+ */
 export function styleTileFactor(style?: string) {
   switch (style) {
     case "zebra":
-      return 0.72;
+      return 1.05;
     case "roman":
-      return 0.78;
+      return 1.1;
     case "shade":
     case "double":
-      return 0.74;
+      return 1.12;
     case "roller":
-      return 0.7;
+      return 1.08;
     case "panel":
-      return 0.8;
+      return 0.95;
     case "pleated-manual":
     case "pleated-chain":
     case "pleated-sheer":
-      return 0.68;
+      return 1.0;
     case "wave":
+      return 0.9;
+    case "drape":
       return 0.85;
     default:
-      return 0.82;
+      return 1.05;
   }
 }
 
