@@ -32,12 +32,67 @@ export function getQueueState() {
   return { ...state };
 }
 
-async function resolveTemplateUrl(style: string): Promise<string | null> {
-  const row = await prisma.renderTemplate.findFirst({
-    where: { style },
-    orderBy: { updatedAt: "desc" },
+/**
+ * Resolve install base image for a model:
+ *  1) InstallReference for categorySlug (real photo sample)
+ *  2) RenderTemplate for categorySlug (chroma keyed to that category)
+ *  3) InstallReference / RenderTemplate for mechanism style (roman, zebra, …)
+ * Categories come from CurtainCategory / model.categorySlug — not hardcoded list only.
+ */
+async function resolveTemplateUrl(opts: {
+  categorySlug?: string | null;
+  style: string;
+}): Promise<{ image: string; source: string; key: string } | null> {
+  const keys = [opts.categorySlug, opts.style].filter(
+    (k): k is string => Boolean(k && String(k).trim())
+  );
+  const tried = new Set<string>();
+
+  for (const key of keys) {
+    const k = key.trim().toLowerCase();
+    if (tried.has(k)) continue;
+    tried.add(k);
+
+    const ref = await prisma.installReference.findFirst({
+      where: { style: k },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (ref?.image) return { image: ref.image, source: "install_reference", key: k };
+
+    const tpl = await prisma.renderTemplate.findFirst({
+      where: { style: k },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (tpl?.image) return { image: tpl.image, source: "render_template", key: k };
+  }
+  return null;
+}
+
+/** Categories live in DB — list them for template coverage */
+export async function listCategoryTemplateCoverage() {
+  const [categories, templates, refs] = await Promise.all([
+    prisma.curtainCategory.findMany({ orderBy: { order: "asc" } }),
+    prisma.renderTemplate.findMany({ select: { style: true, image: true, updatedAt: true } }),
+    prisma.installReference.findMany({ select: { style: true, image: true, note: true } }),
+  ]);
+  const tplBy = new Map(templates.map((t) => [t.style.toLowerCase(), t]));
+  const refBy = new Map(refs.map((r) => [r.style.toLowerCase(), r]));
+
+  return categories.map((c) => {
+    const slug = c.slug.toLowerCase();
+    const tpl = tplBy.get(slug);
+    const ref = refBy.get(slug);
+    return {
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      hasChromaTemplate: Boolean(tpl?.image),
+      hasRealReference: Boolean(ref?.image),
+      templateImage: tpl?.image || null,
+      referenceImage: ref?.image || null,
+      referenceNote: ref?.note || null,
+    };
   });
-  return row?.image || null;
 }
 
 /** Admin-only: generate one model with high-accuracy engine */
@@ -46,7 +101,6 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
   if (!model) throw new Error("Model not found");
   if (!model.image) throw new Error("مدل تصویر پارچه ندارد");
 
-  // Skip if already approved and good enough (unless force regenerate)
   if (
     model.installImage &&
     !opts?.regenerate &&
@@ -63,12 +117,15 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
 
   const style = styleFromModel(model);
   const material = guessMaterial(model);
-  const template = await resolveTemplateUrl(style);
-  if (!template) {
+  const categorySlug = model.categorySlug || null;
+  const resolved = await resolveTemplateUrl({ categorySlug, style });
+  if (!resolved) {
     throw new Error(
-      `قالب chroma برای سبک «${style}» موجود نیست. از پنل → پنجره مجازی قالب سبز این سبک را آپلود کنید.`
+      `برای دسته «${categorySlug || "—"}» / سبک «${style}» نه قالب chroma و نه نمونه واقعی در دیتابیس نیست. ` +
+        `از پنل → پنجره مجازی قالب این دسته را بساز/آپلود کن، یا نمونه اجرا در InstallReference ثبت کن.`
     );
   }
+  const template = resolved.image;
 
   await prisma.curtainModel.update({
     where: { id: modelId },
@@ -106,6 +163,9 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
       skipped: false,
       install_image: result.publicPath,
       style,
+      category_slug: categorySlug,
+      template_key: resolved.key,
+      template_source: resolved.source,
       material,
       score: result.qualityScore,
       auto_approved: autoOk,
@@ -145,7 +205,6 @@ export async function runBatch(opts?: {
       if (!m.installImage) return true;
       if (m.installStatus === "rejected") return true;
       if (!m.installStatus || m.installStatus === "pending") return true;
-      // re-render weak approved scores if below threshold
       if (m.installStatus === "approved" && m.installScore != null && m.installScore < threshold - 1)
         return true;
       return false;
