@@ -41,7 +41,6 @@ export default function AdminWindowSettings() {
       .catch(() => {})
       .finally(() => setLoading(false));
 
-    // real fabric sample for product-shot preview (same path as public catalog)
     base44.entities.CurtainModel.list("-updated_date", 20)
       .then((rows) => {
         const withImg = (Array.isArray(rows) ? rows : []).find((m) => m.image);
@@ -58,6 +57,7 @@ export default function AdminWindowSettings() {
     setError("");
     try {
       const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
+      if (!file_url) throw new Error("آپلود ناموفق");
       set("view_image", file_url);
     } catch {
       setError("آپلود تصویر ناموفق بود.");
@@ -138,7 +138,11 @@ export default function AdminWindowSettings() {
       <InstallReviewAdmin />
       <RenderTemplatesAdmin />
 
-      <form onSubmit={save} className="mt-6 rounded-2xl border border-secondary/60 bg-card p-6 lg:p-8">
+      <form
+        onSubmit={save}
+        className="mt-6 rounded-2xl border border-secondary/60 bg-card p-6 lg:p-8"
+        noValidate
+      >
         <p className="mb-4 text-xs text-muted-foreground">
           تنظیمات زیر فقط روی رندر تعاملی WebGL اثر دارد؛ مسیر اصلی کاتالوگ از قالب chroma دسته است.
         </p>
@@ -160,7 +164,7 @@ export default function AdminWindowSettings() {
           <label className="mb-1.5 block font-body text-xs text-muted-foreground">
             چشم‌انداز پشت پنجره
           </label>
-          <div className="flex items-start gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
               {form.view_image ? (
                 <img src={form.view_image} alt="" className="h-full w-full object-cover" />
@@ -168,37 +172,31 @@ export default function AdminWindowSettings() {
                 <Upload className="h-4 w-4 text-muted-foreground" />
               )}
             </div>
-            <div className="flex-1">
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  value={form.view_image}
-                  onChange={(e) => set("view_image", e.target.value)}
-                  placeholder="آدرس تصویر چشم‌انداز یا آپلود…"
-                  className="w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-xs text-foreground outline-none focus:border-primary"
-                />
-                {form.view_image && (
-                  <button
-                    type="button"
-                    onClick={() => set("view_image", "")}
-                    aria-label="حذف تصویر"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-secondary/70 text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-secondary/70 px-3 py-1.5 font-body text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">
-                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                {uploading ? "در حال آپلود…" : "آپلود چشم‌انداز"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => uploadView(e.target.files?.[0])}
-                />
-              </label>
-            </div>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 px-4 py-2.5 font-body text-xs font-bold text-primary">
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+              {uploading ? "در حال آپلود…" : form.view_image ? "تعویض تصویر" : "آپلود چشم‌انداز"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  uploadView(f);
+                }}
+              />
+            </label>
+            {form.view_image && (
+              <button
+                type="button"
+                onClick={() => set("view_image", "")}
+                aria-label="حذف تصویر"
+                className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
 
