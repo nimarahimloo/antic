@@ -1,5 +1,5 @@
 /**
- * App params without @base44/sdk.
+ * Optional local app params.
  * Env vars are optional; local mock does not need a real app id.
  */
 const isNode = typeof window === "undefined";
@@ -8,7 +8,8 @@ const isClearAccessTokenRequested = () =>
   !isNode && new URLSearchParams(window.location.search).get("clear_access_token") === "true";
 
 const clearStoredAccessToken = () => {
-  window.localStorage.removeItem("base44_access_token");
+  window.localStorage.removeItem("antic_access_token");
+  window.localStorage.removeItem("base44_access_token"); // legacy key cleanup
   window.localStorage.removeItem("token");
 };
 
