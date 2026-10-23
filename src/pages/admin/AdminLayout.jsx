@@ -1,4 +1,5 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
+import AdminAssistant from "@/components/agent/AdminAssistant";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import {
@@ -109,6 +110,7 @@ export default function AdminLayout() {
           <Outlet />
         </main>
       </div>
+      <AdminAssistant />
     </div>
   );
 }
