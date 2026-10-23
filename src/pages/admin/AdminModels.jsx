@@ -5,8 +5,8 @@ import { api } from "@/api/client";
 
 /**
  * کاتالوگ فیزیکی: هر ورق = یک مدل.
- * هویت مدل = تصویر تکهٔ پارچه (طرح، رنگ، بافت واقعی).
- * فیلدهای متنی اختیاری‌اند؛ مشتری پارچه را می‌بیند نه نام رنگ.
+ * هویت مدل = تصویر تکهٔ پارچه (طرح و رنگ واقعی داخل عکس).
+ * مشتری پارچه را می‌بیند؛ نام رنگ را پر نمی‌کنیم.
  */
 export default function AdminModels() {
   const [categories, setCategories] = useState([]);
@@ -38,44 +38,34 @@ export default function AdminModels() {
       label: "تکه پارچه (ورق کاتالوگ)",
       type: "image",
       required: true,
-      help: "فقط یک تکه واضح از همان ورق پارچه. همین تصویر با تمام طرح و جزئیات روی پنجره رندر می‌شود — نیازی به پر کردن رنگ نیست.",
+      help: "فقط یک تکه واضح از همان ورق. همین عکس با تمام طرح و جزئیات روی پنجره رندر می‌شود.",
     },
     {
       key: "code",
       label: "کد محصول",
       required: true,
       placeholder: "کد روی ورق کاتالوگ",
-      help: "همان کدی که روی کاتالوگ فیزیکی نوشته شده؛ نام مدل هم می‌شود.",
     },
     {
       key: "name",
-      label: "نام (اختیاری)",
-      placeholder: "خالی = همان کد",
-      help: "اگر خالی باشد همان کد ذخیره می‌شود.",
+      label: "نام مدل",
+      required: true,
+      placeholder: "معمولاً همان کد محصول",
+      help: "همان کد محصول را اینجا هم بنویسید.",
     },
     { key: "category_slug", label: "دسته (سبک نصب)", required: true, type: "select" },
     {
       key: "subcategory",
       label: "زیردسته",
       type: subOptions.length ? "select" : "text",
-      help: "از لیست دسته انتخاب کنید.",
-    },
-    {
-      key: "fabric",
-      label: "نوع پارچه (اختیاری)",
-      placeholder: "زبرا، مخمل، تور…",
     },
     {
       key: "material",
-      label: "جنس (اختیاری — فقط برای نور رندر)",
+      label: "جنس (اختیاری — فقط نور رندر)",
       placeholder: "نخی، مخمل، ابریشم، تور",
-      help: "فقط رفتار نور را عوض می‌کند؛ رنگ و طرح از خود عکس می‌آید.",
+      help: "فقط سایه/برق را کمی عوض می‌کند؛ طرح از خود عکس است.",
     },
-    {
-      key: "description",
-      label: "یادداشت داخلی (اختیاری)",
-      type: "textarea",
-    },
+    { key: "description", label: "یادداشت داخلی (اختیاری)", type: "textarea" },
   ];
 
   const columns = [
@@ -108,11 +98,6 @@ export default function AdminModels() {
       options={{
         category_slug: categories.map((c) => ({ value: c.slug, label: c.name })),
         subcategory: subOptions,
-      }}
-      normalizeBeforeSave={(form) => {
-        const code = String(form.code || "").trim();
-        const name = String(form.name || "").trim() || code;
-        return { ...form, code, name };
       }}
     />
   );
