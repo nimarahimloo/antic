@@ -2,9 +2,11 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireAdmin, type AuthedRequest } from "../middleware/auth.js";
 import { HttpError, sendError } from "../lib/errors.js";
-import { getQueueState, renderOneModel, runBatch } from "../services/renderQueue.js";
+import { getQueueState, renderOneModel, runBatch, listCategoryTemplateCoverage } from "../services/renderQueue.js";
 import { prisma } from "../lib/prisma.js";
-import { ALL_STYLE_KEYS, STYLE_META, resolveStyle, guessMaterial } from "../lib/curtainStyles.js";
+import { ALL_STYLE_KEYS, STYLE_META, resolveStyle, guessMaterial, type CurtainStyleKey } from "../lib/curtainStyles.js";
+import { generateChromaTemplate } from "../services/templateGenerator.js";
+import path from "path";
 
 const router = Router();
 
@@ -19,6 +21,7 @@ router.get("/install/:modelId", async (req, res) => {
       status: model.installStatus || null,
       fabric_image: model.image || null,
       style,
+      category_slug: model.categorySlug,
       style_label: STYLE_META[style]?.label,
       material: guessMaterial(model),
       generated: Boolean(model.installImage),
@@ -121,6 +124,114 @@ router.get("/stats", requireAdmin, async (_req, res) => {
       byStyle,
       queue: getQueueState(),
     });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+/** Categories from DB + which have chroma / real install reference */
+router.get("/categories-coverage", requireAdmin, async (_req, res) => {
+  try {
+    const coverage = await listCategoryTemplateCoverage();
+    res.json({ categories: coverage });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+/**
+ * Generate procedural chroma template for a DB category slug.
+ * Geometry from mechanism; stored under category.slug so models find it first.
+ */
+router.post("/template/from-category", requireAdmin, async (req: AuthedRequest, res) => {
+  try {
+    const body = z
+      .object({
+        category_slug: z.string().min(1),
+        mechanism: z.string().optional(),
+      })
+      .parse(req.body || {});
+
+    const cat = await prisma.curtainCategory.findFirst({
+      where: { slug: body.category_slug },
+    });
+    if (!cat) throw new HttpError(404, `دسته «${body.category_slug}» در دیتابیس نیست`);
+
+    const mechanism = (body.mechanism ||
+      resolveStyle({ categorySlug: cat.slug, subcategory: null })) as CurtainStyleKey;
+
+    const uploadDir = process.env.UPLOAD_DIR || "./uploads";
+    const gen = await generateChromaTemplate(mechanism, path.resolve(uploadDir));
+
+    const existing = await prisma.renderTemplate.findFirst({
+      where: { style: cat.slug },
+      orderBy: { updatedAt: "desc" },
+    });
+    let row;
+    if (existing) {
+      row = await prisma.renderTemplate.update({
+        where: { id: existing.id },
+        data: { image: gen.publicPath },
+      });
+    } else {
+      row = await prisma.renderTemplate.create({
+        data: { style: cat.slug, image: gen.publicPath },
+      });
+    }
+
+    const mechExisting = await prisma.renderTemplate.findFirst({
+      where: { style: mechanism },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (mechExisting) {
+      await prisma.renderTemplate.update({
+        where: { id: mechExisting.id },
+        data: { image: gen.publicPath },
+      });
+    } else {
+      await prisma.renderTemplate.create({
+        data: { style: mechanism, image: gen.publicPath },
+      });
+    }
+
+    res.json({
+      ok: true,
+      category: { id: cat.id, name: cat.name, slug: cat.slug },
+      mechanism,
+      template: row,
+      publicPath: gen.publicPath,
+    });
+  } catch (err) {
+    sendError(res, err instanceof z.ZodError ? new HttpError(400, err.message) : err);
+  }
+});
+
+/** Generate templates for ALL categories in DB */
+router.post("/template/all-categories", requireAdmin, async (_req: AuthedRequest, res) => {
+  try {
+    const categories = await prisma.curtainCategory.findMany({ orderBy: { order: "asc" } });
+    const uploadDir = process.env.UPLOAD_DIR || "./uploads";
+    const results: unknown[] = [];
+    for (const cat of categories) {
+      const mechanism = resolveStyle({ categorySlug: cat.slug, subcategory: null }) as CurtainStyleKey;
+      const gen = await generateChromaTemplate(mechanism, path.resolve(uploadDir));
+      const existing = await prisma.renderTemplate.findFirst({
+        where: { style: cat.slug },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (existing) {
+        await prisma.renderTemplate.update({
+          where: { id: existing.id },
+          data: { image: gen.publicPath },
+        });
+      } else {
+        await prisma.renderTemplate.create({
+          data: { style: cat.slug, image: gen.publicPath },
+        });
+      }
+      results.push({ slug: cat.slug, name: cat.name, mechanism, path: gen.publicPath });
+    }
+    res.json({ ok: true, count: results.length, results });
   } catch (err) {
     sendError(res, err);
   }
