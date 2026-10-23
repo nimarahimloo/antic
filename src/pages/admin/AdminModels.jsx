@@ -1,31 +1,100 @@
 import { useEffect, useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { ALL_CATEGORIES } from "@/lib/catalogData";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import FabricSwatch from "@/components/catalog/FabricSwatch";
+import { api } from "@/api/client";
 
 export default function AdminModels() {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    base44.entities.CurtainCategory
-      .list("order", 100)
-      .then((data) => setCategories(data?.length ? data : ALL_CATEGORIES))
-      .catch(() => setCategories(ALL_CATEGORIES));
+    api.entities
+      .CurtainCategory
+      .list("-order", 100)
+      .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
+      .catch(() => setCategories([]));
   }, []);
 
+  const subOptions = categories.flatMap((c) => {
+    let subs = [];
+    try {
+      subs = c.subcategories ? JSON.parse(c.subcategories) : [];
+    } catch {
+      subs = [];
+    }
+    if (!Array.isArray(subs)) return [];
+    return subs.map((s) => {
+      const value = typeof s === "string" ? s : s.slug || s.id || s.name;
+      const label = typeof s === "string" ? s : s.name || s.slug || value;
+      return {
+        value: String(value),
+        label: `${c.name} → ${label}`,
+      };
+    });
+  });
+
   const fields = [
-    { key: "code", label: "کد محصول", required: true, placeholder: "مثلاً ZB-01" },
-    { key: "name", label: "نام مدل", required: true, placeholder: "مثلاً: زبرا کرمی" },
+    {
+      key: "code",
+      label: "کد محصول / نام مدل",
+      required: true,
+      placeholder: "مثلاً VL-001",
+      help: "نام مدل همان کد محصول است و به‌صورت خودکار در فیلد نام هم نوشته می‌شود.",
+    },
+    {
+      key: "name",
+      label: "نام نمایشی",
+      required: true,
+      placeholder: "معمولاً همان کد",
+      help: "اگر خالی بماند، همان کد محصول ذخیره می‌شود.",
+    },
     { key: "category_slug", label: "دسته‌بندی", required: true, type: "select" },
-    { key: "subcategory", label: "زیردسته", help: "شناسه زیردسته، مثل plain یا patterned" },
-    { key: "fabric", label: "نوع پارچه", placeholder: "مثلاً: زبرا" },
-    { key: "color", label: "رنگ", placeholder: "مثلاً: کرمی" },
-    { key: "color_code", label: "کد رنگ", placeholder: "#C9A227" },
-    { key: "material", label: "ترکیب جنس" },
-    { key: "texture", label: "بافت" },
-    { key: "image", label: "تصویر مدل", type: "image" },
-    { key: "install_image", label: "تصویر نصب اجراشده", type: "image", help: "عکس واقعی از نصب پرده روی پنجره" },
+    {
+      key: "subcategory",
+      label: "زیردسته",
+      type: subOptions.length ? "select" : "text",
+      help: "از زیردسته‌های همان دسته انتخاب کنید (نه مقدار آزاد بی‌ربط).",
+    },
+    {
+      key: "image",
+      label: "تصویر پارچه / مدل",
+      type: "image",
+      required: true,
+      help: "با آپلود، رنگ، بافت، جنس و نوع پارچه پیشنهاد می‌شود. پارچه طرح‌دار نیازی به کد رنگ ندارد.",
+    },
+    {
+      key: "fabric",
+      label: "نوع پارچه",
+      placeholder: "مثلاً زبرا، مخمل، تور",
+      help: "پس از آپلود عکس قابل تکمیل خودکار است.",
+    },
+    {
+      key: "color",
+      label: "رنگ / ظاهر",
+      placeholder: "مثلاً کرمی طرح‌دار",
+      help: "برای پارچه طرح‌دار همان توصیف ظاهر کافی است.",
+    },
+    {
+      key: "color_code",
+      label: "رنگ غالب (اختیاری)",
+      placeholder: "#C9A227",
+      help: "فقط برای پارچه ساده — برای طرح‌دار خالی بگذارید. کد رنگ اجباری نیست.",
+    },
+    {
+      key: "material",
+      label: "ترکیب جنس",
+      placeholder: "مثلاً نخی / مخمل / ابریشم",
+    },
+    {
+      key: "texture",
+      label: "بافت",
+      placeholder: "ساده، طرح‌دار، ریزبافت…",
+    },
+    {
+      key: "install_image",
+      label: "تصویر نصب اجراشده",
+      type: "image",
+      help: "عکس واقعی نصب روی پنجره (اختیاری؛ موتور رندر هم می‌تواند بسازد).",
+    },
     { key: "description", label: "توضیحات", type: "textarea" },
   ];
 
@@ -39,24 +108,32 @@ export default function AdminModels() {
         </div>
       ),
     },
-    { key: "code", label: "کد", render: (v) => <span className="font-display font-bold text-primary">{v}</span> },
-    { key: "name", label: "نام" },
+    {
+      key: "code",
+      label: "کد / نام",
+      render: (v, r) => (
+        <span className="font-display font-bold text-primary">{v || r.name}</span>
+      ),
+    },
     { key: "category_slug", label: "دسته" },
+    { key: "subcategory", label: "زیردسته" },
     {
       key: "color",
-      label: "رنگ",
+      label: "رنگ / ظاهر",
       render: (v, r) => (
         <span className="flex items-center gap-2">
-          {r.color_code && (
+          {r.color_code ? (
             <span
-              className="h-3.5 w-3.5 rounded-full border border-secondary/60"
+              className="h-3.5 w-3.5 shrink-0 rounded-full border border-secondary/60"
               style={{ backgroundColor: r.color_code }}
+              title="رنگ غالب (اختیاری)"
             />
-          )}
+          ) : null}
           {v || "—"}
         </span>
       ),
     },
+    { key: "texture", label: "بافت" },
   ];
 
   return (
@@ -67,7 +144,14 @@ export default function AdminModels() {
       columns={columns}
       options={{
         category_slug: categories.map((c) => ({ value: c.slug, label: c.name })),
+        subcategory: subOptions,
       }}
+      normalizeBeforeSave={(form) => {
+        const code = String(form.code || "").trim();
+        const name = String(form.name || "").trim() || code;
+        return { ...form, code, name };
+      }}
+      analyzeImageField="image"
     />
   );
 }
