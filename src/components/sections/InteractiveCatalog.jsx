@@ -58,7 +58,6 @@ export default function InteractiveCatalog({ initialCategory }) {
   }, [selectedCategory, selectedSubcategory, search]);
 
   useEffect(() => {
-    // lightweight counts: one list pass
     base44.entities.CurtainModel.list("-created_date", 500)
       .then((rows) => {
         const counts = {};
@@ -82,17 +81,16 @@ export default function InteractiveCatalog({ initialCategory }) {
   }, [gridItems]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <section id="catalog" className="relative overflow-hidden bg-background py-16 lg:py-24">
+    <section id="catalog" className="relative overflow-hidden bg-background py-12 lg:py-20">
       <div className="mx-auto max-w-7xl px-5 lg:px-10">
-        <div className="mb-10 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+        <div className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <span className="eyebrow mb-3 block">کاتالوگ دقیق</span>
-            <h2 className="font-display text-2xl font-black text-foreground lg:text-4xl">
-              پارچه واقعی روی <span className="text-gold-gradient">پنجره</span>
+            <span className="eyebrow mb-2 block">انتخاب مدل</span>
+            <h2 className="font-display text-xl font-black text-foreground lg:text-3xl">
+              پارچه واقعی · <span className="text-gold-gradient">فرم نصب دسته</span>
             </h2>
-            <p className="mt-3 max-w-lg font-body text-sm leading-7 text-muted-foreground">
-              عکس ورق کاتالوگ فیزیکی هر مدل بارگذاری شده؛ رنگ، طرح و بافت همان پارچه روی فرم نصب دیده می‌شود.
-              کد محصول را جستجو کنید یا از دسته‌ها انتخاب کنید.
+            <p className="mt-2 max-w-lg font-body text-sm leading-7 text-muted-foreground">
+              تصویر بزرگ = نمونه نصب همین مدل. کارت‌ها عکس پارچه یا نمونه تأییدشده را نشان می‌دهند.
             </p>
           </div>
           <Link to="/#contact" className="btn-ghost-gold shrink-0">
@@ -100,7 +98,7 @@ export default function InteractiveCatalog({ initialCategory }) {
           </Link>
         </div>
 
-        <div className="relative mb-8">
+        <div className="relative mb-6">
           <Search className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-primary/70" />
           <input
             type="text"
@@ -111,6 +109,7 @@ export default function InteractiveCatalog({ initialCategory }) {
           />
           {search && (
             <button
+              type="button"
               onClick={() => setSearch("")}
               aria-label="پاک کردن جستجو"
               className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
@@ -123,6 +122,7 @@ export default function InteractiveCatalog({ initialCategory }) {
         <div className="mb-8 flex gap-2 overflow-x-auto no-scrollbar pb-1" dir="rtl">
           {CATEGORIES.map((cat) => (
             <button
+              type="button"
               key={cat.slug}
               onClick={() => {
                 setSearch("");
@@ -152,9 +152,7 @@ export default function InteractiveCatalog({ initialCategory }) {
 
         <div className="grid gap-8 lg:grid-cols-5">
           <div className="lg:col-span-3">
-            <div className="relative">
-              <CurtainPreview fabric={selectedModel} />
-            </div>
+            <CurtainPreview fabric={selectedModel} publicMode />
 
             {selectedModel && (
               <motion.div
@@ -187,7 +185,10 @@ export default function InteractiveCatalog({ initialCategory }) {
                     {selectedModel.description}
                   </p>
                 )}
-                <Link to={`/curtain/${selectedModel.id}`} className="btn-ghost-gold mt-4 w-full justify-center text-xs">
+                <Link
+                  to={`/curtain/${selectedModel.id}`}
+                  className="btn-ghost-gold mt-4 w-full justify-center text-xs"
+                >
                   مشاهدهٔ جزئیات کامل
                 </Link>
                 <a href="tel:02112345678" className="btn-gold mt-3 w-full justify-center">
@@ -202,6 +203,7 @@ export default function InteractiveCatalog({ initialCategory }) {
               <div className="mb-4 flex flex-wrap gap-2">
                 {category.subcategories.map((sub) => (
                   <button
+                    type="button"
                     key={sub.slug}
                     onClick={() => setSelectedSubcategory(sub.slug)}
                     className={`rounded-full border px-4 py-1.5 font-body text-xs transition-colors ${

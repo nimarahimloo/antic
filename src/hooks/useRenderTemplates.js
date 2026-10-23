@@ -4,24 +4,19 @@ import { base44 } from "@/api/base44Client";
 let cache = null;
 
 /**
- * Merged map: style/slug → image URL.
- * InstallReference wins over RenderTemplate for the same key (real install photo > procedural chroma).
+ * Map style/slug → chroma template URL for live fabric mapping.
+ * Only RenderTemplate (green chroma). InstallReference is NOT merged here —
+ * finished product photos without green break PhotoCurtain and force 3D fallback.
+ * Server-side install_image already used InstallReference when appropriate.
  */
 export function useRenderTemplates() {
   const [templates, setTemplates] = useState(null);
   useEffect(() => {
     if (!cache) {
-      cache = Promise.all([
-        base44.entities.RenderTemplate.list("-updated_date", 80).catch(() => []),
-        base44.entities.InstallReference.list("-updated_date", 80).catch(() => []),
-      ])
-        .then(([tplRows, refRows]) => {
+      cache = base44.entities.RenderTemplate.list("-updated_date", 120)
+        .then((tplRows) => {
           const map = {};
           for (const r of Array.isArray(tplRows) ? tplRows : []) {
-            if (r?.style && r?.image) map[String(r.style).toLowerCase()] = r.image;
-          }
-          // references overwrite chroma for same key
-          for (const r of Array.isArray(refRows) ? refRows : []) {
             if (r?.style && r?.image) map[String(r.style).toLowerCase()] = r.image;
           }
           return map;

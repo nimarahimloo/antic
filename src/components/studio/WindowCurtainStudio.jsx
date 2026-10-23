@@ -31,6 +31,9 @@ function motionLabel(style) {
   return "باز / بسته کردن پرده";
 }
 
+/**
+ * فقط برای عکس پنجرهٔ مشتری — جایگزین پیش‌نمایش کاتالوگ نیست.
+ */
 export default function WindowCurtainStudio() {
   const [photoUrl, setPhotoUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -67,7 +70,6 @@ export default function WindowCurtainStudio() {
         const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
         setPhotoUrl(file_url);
       } catch {
-        // last resort: local object URL so studio still works offline
         setPhotoUrl(URL.createObjectURL(file));
         setSavedMsg({
           type: "error",
@@ -175,13 +177,14 @@ export default function WindowCurtainStudio() {
   return (
     <div className="rounded-3xl border border-secondary/60 bg-card p-4 lg:p-8">
       <div className="mb-5">
-        <span className="eyebrow mb-2 block">استودیوی مجازی پرده</span>
-        <h3 className="font-display text-base font-bold text-foreground lg:text-xl">
-          پرده را روی <span className="text-gold-gradient">پنجره خودتان</span> ببینید
-        </h3>
-        <p className="mt-1.5 font-body text-xs leading-6 text-muted-foreground">
-          عکس پنجره‌تان را بگذارید، مدل/کد پارچهٔ کاتالوگ را انتخاب کنید، باز یا بالا ببرید و نتیجه را ذخیره کنید.
+        <p className="mb-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 font-body text-[11px] leading-5 text-muted-foreground">
+          <strong className="text-primary">توجه:</strong> اینجا برای آپلود عکس پنجرهٔ منزل شماست. برای دیدن
+          مدل‌های کاتالوگ و نمونه نصب، از بخش بالای همین صفحه استفاده کنید.
         </p>
+        <span className="eyebrow mb-2 block">استودیوی پنجره شخصی</span>
+        <h3 className="font-display text-base font-bold text-foreground lg:text-xl">
+          پرده را روی <span className="text-gold-gradient">عکس پنجره خودتان</span> ببینید
+        </h3>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-5 lg:gap-6">
@@ -206,6 +209,7 @@ export default function WindowCurtainStudio() {
                   fabricImage={selectedModel?.image || null}
                 />
                 <button
+                  type="button"
                   onClick={() => {
                     setPhotoUrl(null);
                     setSelectedModel(null);
@@ -226,8 +230,12 @@ export default function WindowCurtainStudio() {
                       <Upload className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <p className="font-display text-sm font-bold text-foreground">عکس پنجره خود را آپلود کنید</p>
-                      <p className="mt-1 font-body text-xs text-muted-foreground">JPG یا PNG — از دوربین گوشی هم می‌شود</p>
+                      <p className="font-display text-sm font-bold text-foreground">
+                        عکس پنجره منزل را آپلود کنید
+                      </p>
+                      <p className="mt-1 font-body text-xs text-muted-foreground">
+                        JPG یا PNG — از دوربین گوشی هم می‌شود
+                      </p>
                     </div>
                   </>
                 )}
@@ -245,11 +253,11 @@ export default function WindowCurtainStudio() {
 
           {photoUrl && (
             <div className="mt-4 flex flex-col gap-2.5 sm:flex-row">
-              <button onClick={handleSave} disabled={saving} className="btn-gold flex-1 justify-center">
+              <button type="button" onClick={handleSave} disabled={saving} className="btn-gold flex-1 justify-center">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 ذخیره در گالری
               </button>
-              <button onClick={handleShare} className="btn-ghost-gold flex-1 justify-center">
+              <button type="button" onClick={handleShare} className="btn-ghost-gold flex-1 justify-center">
                 <Share2 className="h-4 w-4" />
                 اشتراک‌گذاری
               </button>
@@ -277,6 +285,7 @@ export default function WindowCurtainStudio() {
                 <div className="grid grid-cols-3 gap-1.5">
                   {models.map((m) => (
                     <button
+                      type="button"
                       key={m.id}
                       onClick={() => handleModelSelect(m)}
                       className={`rounded-lg border p-1.5 text-center transition-colors ${
@@ -307,6 +316,7 @@ export default function WindowCurtainStudio() {
                 <div className="flex flex-wrap gap-1.5">
                   {STUDIO_STYLES.map((s) => (
                     <button
+                      type="button"
                       key={s.slug}
                       onClick={() => setSelectedStyle(s.slug)}
                       className={`rounded-full border px-3 py-1.5 font-body text-xs transition-colors ${
@@ -326,6 +336,7 @@ export default function WindowCurtainStudio() {
                 <div className="flex flex-wrap gap-1.5">
                   {COLOR_PRESETS.map((c) => (
                     <button
+                      type="button"
                       key={c}
                       onClick={() => setColor(c)}
                       title={c}
@@ -359,6 +370,7 @@ export default function WindowCurtainStudio() {
           />
 
           <button
+            type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="flex w-full items-center gap-2 font-body text-xs text-muted-foreground transition-colors hover:text-primary"
           >
@@ -377,6 +389,7 @@ export default function WindowCurtainStudio() {
 
           {modelMode && (
             <button
+              type="button"
               onClick={() => {
                 setSelectedModel(null);
                 setSelectedStyle("drape");

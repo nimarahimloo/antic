@@ -1,7 +1,12 @@
 import { useMemo, useState, useCallback } from "react";
 import VirtualWindow from "@/components/catalog/VirtualWindow";
 import PhotoCurtain from "@/components/catalog/photo/PhotoCurtain";
-import { resolveStyle, pickTemplateUrl, styleFabricScale, MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
+import {
+  resolveStyle,
+  pickTemplateUrl,
+  styleFabricScale,
+  MECHANISM_LABELS,
+} from "@/lib/curtainStyleResolve";
 import { useRenderTemplates } from "@/hooks/useRenderTemplates";
 
 function controlLabel(style, categorySlug) {
@@ -21,12 +26,14 @@ function controlLabel(style, categorySlug) {
 }
 
 /**
- * Catalog preview priority (product-shot quality path first):
- *  1) approved server install_image
- *  2) live chroma/photo composite from admin template for this mechanism
- *  3) interactive WebGL (optional)
+ * مسیر درست کاتالوگ (به ترتیب):
+ *  1) install_image تأییدشده روی سرور  ← همان چیزی که مشتری باید ببیند
+ *  2) قالب chroma سبز + عکس پارچه (زنده در مرورگر)
+ *  3) WebGL تعاملی فقط وقتی هیچ‌کدام نیست
+ *
+ * publicMode: بدون تب‌های گیج‌کننده و بدون پیام «به ادمین برو»
  */
-export default function CurtainPreview({ fabric }) {
+export default function CurtainPreview({ fabric, publicMode = false }) {
   const [open, setOpen] = useState(0.3);
   const [mode, setMode] = useState("auto");
   const templates = useRenderTemplates();
@@ -37,71 +44,52 @@ export default function CurtainPreview({ fabric }) {
   const hasPhoto = Boolean(templateUrl && fabric?.image);
   const hasApprovedInstall =
     fabric?.install_status === "approved" && Boolean(fabric?.install_image);
+  // هر install ذخیره‌شده (حتی pending) بهتر از 3D سفید است
+  const hasAnyInstall = Boolean(fabric?.install_image);
 
   const effectiveMode = useMemo(() => {
-    if (mode === "install" && hasApprovedInstall) return "install";
+    if (mode === "install" && hasAnyInstall) return "install";
     if (mode === "photo" && hasPhoto) return "photo";
     if (mode === "interactive") return "interactive";
-    // auto: product-shot path first
-    if (hasApprovedInstall) return "install";
+    // auto priority
+    if (hasApprovedInstall || hasAnyInstall) return "install";
     if (hasPhoto) return "photo";
     return "interactive";
-  }, [mode, hasPhoto, hasApprovedInstall]);
+  }, [mode, hasPhoto, hasApprovedInstall, hasAnyInstall]);
 
   const onOpenChange = useCallback((v) => setOpen(v), []);
   const label = controlLabel(style, fabric?.category_slug);
   const styleLabel = MECHANISM_LABELS[style] || style;
   const tileScale = styleFabricScale(style);
 
+  const title =
+    effectiveMode === "install"
+      ? "نمونه نصب"
+      : effectiveMode === "photo"
+        ? `نصب · ${styleLabel}`
+        : `پیش‌نمایش · ${styleLabel}`;
+
   return (
     <div id="curtain-render-preview">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="font-display font-bold text-primary">
-          {effectiveMode === "install"
-            ? "نمونه نصب تأییدشده"
-            : effectiveMode === "photo"
-              ? `نصب واقعی · ${styleLabel}`
-              : `پنجره مجازی · ${styleLabel}`}
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {hasApprovedInstall && (
-            <button
-              type="button"
-              onClick={() => setMode("install")}
-              className={`rounded-full border px-2.5 py-1 text-[10px] ${
-                effectiveMode === "install"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-secondary/60 text-muted-foreground"
-              }`}
-            >
-              نصب تأییدشده
-            </button>
-          )}
-          {hasPhoto && (
-            <button
-              type="button"
-              onClick={() => setMode("photo")}
-              className={`rounded-full border px-2.5 py-1 text-[10px] ${
-                effectiveMode === "photo"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-secondary/60 text-muted-foreground"
-              }`}
-            >
-              قالب نصب
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setMode("interactive")}
-            className={`rounded-full border px-2.5 py-1 text-[10px] ${
-              effectiveMode === "interactive"
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-secondary/60 text-muted-foreground"
-            }`}
-          >
-            حرکت تعاملی
-          </button>
-        </div>
+        <span className="font-display font-bold text-primary">{title}</span>
+        {!publicMode && (
+          <div className="flex flex-wrap gap-1.5">
+            {hasAnyInstall && (
+              <ModeBtn active={effectiveMode === "install"} onClick={() => setMode("install")}>
+                نمونه نصب
+              </ModeBtn>
+            )}
+            {hasPhoto && (
+              <ModeBtn active={effectiveMode === "photo"} onClick={() => setMode("photo")}>
+                قالب زنده
+              </ModeBtn>
+            )}
+            <ModeBtn active={effectiveMode === "interactive"} onClick={() => setMode("interactive")}>
+              حرکت تعاملی
+            </ModeBtn>
+          </div>
+        )}
       </div>
 
       {effectiveMode === "install" && fabric?.install_image ? (
@@ -118,13 +106,25 @@ export default function CurtainPreview({ fabric }) {
         <VirtualWindow fabric={fabric} open={open} scale={0.65} onOpenChange={onOpenChange} />
       )}
 
-      <p className="mt-2 text-[10px] leading-5 text-muted-foreground">
-        {effectiveMode === "install"
-          ? "تصویر تولیدشده روی سرور از قالب نصب این سبک + عکس پارچه مدل — همان مسیری که برای کاتالوگ تأیید می‌شود."
-          : effectiveMode === "photo"
-            ? "عکس پارچهٔ ورق کاتالوگ روی قالب نصب این سازوکار (رومن / پلیسه / شید / …). اسکیل بافت برای هر سبک جدا تنظیم شده است."
-            : "رندر سه‌بعدی تعاملی. برای نزدیک‌ترین کیفیت به عکس محصول، قالب chroma یا نمونه نصب را در ادمین برای این سبک آپلود کنید."}
-      </p>
+      {publicMode ? (
+        <p className="mt-2 text-[10px] leading-5 text-muted-foreground">
+          {effectiveMode === "install"
+            ? "تصویر نصب تولیدشده برای همین مدل از روی قالب دسته و عکس پارچه."
+            : effectiveMode === "photo"
+              ? "پیش‌نمایش زنده: پارچهٔ ورق روی قالب نصب این دسته."
+              : fabric?.image
+                ? "نمونه نصب این مدل هنوز آماده نیست؛ پیش‌نمایش تقریبی نشان داده می‌شود."
+                : "برای این مدل عکس پارچه ثبت نشده است."}
+        </p>
+      ) : (
+        <p className="mt-2 text-[10px] leading-5 text-muted-foreground">
+          {effectiveMode === "install"
+            ? "تصویر سرور (قالب دسته + پارچه مدل)."
+            : effectiveMode === "photo"
+              ? "قالب chroma + پارچه در مرورگر."
+              : "رندر سه‌بعدی موقت — برای کیفیت نهایی قالب سبز یا batch نصب بسازید."}
+        </p>
+      )}
 
       {fabric && effectiveMode === "interactive" && (
         <div className="mt-4 rounded-xl border border-border bg-card p-4">
@@ -146,19 +146,22 @@ export default function CurtainPreview({ fabric }) {
           />
         </div>
       )}
-
-      {fabric && !fabric.image && (
-        <p className="mt-2 text-[10px] text-muted-foreground">
-          این مدل عکس تکهٔ پارچه ندارد؛ از پنل ادمین عکس ورق کاتالوگ را بارگذاری کنید.
-        </p>
-      )}
-
-      {fabric?.image && !hasPhoto && !hasApprovedInstall && templates && (
-        <p className="mt-2 text-[10px] text-amber-700 dark:text-amber-400">
-          برای سبک «{styleLabel}» هنوز قالب نصب در ادمین ثبت نشده. از پنجره مجازی → قالب‌های نصب، یک عکس
-          نصب واقعی با ناحیهٔ سبز (یا نمونه اجرا) برای این سازوکار آپلود کنید تا خروجی شبیه عکس محصول شود.
-        </p>
-      )}
     </div>
+  );
+}
+
+function ModeBtn({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-2.5 py-1 text-[10px] ${
+        active
+          ? "border-primary bg-primary/10 text-primary"
+          : "border-secondary/60 text-muted-foreground"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
