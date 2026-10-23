@@ -3,6 +3,7 @@ import { analyzeTemplate, renderPhoto } from "@/components/catalog/photo/photoRe
 import { materialOf } from "@/components/catalog/photo/materials";
 import { analyzeFabric } from "@/components/catalog/photo/fabricAnalyzer";
 import { makeSwatchCanvas } from "@/components/catalog/fabricSwatch";
+import { styleFabricScale } from "@/lib/curtainStyleResolve";
 
 const load = (src) =>
   new Promise((resolve, reject) => {
@@ -14,10 +15,10 @@ const load = (src) =>
   });
 
 /**
- * Shows the model's fabric image mapped onto a real window install template.
- * The fabric photo is the product — we do not recolor it from metadata.
+ * Maps the model's fabric image onto a real window-install template (chroma).
+ * scale / styleKey control pattern size so roman vs pleated vs shade read correctly.
  */
-export default function PhotoCurtain({ template, fabric, scale = 0.55 }) {
+export default function PhotoCurtain({ template, fabric, scale, styleKey }) {
   const canvas = useRef(null);
   const [state, setState] = useState("loading");
 
@@ -26,6 +27,11 @@ export default function PhotoCurtain({ template, fabric, scale = 0.55 }) {
     setState("loading");
 
     const fabricSrc = fabric?.image;
+    const baseScale =
+      typeof scale === "number" && scale > 0
+        ? scale
+        : styleFabricScale(styleKey || fabric?.category_slug);
+
     Promise.all([
       load(template),
       fabricSrc ? load(fabricSrc) : Promise.resolve(makeSwatchCanvas(fabric)),
@@ -36,9 +42,11 @@ export default function PhotoCurtain({ template, fabric, scale = 0.55 }) {
         const info = analyzeTemplate(photo);
         if (info.coverage < 0.02) return setState("invalid");
 
-        const tileScale = analysis?.patternScale
-          ? Math.min(1.1, Math.max(0.3, scale * (analysis.patternScale / 18)))
-          : scale;
+        // patternScale from analyzer: larger number ≈ coarser pattern → slightly larger tile
+        const patternAdj = analysis?.patternScale
+          ? Math.min(1.2, Math.max(0.75, analysis.patternScale / 16))
+          : 1;
+        const tileScale = Math.min(1.05, Math.max(0.32, baseScale * patternAdj));
 
         const material = materialOf(fabric, analysis);
         renderPhoto(canvas.current, photo, swatch, info, material, tileScale);
@@ -49,7 +57,7 @@ export default function PhotoCurtain({ template, fabric, scale = 0.55 }) {
     return () => {
       alive = false;
     };
-  }, [template, fabric?.image, fabric?.fabric, fabric?.material, scale]);
+  }, [template, fabric?.image, fabric?.fabric, fabric?.material, scale, styleKey]);
 
   return (
     <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-card">
@@ -65,7 +73,8 @@ export default function PhotoCurtain({ template, fabric, scale = 0.55 }) {
       )}
       {state === "invalid" && (
         <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-xs text-muted-foreground">
-          قالب نصب پارچهٔ سبز قابل‌تشخیص ندارد. در ادمین برای این سبک یک عکس واقعی نصب با پارچه سبز آپلود کنید.
+          قالب نصب ناحیهٔ سبز (chroma) قابل‌تشخیص ندارد. در ادمین برای این سبک یک عکس نصب واقعی با پارچه
+          سبز آپلود کنید — مثل عکس‌های محصول (رومن / پلیسه / شید) با فرم درست همان سازوکار.
         </p>
       )}
       {state === "error" && (
