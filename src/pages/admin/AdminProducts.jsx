@@ -288,7 +288,11 @@ export default function AdminProducts() {
                     )}
                   </div>
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 px-3 py-2 text-xs text-primary">
-                    {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    {uploading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="h-3.5 w-3.5" />
+                    )}
                     {uploading ? "آپلود…" : form.image ? "تعویض" : "انتخاب تصویر"}
                     <input
                       type="file"
@@ -348,7 +352,7 @@ export default function AdminProducts() {
                 </label>
                 <label className="flex items-center gap-2 text-xs">
                   <input
-                    type="checkbox"igurative
+                    type="checkbox"
                     checked={form.inStock}
                     onChange={(e) => setForm((f) => ({ ...f, inStock: e.target.checked }))}
                   />
@@ -358,7 +362,11 @@ export default function AdminProducts() {
             </div>
             {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
             <div className="mt-6 flex gap-3">
-              <button type="submit" disabled={saving || uploading} className="btn-gold flex-1 justify-center">
+              <button
+                type="submit"
+                disabled={saving || uploading}
+                className="btn-gold flex-1 justify-center"
+              >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
               </button>
               <button type="button" onClick={() => setEditing(null)} className="btn-ghost-gold">
