@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { HttpError, sendError } from "../lib/errors.js";
-import { buildConsultantReply, type ChatMessage } from "../lib/consultant.js";
+import { buildAssistantReply, type ChatMessage } from "../lib/consultant.js";
 
 const router = Router();
 
@@ -24,6 +24,19 @@ function prune() {
   }
 }
 
+function welcome(agent: string) {
+  if (agent === "admin_assistant") {
+    return (
+      "سلام — دستیار ادمین آنتیک هستم. هر صفحه‌ای از پنل که باشی می‌بینم و قدم‌به‌قدم کمک می‌کنم: " +
+      "مدل، قالب chroma، متن، دسته، سفارش و درخواست مشاوره. بگو الان چی لازم داری."
+    );
+  }
+  return (
+    "سلام 👋 دستیار طراحی پرده آنتیک هستم. سلیقه‌ت را می‌پرسم و از کاتالوگ واقعی مدل پیشنهاد می‌دهم. " +
+    "فضا، نور و سبک دکوراسیونت را بگو."
+  );
+}
+
 router.post("/conversations", async (req, res) => {
   try {
     prune();
@@ -39,15 +52,7 @@ router.post("/conversations", async (req, res) => {
       id,
       agent_name: body.agent_name,
       metadata: body.metadata,
-      messages: [
-        {
-          role: "assistant",
-          content:
-            "سلام، من مشاور طراحی پرده آنتیک هستم و به کاتالوگ زنده (دیتابیس) وصلم. " +
-            "بگو فضات چیه (نشیمن، خواب، آشپزخانه، اداری)، چقدر نور می‌خوای، و سبک دکوراسیونت چطوره " +
-            "تا از مدل‌های واقعی برات پیشنهاد بدم. می‌تونی بپرسی: سبک‌ها چیه؟ / زبرا دارید؟ / قیمت چطوره؟",
-        },
-      ],
+      messages: [{ role: "assistant", content: welcome(body.agent_name) }],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -77,6 +82,13 @@ router.post("/conversations/:id/messages", async (req, res) => {
       .object({
         role: z.enum(["user", "assistant"]).default("user"),
         content: z.string().min(1),
+        context: z
+          .object({
+            path: z.string().optional(),
+            page: z.string().optional(),
+            role: z.string().optional(),
+          })
+          .optional(),
       })
       .parse(req.body || {});
 
@@ -85,7 +97,18 @@ router.post("/conversations/:id/messages", async (req, res) => {
 
     if (body.role === "user") {
       const history = conv.messages.slice(0, -1);
-      const { text, meta } = await buildConsultantReply(body.content, history);
+      const ctx = {
+        ...(typeof conv.metadata === "object" && conv.metadata?.context
+          ? (conv.metadata.context as object)
+          : {}),
+        ...body.context,
+      };
+      const { text, meta } = await buildAssistantReply(
+        conv.agent_name,
+        body.content,
+        history,
+        ctx
+      );
       conv.messages.push({
         role: "assistant",
         content: text,
@@ -93,16 +116,12 @@ router.post("/conversations/:id/messages", async (req, res) => {
           {
             status: "completed",
             display_projection: {
-              label:
-                meta.intent === "greeting"
-                  ? "آماده مشاوره"
-                  : meta.intent === "recommend" || meta.intent === "search_models"
-                    ? "کاتالوگ بررسی شد"
-                    : "پاسخ از کاتالوگ محلی",
+              label: conv.agent_name === "admin_assistant" ? "دستیار ادمین" : "کاتالوگ محلی",
             },
             arguments_string: JSON.stringify({
               query: body.content.slice(0, 120),
               intent: meta.intent,
+              path: meta.path,
             }),
             results: JSON.stringify(meta),
           },
