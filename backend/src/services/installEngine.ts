@@ -3,7 +3,7 @@
  * Closely follows browser photoRenderer.js:
  *  - linear (gamma 2.2) shading from chroma template folds
  *  - soft green key + despill
- *  - fabric tile with pattern-preserving sample (0.72 mix)
+ *  - fabric tile with pattern-preserving sample (0.82 mix)
  *  - material profiles (cotton/velvet/silk/sheer)
  *
  * Performance:
@@ -112,7 +112,7 @@ function materialParams(material?: string, logStd?: number) {
     case "voile":
       return { id: 3, contrast, sheen: 0.12, detail: 0.18, tile: 0.42, warp: 0.07, ao: 0.22 };
     default:
-      return { id: 0, contrast, sheen: 0.06, detail: 0.32, tile: 0.62, warp: 0.13, ao: 0.42 };
+      return { id: 0, contrast, sheen: 0.08, detail: 0.38, tile: 0.58, warp: 0.11, ao: 0.48 };
   }
 }
 
@@ -253,7 +253,7 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const fabMeta = await sharp(fabricBuf).metadata();
   const aspect = (fabMeta.width || 1) / (fabMeta.height || 1);
 
-  const fabW = Math.max(256, Math.min(1024, Math.round(tpl.w * fabricScale * 1.25)));
+  const fabW = Math.max(320, Math.min(1280, Math.round(tpl.w * fabricScale * 1.45)));
   const fabH = Math.max(128, Math.min(1024, Math.round(fabW / aspect)));
 
   const { data: fd, info: fi } = await sharp(fabricBuf)
@@ -345,11 +345,11 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       const ratioR = Math.min(1.35, Math.max(0.75, flr / Math.max(meanR, 0.004)));
       const ratioG = Math.min(1.35, Math.max(0.75, flg / Math.max(meanG, 0.004)));
       const ratioB = Math.min(1.35, Math.max(0.75, flb / Math.max(meanB, 0.004)));
-      const flatR = flr * 0.72 + meanR * ratioR * 0.28;
-      const flatG = flg * 0.72 + meanG * ratioG * 0.28;
-      const flatB = flb * 0.72 + meanB * ratioB * 0.28;
+      const flatR = flr * 0.82 + meanR * ratioR * 0.18;
+      const flatG = flg * 0.82 + meanG * ratioG * 0.18;
+      const flatB = flb * 0.82 + meanB * ratioB * 0.18;
 
-      const ao = mat.ao != null ? 1 - (1 - smoothstep(0.3, 1.2, s)) * mat.ao * 0.65 : 1;
+      const ao = mat.ao != null ? 1 - (1 - smoothstep(0.25, 1.15, s)) * mat.ao * 0.78 : 1;
       let cr = flatR * s * ao;
       let cg = flatG * s * ao;
       let cb = flatB * s * ao;
@@ -395,7 +395,7 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   fs.mkdirSync(input.outDir, { recursive: true });
 
   await sharp(out, { raw: { width: w, height: h, channels: 4 } })
-    .jpeg({ quality: 92, mozjpeg: true, chromaSubsampling: "4:4:4" })
+    .jpeg({ quality: 94, mozjpeg: true, chromaSubsampling: "4:4:4" })
     .toFile(filePath);
 
   return {
