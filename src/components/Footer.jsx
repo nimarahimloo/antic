@@ -8,8 +8,11 @@ export default function Footer() {
         <div className="grid gap-12 md:grid-cols-4">
           <div className="md:col-span-1">
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/50 font-display text-lg font-bold text-primary">پ</span>
-              <span className="font-display text-lg font-bold text-foreground">پرده آنتیک</span>
+              <img src="/brand/mark.svg" alt="Antic Curtain" className="h-11 w-11 object-contain" width={44} height={44} />
+              <div className="flex flex-col leading-none">
+                <span className="font-display text-lg font-bold text-foreground">پرده آنتیک</span>
+                <span className="mt-1 font-body text-[10px] tracking-wider text-primary">ANTIC CURTAIN</span>
+              </div>
             </div>
             <p className="mt-5 font-body text-sm leading-7 text-muted-foreground">
               خانه لوکس پرده و پارچه. از طراحی تا اجرا، هر پرده یک اثر معماری است.
