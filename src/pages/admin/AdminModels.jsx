@@ -3,34 +3,34 @@ import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import FabricSwatch from "@/components/catalog/FabricSwatch";
 import { api } from "@/api/client";
 
-/**
- * کاتالوگ فیزیکی: هر ورق = یک مدل.
- * هویت مدل = تصویر تکهٔ پارچه (طرح و رنگ واقعی داخل عکس).
- * مشتری پارچه را می‌بیند؛ نام رنگ را پر نمی‌کنیم.
- */
+function parseSubs(c) {
+  let subs = c?.subcategories;
+  if (typeof subs === "string") {
+    try {
+      subs = JSON.parse(subs);
+    } catch {
+      subs = [];
+    }
+  }
+  return Array.isArray(subs) ? subs : [];
+}
+
 export default function AdminModels() {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    api.entities.CurtainCategory.list("-order", 100)
+    api.entities.CurtainCategory.list("order", 100)
       .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
       .catch(() => setCategories([]));
   }, []);
 
-  const subOptions = categories.flatMap((c) => {
-    let subs = [];
-    try {
-      subs = c.subcategories ? JSON.parse(c.subcategories) : [];
-    } catch {
-      subs = [];
-    }
-    if (!Array.isArray(subs)) return [];
-    return subs.map((s) => {
+  const subOptions = categories.flatMap((c) =>
+    parseSubs(c).map((s) => {
       const value = typeof s === "string" ? s : s.slug || s.id || s.name;
       const label = typeof s === "string" ? s : s.name || s.slug || value;
       return { value: String(value), label: `${c.name} → ${label}` };
-    });
-  });
+    })
+  );
 
   const fields = [
     {
@@ -38,7 +38,7 @@ export default function AdminModels() {
       label: "تکه پارچه (ورق کاتالوگ)",
       type: "image",
       required: true,
-      help: "فقط یک تکه واضح از همان ورق. همین عکس با تمام طرح و جزئیات روی پنجره رندر می‌شود.",
+      help: "فقط تکه پارچه واضح. بعد از ذخیره، نمونه نصب روی سرور از قالب همان دسته ساخته می‌شود.",
     },
     {
       key: "code",
@@ -51,9 +51,14 @@ export default function AdminModels() {
       label: "نام مدل",
       required: true,
       placeholder: "معمولاً همان کد محصول",
-      help: "همان کد محصول را اینجا هم بنویسید.",
     },
-    { key: "category_slug", label: "دسته (سبک نصب)", required: true, type: "select" },
+    {
+      key: "category_slug",
+      label: "دسته (سبک نصب)",
+      required: true,
+      type: "select",
+      help: "قالب chroma از همین slug دسته خوانده می‌شود.",
+    },
     {
       key: "subcategory",
       label: "زیردسته",
@@ -74,7 +79,11 @@ export default function AdminModels() {
       label: "پارچه",
       render: (_v, r) => (
         <div className="h-14 w-20 overflow-hidden rounded-lg border border-secondary/60">
-          <FabricSwatch fabric={r} />
+          {r.install_status === "approved" && r.install_image ? (
+            <img src={r.install_image} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <FabricSwatch fabric={r} />
+          )}
         </div>
       ),
     },
@@ -87,6 +96,19 @@ export default function AdminModels() {
     },
     { key: "category_slug", label: "دسته" },
     { key: "subcategory", label: "زیردسته" },
+    {
+      key: "install_status",
+      label: "نصب",
+      render: (v, r) => {
+        if (r.install_pending === "rendering")
+          return <span className="text-[10px] text-primary">در حال رندر…</span>;
+        if (v === "approved")
+          return <span className="text-[10px] text-primary">تأیید · {r.install_score ?? "—"}</span>;
+        if (v === "rejected") return <span className="text-[10px] text-destructive">رد</span>;
+        if (r.install_image) return <span className="text-[10px] text-muted-foreground">بازبینی</span>;
+        return <span className="text-[10px] text-muted-foreground">—</span>;
+      },
+    },
   ];
 
   return (

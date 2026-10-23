@@ -3,7 +3,13 @@ import AdminEntityPage from "@/components/admin/AdminEntityPage";
 export default function AdminCategories() {
   const fields = [
     { key: "name", label: "نام دسته", required: true, placeholder: "مثلاً: زبرا" },
-    { key: "slug", label: "شناسه", required: true, placeholder: "مثلاً: zebra" },
+    {
+      key: "slug",
+      label: "شناسه",
+      required: true,
+      placeholder: "مثلاً: zebra",
+      help: "همان کلید قالب نصب و فیلتر کاتالوگ است. بعد از ذخیره، قالب chroma این دسته خودکار ساخته می‌شود.",
+    },
     { key: "order", label: "ترتیب نمایش", type: "number", placeholder: "مثلاً: 1" },
     { key: "image", label: "تصویر", type: "image" },
     { key: "description", label: "توضیحات", type: "textarea" },
@@ -23,7 +29,11 @@ export default function AdminCategories() {
       render: (v) =>
         v ? <img src={v} alt="" className="h-10 w-10 rounded-lg object-cover" /> : "—",
     },
-    { key: "name", label: "نام", render: (v) => <span className="font-display font-bold text-foreground">{v}</span> },
+    {
+      key: "name",
+      label: "نام",
+      render: (v) => <span className="font-display font-bold text-foreground">{v}</span>,
+    },
     { key: "slug", label: "شناسه" },
     { key: "order", label: "ترتیب" },
     {

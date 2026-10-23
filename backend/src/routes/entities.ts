@@ -9,6 +9,8 @@ import {
 import { fromApi, toApi, toApiList } from "../lib/serialize.js";
 import { HttpError, sendError } from "../lib/errors.js";
 import { optionalAuth, requireAdmin, type AuthedRequest } from "../middleware/auth.js";
+import { ensureCategoryTemplateBackground } from "../services/categoryTemplate.js";
+import { renderOneModel } from "../services/renderQueue.js";
 
 const router = Router();
 
@@ -27,12 +29,9 @@ function canWrite(meta: ReturnType<typeof getMeta>, user?: { role: string }, isC
   return user?.role === "admin";
 }
 
-/** Text search across CurtainModel string fields (catalog precision). */
 function searchWhere(entity: string, search: string): Record<string, unknown> | null {
   const q = search.trim();
   if (!q || entity !== "CurtainModel") return null;
-  // SQLite: case-insensitive via contains mode insensitive when available;
-  // Prisma sqlite supports contains
   return {
     OR: [
       { code: { contains: q } },
@@ -46,6 +45,24 @@ function searchWhere(entity: string, search: string): Record<string, unknown> | 
       { subcategory: { contains: q } },
     ],
   };
+}
+
+/** After category write → ensure chroma template for that slug */
+function afterCategoryWrite(row: { slug?: string | null }) {
+  if (row?.slug) ensureCategoryTemplateBackground(row.slug, true);
+}
+
+/** After model write with fabric image → queue install render (async) */
+function afterModelWrite(row: {
+  id: string;
+  image?: string | null;
+  installImage?: string | null;
+}) {
+  if (!row?.id || !row.image) return;
+  // regenerate when image present so catalog stays in sync
+  renderOneModel(row.id, { regenerate: true }).catch((e) =>
+    console.warn("[auto-render]", row.id, e instanceof Error ? e.message : e)
+  );
 }
 
 router.get("/:Entity/count", optionalAuth, async (req: AuthedRequest, res) => {
@@ -135,6 +152,10 @@ router.post("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
     if (Object.keys(data).length === 0) throw new HttpError(400, "Empty payload");
     // @ts-expect-error dynamic
     const row = await meta.model.create({ data });
+
+    if (meta.name === "CurtainCategory") afterCategoryWrite(row);
+    if (meta.name === "CurtainModel") afterModelWrite(row);
+
     res.status(201).json(toApi(row));
   } catch (err) {
     sendError(res, err);
@@ -149,6 +170,15 @@ router.put("/:Entity/:id", requireAdmin, async (req: AuthedRequest, res) => {
     if (Object.keys(data).length === 0) throw new HttpError(400, "Empty payload");
     // @ts-expect-error dynamic
     const row = await meta.model.update({ where: { id: req.params.id }, data });
+
+    if (meta.name === "CurtainCategory") afterCategoryWrite(row);
+    if (meta.name === "CurtainModel") {
+      // re-render if fabric image or category changed
+      if (data.image !== undefined || data.categorySlug !== undefined || data.subcategory !== undefined) {
+        afterModelWrite(row);
+      }
+    }
+
     res.json(toApi(row));
   } catch (err) {
     sendError(res, err);

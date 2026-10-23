@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import VirtualWindow from "@/components/catalog/VirtualWindow";
+import CurtainPreview from "@/components/catalog/CurtainPreview";
 import { Loader2, Upload, X } from "lucide-react";
 import RenderTemplatesAdmin from "@/components/admin/RenderTemplatesAdmin";
 import InstallReferencesAdmin from "@/components/admin/InstallReferencesAdmin";
 import InstallReviewAdmin from "@/components/admin/InstallReviewAdmin";
 
-const PREVIEW_FABRIC = { id: "preview", category_slug: "silk", color_code: "#DCC9A4" };
-const DEFAULTS = { wall_color: "#75634f", frame_color: "#3b352c", rail_color: "#C9A227", view_image: "" };
+const DEFAULTS = {
+  wall_color: "#75634f",
+  frame_color: "#3b352c",
+  rail_color: "#C9A227",
+  view_image: "",
+};
 
 export default function AdminWindowSettings() {
   const [record, setRecord] = useState(null);
@@ -17,10 +22,10 @@ export default function AdminWindowSettings() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [sampleModel, setSampleModel] = useState(null);
 
   useEffect(() => {
-    base44.entities.VirtualWindowSetting
-      .list("-created_date", 5)
+    base44.entities.VirtualWindowSetting.list("-created_date", 5)
       .then((data) => {
         const rec = data?.[0];
         if (rec) {
@@ -35,6 +40,14 @@ export default function AdminWindowSettings() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    // real fabric sample for product-shot preview (same path as public catalog)
+    base44.entities.CurtainModel.list("-updated_date", 20)
+      .then((rows) => {
+        const withImg = (Array.isArray(rows) ? rows : []).find((m) => m.image);
+        setSampleModel(withImg || null);
+      })
+      .catch(() => setSampleModel(null));
   }, []);
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
@@ -65,7 +78,7 @@ export default function AdminWindowSettings() {
         const created = await base44.entities.VirtualWindowSetting.create(form);
         setRecord(created);
       }
-      setMessage("تنظیمات ذخیره شد و روی پنجرهٔ مجازی کل سایت اعمال می‌شود.");
+      setMessage("تنظیمات صحنه ذخیره شد (رنگ دیوار/فریم برای حالت تعاملی).");
     } catch {
       setError("ذخیره ناموفق بود؛ دوباره تلاش کنید.");
     } finally {
@@ -83,15 +96,42 @@ export default function AdminWindowSettings() {
 
   return (
     <div>
-      <h1 className="font-display text-xl font-black text-foreground">پنجرهٔ مجازی</h1>
+      <h1 className="font-display text-xl font-black text-foreground">پنجرهٔ مجازی و قالب نصب</h1>
       <p className="mt-1 font-body text-xs text-muted-foreground">
-        رنگ دیوار، چهارچوب، میلهٔ پرده و چشم‌انداز صحنه را مدیریت کنید؛ تغییرات بلافاصله در کاتالوگ اعمال می‌شود.
+        قالب‌های نصب از <strong>دسته‌بندی کاتالوگ</strong> می‌آیند. پیش‌نمایش زیر همان مسیر سایت (قالب + پارچه)
+        است؛ رنگ دیوار فقط برای حالت تعاملی WebGL.
       </p>
 
-      {/* پیش‌نمایش زنده */}
-      <div className="mt-6 rounded-2xl border border-secondary/60 bg-card p-5">
-        <span className="eyebrow mb-3 block">پیش‌نمایش زنده</span>
-        <VirtualWindow fabric={PREVIEW_FABRIC} settings={form} />
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-secondary/60 bg-card p-5">
+          <span className="eyebrow mb-3 block">پیش‌نمایش مسیر کاتالوگ (قالب نصب)</span>
+          {sampleModel ? (
+            <CurtainPreview fabric={sampleModel} />
+          ) : (
+            <p className="py-10 text-center text-xs text-muted-foreground">
+              مدلی با عکس پارچه نیست — اول یک مدل در کاتالوگ ثبت کنید.
+            </p>
+          )}
+          {sampleModel && (
+            <p className="mt-2 text-[10px] text-muted-foreground">
+              نمونه: {sampleModel.code || sampleModel.name} · دسته {sampleModel.category_slug}
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-secondary/60 bg-card p-5">
+          <span className="eyebrow mb-3 block">حالت تعاملی (رنگ صحنه)</span>
+          <VirtualWindow
+            fabric={
+              sampleModel || {
+                id: "preview",
+                category_slug: "roman",
+                color_code: "#DCC9A4",
+              }
+            }
+            settings={form}
+          />
+        </div>
       </div>
 
       <InstallReferencesAdmin />
@@ -99,14 +139,27 @@ export default function AdminWindowSettings() {
       <RenderTemplatesAdmin />
 
       <form onSubmit={save} className="mt-6 rounded-2xl border border-secondary/60 bg-card p-6 lg:p-8">
+        <p className="mb-4 text-xs text-muted-foreground">
+          تنظیمات زیر فقط روی رندر تعاملی WebGL اثر دارد؛ مسیر اصلی کاتالوگ از قالب chroma دسته است.
+        </p>
         <div className="grid gap-5 sm:grid-cols-3">
           <ColorField label="رنگ دیوار" value={form.wall_color} onChange={(v) => set("wall_color", v)} />
-          <ColorField label="رنگ چهارچوب پنجره" value={form.frame_color} onChange={(v) => set("frame_color", v)} />
-          <ColorField label="رنگ ریل و میلهٔ پرده" value={form.rail_color} onChange={(v) => set("rail_color", v)} />
+          <ColorField
+            label="رنگ چهارچوب پنجره"
+            value={form.frame_color}
+            onChange={(v) => set("frame_color", v)}
+          />
+          <ColorField
+            label="رنگ ریل و میلهٔ پرده"
+            value={form.rail_color}
+            onChange={(v) => set("rail_color", v)}
+          />
         </div>
 
         <div className="mt-6">
-          <label className="mb-1.5 block font-body text-xs text-muted-foreground">چشم‌انداز پشت پنجره</label>
+          <label className="mb-1.5 block font-body text-xs text-muted-foreground">
+            چشم‌انداز پشت پنجره
+          </label>
           <div className="flex items-start gap-3">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
               {form.view_image ? (
@@ -152,8 +205,12 @@ export default function AdminWindowSettings() {
         {message && <p className="mt-5 font-body text-xs text-primary">{message}</p>}
         {error && <p className="mt-5 font-body text-xs text-destructive">{error}</p>}
 
-        <button type="submit" disabled={saving || uploading} className="btn-gold mt-6 w-full justify-center disabled:opacity-60 sm:w-auto">
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره تنظیمات"}
+        <button
+          type="submit"
+          disabled={saving || uploading}
+          className="btn-gold mt-6 w-full justify-center disabled:opacity-60 sm:w-auto"
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره تنظیمات صحنه"}
         </button>
       </form>
     </div>
