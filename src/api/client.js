@@ -289,6 +289,28 @@ export const api = {
     },
   },
 
+  /** Install render + category templates (admin) */
+  render: {
+    categoriesCoverage() {
+      return request("/render/categories-coverage");
+    },
+    templateFromCategory(category_slug, mechanism) {
+      return request("/render/template/from-category", {
+        method: "POST",
+        body: { category_slug, mechanism },
+      });
+    },
+    templateAllCategories() {
+      return request("/render/template/all-categories", { method: "POST", body: {} });
+    },
+    stats() {
+      return request("/render/stats");
+    },
+    styles() {
+      return request("/render/styles", { auth: false });
+    },
+  },
+
   integrations: {
     Core: {
       async UploadPublicFile(opts) {

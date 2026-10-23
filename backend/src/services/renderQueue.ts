@@ -32,40 +32,53 @@ export function getQueueState() {
   return { ...state };
 }
 
+type ResolvedTemplate = { image: string; source: string; key: string };
+
 /**
- * Resolve install base image for a model:
- *  1) InstallReference for categorySlug (real photo sample)
- *  2) RenderTemplate for categorySlug (chroma keyed to that category)
- *  3) InstallReference / RenderTemplate for mechanism style (roman, zebra, …)
- * Categories come from CurtainCategory / model.categorySlug — not hardcoded list only.
+ * Resolve install base image for a model (category-first):
+ *  1) InstallReference for categorySlug (real chroma photo) — optional boost
+ *  2) RenderTemplate for categorySlug (from DB category)
+ *  3) same for mechanism style (roman, zebra, …) as fallback
+ *
+ * Categories live in CurtainCategory; template keys = category.slug.
  */
-async function resolveTemplateUrl(opts: {
+async function resolveTemplateCandidates(opts: {
   categorySlug?: string | null;
   style: string;
-}): Promise<{ image: string; source: string; key: string } | null> {
-  const keys = [opts.categorySlug, opts.style].filter(
-    (k): k is string => Boolean(k && String(k).trim())
-  );
-  const tried = new Set<string>();
+}): Promise<ResolvedTemplate[]> {
+  const keys = [opts.categorySlug, opts.style]
+    .filter((k): k is string => Boolean(k && String(k).trim()))
+    .map((k) => k.trim().toLowerCase());
+  const unique = [...new Set(keys)];
+  const out: ResolvedTemplate[] = [];
+  const seen = new Set<string>();
 
-  for (const key of keys) {
-    const k = key.trim().toLowerCase();
-    if (tried.has(k)) continue;
-    tried.add(k);
-
+  for (const k of unique) {
     const ref = await prisma.installReference.findFirst({
       where: { style: k },
       orderBy: { updatedAt: "desc" },
     });
-    if (ref?.image) return { image: ref.image, source: "install_reference", key: k };
+    if (ref?.image) {
+      const id = `ref:${k}:${ref.image}`;
+      if (!seen.has(id)) {
+        seen.add(id);
+        out.push({ image: ref.image, source: "install_reference", key: k });
+      }
+    }
 
     const tpl = await prisma.renderTemplate.findFirst({
       where: { style: k },
       orderBy: { updatedAt: "desc" },
     });
-    if (tpl?.image) return { image: tpl.image, source: "render_template", key: k };
+    if (tpl?.image) {
+      const id = `tpl:${k}:${tpl.image}`;
+      if (!seen.has(id)) {
+        seen.add(id);
+        out.push({ image: tpl.image, source: "render_template", key: k });
+      }
+    }
   }
-  return null;
+  return out;
 }
 
 /** Categories live in DB — list them for template coverage */
@@ -118,68 +131,74 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
   const style = styleFromModel(model);
   const material = guessMaterial(model);
   const categorySlug = model.categorySlug || null;
-  const resolved = await resolveTemplateUrl({ categorySlug, style });
-  if (!resolved) {
+  const candidates = await resolveTemplateCandidates({ categorySlug, style });
+  if (!candidates.length) {
     throw new Error(
-      `برای دسته «${categorySlug || "—"}» / سبک «${style}» نه قالب chroma و نه نمونه واقعی در دیتابیس نیست. ` +
-        `از پنل → پنجره مجازی قالب این دسته را بساز/آپلود کن، یا نمونه اجرا در InstallReference ثبت کن.`
+      `برای دسته «${categorySlug || "—"}» / سبک «${style}» قالب chroma در دیتابیس نیست. ` +
+        `از پنل → پنجره مجازی، برای همین دسته «ساخت قالب» بزنید یا عکس سبز آپلود کنید.`
     );
   }
-  const template = resolved.image;
 
   await prisma.curtainModel.update({
     where: { id: modelId },
     data: { installPending: "rendering" },
   });
 
-  try {
-    const result = await renderInstallImage({
-      templatePathOrUrl: template,
-      fabricPathOrUrl: model.image,
-      outDir: path.resolve(uploadDir),
-      material,
-      style,
-    });
+  let lastErr: unknown;
+  for (const resolved of candidates) {
+    try {
+      const result = await renderInstallImage({
+        templatePathOrUrl: resolved.image,
+        fabricPathOrUrl: model.image,
+        outDir: path.resolve(uploadDir),
+        material,
+        style,
+      });
 
-    const threshold = autoApproveThreshold();
-    const autoOk = result.qualityScore >= threshold;
-    const status = autoOk ? "approved" : "pending";
-    const review = autoOk
-      ? `موتور داخلی v2 · امتیاز ${result.qualityScore}/10 · تأیید خودکار`
-      : `موتور داخلی v2 · امتیاز ${result.qualityScore}/10 · پوشش سبز ${Math.round(result.coverage * 100)}٪ · منتظر بازبینی`;
+      const threshold = autoApproveThreshold();
+      const autoOk = result.qualityScore >= threshold;
+      const status = autoOk ? "approved" : "pending";
+      const review = autoOk
+        ? `موتور داخلی · امتیاز ${result.qualityScore}/10 · تأیید خودکار · منبع ${resolved.source}`
+        : `موتور داخلی · امتیاز ${result.qualityScore}/10 · پوشش سبز ${Math.round(result.coverage * 100)}٪ · منبع ${resolved.source}`;
 
-    await prisma.curtainModel.update({
-      where: { id: modelId },
-      data: {
-        installImage: result.publicPath,
-        installStatus: status,
-        installPending: null,
-        installReview: review,
-        installScore: result.qualityScore,
-      },
-    });
+      await prisma.curtainModel.update({
+        where: { id: modelId },
+        data: {
+          installImage: result.publicPath,
+          installStatus: status,
+          installPending: null,
+          installReview: review,
+          installScore: result.qualityScore,
+        },
+      });
 
-    return {
-      skipped: false,
-      install_image: result.publicPath,
-      style,
-      category_slug: categorySlug,
-      template_key: resolved.key,
-      template_source: resolved.source,
-      material,
-      score: result.qualityScore,
-      auto_approved: autoOk,
-    };
-  } catch (e) {
-    await prisma.curtainModel.update({
-      where: { id: modelId },
-      data: {
-        installPending: null,
-        installReview: e instanceof Error ? e.message : String(e),
-      },
-    });
-    throw e;
+      return {
+        skipped: false,
+        install_image: result.publicPath,
+        style,
+        category_slug: categorySlug,
+        template_key: resolved.key,
+        template_source: resolved.source,
+        material,
+        score: result.qualityScore,
+        auto_approved: autoOk,
+      };
+    } catch (e) {
+      lastErr = e;
+      // try next candidate (e.g. real photo without green → fall back to chroma template)
+      console.warn("[render] template candidate failed", resolved.source, resolved.key, e);
+    }
   }
+
+  await prisma.curtainModel.update({
+    where: { id: modelId },
+    data: {
+      installPending: null,
+      installReview: lastErr instanceof Error ? lastErr.message : String(lastErr),
+    },
+  });
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 /** Admin batch — sequential; template cache makes later items much faster */
