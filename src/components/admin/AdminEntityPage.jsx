@@ -8,14 +8,14 @@ const inputCls =
 const labelCls = "mb-1.5 block font-body text-xs text-muted-foreground";
 const WIDE_TYPES = ["textarea", "list", "sublist", "image"];
 
-/**
- * AdminEntityPage — CRUD عمومی برای موجودیت‌های دیتابیس.
- * fields: [{ key, label, type, required, placeholder, help }]
- *  انواع پشتیبانی‌شده: text (پیش‌فرض)، textarea، number، date، boolean، image (با آپلود)،
- *  list (آرایه از متن با کاما)، sublist (آرایه آبجکت {name,slug})، select (با options)
- * columns: [{ key, label, render? }]
- */
-export default function AdminEntityPage({ title, entity, fields, columns, options = {}, sortBy = "-created_date" }) {
+export default function AdminEntityPage({
+  title,
+  entity,
+  fields,
+  columns,
+  options = {},
+  sortBy = "-created_date",
+}) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -36,7 +36,9 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
       .finally(() => setLoading(false));
   }, [entity, sortBy]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   function openNew() {
     const initial = {};
@@ -83,7 +85,10 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
     fields.forEach((f) => {
       const v = form[f.key];
       if (f.type === "list") {
-        payload[f.key] = String(v || "").split(",").map((s) => s.trim()).filter(Boolean);
+        payload[f.key] = String(v || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
       } else if (f.type === "sublist") {
         payload[f.key] = String(v || "")
           .split(",")
@@ -91,7 +96,9 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
           .filter(Boolean)
           .map((item) => {
             const [name, slug] = item.split(":").map((p) => p.trim());
-            return slug ? { name, slug } : { name: item, slug: item.replace(/\s+/g, "-").toLowerCase() };
+            return slug
+              ? { name, slug }
+              : { name: item, slug: item.replace(/\s+/g, "-").toLowerCase() };
           });
       } else if (f.type === "number") {
         payload[f.key] = v === "" ? undefined : Number(v);
@@ -108,15 +115,16 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
       else await base44.entities[entity].create(payload);
       closeModal();
       load();
-    } catch {
-      setError("ذخیره ناموفق بود؛ دوباره تلاش کنید.");
+    } catch (err) {
+      setError(err?.data?.error || err?.message || "ذخیره ناموفق بود؛ دوباره تلاش کنید.");
     } finally {
       setSaving(false);
     }
   }
 
   async function remove(record) {
-    if (!window.confirm(`حذف «${record[columns[0].key] ?? "این مورد"}»؟ این عمل بازگشت‌پذیر نیست.`)) return;
+    if (!window.confirm(`حذف «${record[columns[0].key] ?? "این مورد"}»؟ این عمل بازگشت‌پذیر نیست.`))
+      return;
     try {
       await base44.entities[entity].delete(record.id);
       load();
@@ -128,18 +136,23 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
   async function uploadImage(fieldKey, file) {
     if (!file) return;
     setUploading(true);
+    setError("");
     try {
       const compressed = await compressImage(file);
-      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file: compressed });
-      setForm((f) => ({ ...f, [fieldKey]: file_url }));
-    } catch {
-      setError("آپلود تصویر ناموفق بود. عکس را بررسی و دوباره تلاش کنید.");
+      const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+      const url = res?.file_url || res?.url;
+      if (!url) throw new Error("آپلود پاسخ معتبری نداد");
+      setForm((f) => ({ ...f, [fieldKey]: url }));
+    } catch (err) {
+      setError(err?.message || "آپلود تصویر ناموفق بود. فایل را بررسی کنید.");
     } finally {
       setUploading(false);
     }
   }
 
-  const filtered = records.filter((r) => !search.trim() || JSON.stringify(r).includes(search.trim()));
+  const filtered = records.filter(
+    (r) => !search.trim() || JSON.stringify(r).includes(search.trim())
+  );
 
   return (
     <div>
@@ -158,7 +171,7 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
             placeholder="جستجو…"
             className={`${inputCls} sm:w-56`}
           />
-          <button onClick={openNew} className="btn-gold shrink-0">
+          <button type="button" onClick={openNew} className="btn-gold shrink-0">
             <Plus className="h-4 w-4" /> افزودن
           </button>
         </div>
@@ -172,11 +185,16 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
             <thead>
               <tr className="border-b border-secondary/60">
                 {columns.map((c) => (
-                  <th key={c.key} className="px-4 py-3 text-right font-body text-xs text-muted-foreground">
+                  <th
+                    key={c.key}
+                    className="px-4 py-3 text-right font-body text-xs text-muted-foreground"
+                  >
                     {c.label}
                   </th>
                 ))}
-                <th className="px-4 py-3 text-left font-body text-xs text-muted-foreground">عملیات</th>
+                <th className="px-4 py-3 text-left font-body text-xs text-muted-foreground">
+                  عملیات
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -188,21 +206,31 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 1} className="px-4 py-16 text-center font-body text-sm text-muted-foreground">
+                  <td
+                    colSpan={columns.length + 1}
+                    className="px-4 py-16 text-center font-body text-sm text-muted-foreground"
+                  >
                     موردی یافت نشد.
                   </td>
                 </tr>
               ) : (
                 filtered.map((record) => (
-                  <tr key={record.id} className="border-b border-secondary/40 transition-colors last:border-0 hover:bg-background/40">
+                  <tr
+                    key={record.id}
+                    className="border-b border-secondary/40 transition-colors last:border-0 hover:bg-background/40"
+                  >
                     {columns.map((c) => (
-                      <td key={c.key} className="px-4 py-3 align-middle font-body text-xs text-foreground">
-                        {c.render ? c.render(record[c.key], record) : (record[c.key] ?? "—")}
+                      <td
+                        key={c.key}
+                        className="px-4 py-3 align-middle font-body text-xs text-foreground"
+                      >
+                        {c.render ? c.render(record[c.key], record) : record[c.key] ?? "—"}
                       </td>
                     ))}
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          type="button"
                           onClick={() => openEdit(record)}
                           aria-label="ویرایش"
                           className="flex h-8 w-8 items-center justify-center rounded-lg border border-secondary/70 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
@@ -210,6 +238,7 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => remove(record)}
                           aria-label="حذف"
                           className="flex h-8 w-8 items-center justify-center rounded-lg border border-secondary/70 text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
@@ -232,6 +261,7 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
             onSubmit={submit}
             onClick={(e) => e.stopPropagation()}
             className="mx-auto my-8 w-full max-w-2xl rounded-3xl border border-secondary/60 bg-card p-6 lg:p-8"
+            noValidate
           >
             <div className="mb-6 flex items-center justify-between">
               <h3 className="font-display text-lg font-black text-foreground">
@@ -257,7 +287,7 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
 
                   {f.type === "select" ? (
                     <select
-                      value={form[f.key]}
+                      value={form[f.key] ?? ""}
                       onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
                       className={inputCls}
                     >
@@ -271,7 +301,7 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
                   ) : f.type === "textarea" ? (
                     <textarea
                       rows={3}
-                      value={form[f.key]}
+                      value={form[f.key] ?? ""}
                       onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
                       placeholder={f.placeholder}
                       className={`${inputCls} resize-none`}
@@ -285,7 +315,9 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
                         className="h-4 w-4"
                         style={{ accentColor: "#C9A227" }}
                       />
-                      <span className="font-body text-xs text-foreground">{f.placeholder || "فعال"}</span>
+                      <span className="font-body text-xs text-foreground">
+                        {f.placeholder || "فعال"}
+                      </span>
                     </label>
                   ) : f.type === "date" ? (
                     <input
@@ -295,49 +327,58 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
                       className={inputCls}
                     />
                   ) : f.type === "image" ? (
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
                         {form[f.key] ? (
                           <img src={form[f.key]} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          <Upload className="h-4 w-4 text-muted-foreground" />
+                          <Upload className="h-5 w-5 text-muted-foreground" />
                         )}
                       </div>
-                      <div className="flex-1">
-                        <input
-                          type="url"
-                          value={form[f.key]}
-                          onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
-                          placeholder="آدرس تصویر یا آپلود…"
-                          className={inputCls}
-                        />
-                        <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-secondary/70 px-3 py-1.5 font-body text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary transition-colors hover:bg-primary/10">
                           {uploading ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Upload className="h-3.5 w-3.5" />
+                            <Upload className="h-4 w-4" />
                           )}
-                          {uploading ? "در حال آپلود…" : "آپلود تصویر"}
+                          {uploading ? "در حال آپلود…" : form[f.key] ? "تعویض تصویر" : "انتخاب تصویر"}
                           <input
                             type="file"
-                            accept="image/*"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
                             className="hidden"
-                            onChange={(e) => uploadImage(f.key, e.target.files?.[0])}
+                            disabled={uploading}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = "";
+                              uploadImage(f.key, file);
+                            }}
                           />
                         </label>
+                        {form[f.key] && (
+                          <button
+                            type="button"
+                            onClick={() => setForm((s) => ({ ...s, [f.key]: "" }))}
+                            className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive"
+                          >
+                            حذف
+                          </button>
+                        )}
                       </div>
                     </div>
                   ) : (
                     <input
                       type={f.type === "number" ? "number" : "text"}
-                      value={form[f.key]}
+                      value={form[f.key] ?? ""}
                       onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
                       placeholder={f.placeholder}
                       className={inputCls}
                     />
                   )}
 
-                  {f.help && <p className="mt-1 font-body text-[10px] text-muted-foreground">{f.help}</p>}
+                  {f.help && (
+                    <p className="mt-1 font-body text-[10px] text-muted-foreground">{f.help}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -345,7 +386,11 @@ export default function AdminEntityPage({ title, entity, fields, columns, option
             {error && <p className="mt-4 font-body text-xs text-destructive">{error}</p>}
 
             <div className="mt-7 flex gap-3">
-              <button type="submit" disabled={saving || uploading} className="btn-gold flex-1 justify-center disabled:opacity-60">
+              <button
+                type="submit"
+                disabled={saving || uploading}
+                className="btn-gold flex-1 justify-center disabled:opacity-60"
+              >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
               </button>
               <button type="button" onClick={closeModal} className="btn-ghost-gold justify-center">
