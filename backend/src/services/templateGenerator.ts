@@ -1,7 +1,12 @@
 /**
  * Per-mechanism product-shot chroma templates.
- * Each CurtainStyleKey has its own geometry, folds, and hardware
- * (rod vs cassette, chain side, fold axis, panel count).
+ *
+ * Quality target = catalog product photos:
+ *  - pleated-manual → horizontal pleats on two casement panes (PX2607)
+ *  - pleated-chain  → full-width cellular + top cassette + left chain (PNF1210)
+ *  - roman          → half-raised stack + cassette + right pull (Roman80)
+ *
+ * Green region = fabric mapping area. Frame / cassette / chain stay non-green.
  */
 import fs from "fs";
 import path from "path";
@@ -37,7 +42,8 @@ function setPx(data: Buffer, width: number, x: number, y: number, r: number, g: 
 }
 function greenShade(shade: number): [number, number, number] {
   const s = clamp01(shade);
-  return [Math.round(22 + s * 32), Math.round(118 + s * 110), Math.round(30 + s * 28)];
+  // Strong chroma green so keying is stable
+  return [Math.round(18 + s * 28), Math.round(130 + s * 100), Math.round(28 + s * 24)];
 }
 
 function paintWallAndFloor(data: Buffer, width: number, height: number) {
@@ -45,9 +51,10 @@ function paintWallAndFloor(data: Buffer, width: number, height: number) {
     for (let x = 0; x < width; x++) {
       const v = y / height;
       const u = x / width;
-      const base = 214 - v * 14 - Math.abs(u - 0.5) * 8;
+      // Warm beige wall like product shots
+      const base = 218 - v * 12 - Math.abs(u - 0.5) * 6;
       const noise = ((x * 17 + y * 11) % 7) - 3;
-      setPx(data, width, x, y, clamp(base + noise), clamp(base - 3 + noise), clamp(base - 10 + noise));
+      setPx(data, width, x, y, clamp(base + noise), clamp(base - 4 + noise), clamp(base - 14 + noise));
     }
   }
   const floorY = Math.floor(height * 0.9);
@@ -55,18 +62,64 @@ function paintWallAndFloor(data: Buffer, width: number, height: number) {
     const t = (y - floorY) / Math.max(1, height - floorY);
     for (let x = 0; x < width; x++) {
       const plank = Math.floor(x / 42) % 2;
-      const wood = 150 - t * 18 - plank * 8 + ((x + y) % 5);
-      setPx(data, width, x, y, clamp(wood + 12), clamp(wood - 5), clamp(wood - 30));
+      const wood = 155 - t * 16 - plank * 8 + ((x + y) % 5);
+      setPx(data, width, x, y, clamp(wood + 18), clamp(wood - 2), clamp(wood - 28));
     }
   }
-  for (let y = floorY - 10; y < floorY; y++) {
-    for (let x = 0; x < width; x++) setPx(data, width, x, y, 232, 226, 216);
+  for (let y = floorY - 12; y < floorY; y++) {
+    for (let x = 0; x < width; x++) setPx(data, width, x, y, 236, 230, 220);
   }
 }
 
 type FrameBox = { fx0: number; fx1: number; fy0: number; fy1: number; frame: number };
 
-function paintWhiteFrame(data: Buffer, width: number, height: number, box: FrameBox) {
+/** White moulded frame with center mullion + handles (French door look) */
+function paintFrenchFrame(data: Buffer, width: number, height: number, box: FrameBox) {
+  const { fx0, fx1, fy0, fy1, frame } = box;
+  // Outer moulding
+  for (let y = fy0 - frame; y < fy1 + Math.floor(frame * 0.4); y++) {
+    for (let x = fx0 - frame; x < fx1 + frame; x++) {
+      if (x < 0 || x >= width || y < 0 || y >= height) continue;
+      if (x >= fx0 && x < fx1 && y >= fy0 && y < fy1) continue;
+      const dx = Math.min(x - (fx0 - frame), fx1 + frame - x);
+      const dy = Math.min(y - (fy0 - frame), fy1 + frame * 0.4 - y);
+      const shade = 0.93 + 0.07 * smoothstep(0, 10, Math.min(dx, dy));
+      const c = Math.round(250 * shade);
+      setPx(data, width, x, y, c, c, Math.round(c * 0.99));
+    }
+  }
+  // Glass / interior default (light)
+  for (let y = fy0; y < fy1; y++) {
+    for (let x = fx0; x < fx1; x++) {
+      const t = (y - fy0) / Math.max(1, fy1 - fy0);
+      const light = 0.9 + 0.06 * (1 - Math.abs((x - (fx0 + fx1) / 2) / ((fx1 - fx0) / 2)));
+      setPx(data, width, x, y, clamp(215 * light + t * 6), clamp(222 * light + t * 5), clamp(230 * light));
+    }
+  }
+  // Center mullion
+  const mid = Math.floor((fx0 + fx1) / 2);
+  for (let y = fy0; y < fy1; y++) {
+    for (let x = mid - 10; x < mid + 10; x++) setPx(data, width, x, y, 252, 252, 250);
+  }
+  // Door handles
+  const hy = Math.floor(fy0 + (fy1 - fy0) * 0.48);
+  for (const hx of [mid - 26, mid + 16]) {
+    for (let y = hy; y < hy + 32; y++) {
+      for (let x = hx; x < hx + 9; x++) setPx(data, width, x, y, 242, 242, 240);
+    }
+  }
+  // Sill
+  for (let y = fy1; y < fy1 + 22 && y < height; y++) {
+    for (let x = fx0 - frame; x < fx1 + frame; x++) {
+      if (x < 0 || x >= width) continue;
+      const t = (y - fy1) / 22;
+      setPx(data, width, x, y, clamp(248 - t * 12), clamp(248 - t * 12), clamp(244 - t * 10));
+    }
+  }
+}
+
+/** Simpler single opening frame (no mullion) — for cassette styles */
+function paintSimpleFrame(data: Buffer, width: number, height: number, box: FrameBox) {
   const { fx0, fx1, fy0, fy1, frame } = box;
   for (let y = fy0 - frame; y < fy1 + Math.floor(frame * 0.35); y++) {
     for (let x = fx0 - frame; x < fx1 + frame; x++) {
@@ -74,33 +127,20 @@ function paintWhiteFrame(data: Buffer, width: number, height: number, box: Frame
       if (x >= fx0 && x < fx1 && y >= fy0 && y < fy1) continue;
       const dx = Math.min(x - (fx0 - frame), fx1 + frame - x);
       const dy = Math.min(y - (fy0 - frame), fy1 + frame * 0.35 - y);
-      const shade = 0.92 + 0.08 * smoothstep(0, 8, Math.min(dx, dy));
+      const shade = 0.94 + 0.06 * smoothstep(0, 8, Math.min(dx, dy));
       const c = Math.round(248 * shade);
       setPx(data, width, x, y, c, c, Math.round(c * 0.99));
     }
   }
   for (let y = fy0; y < fy1; y++) {
     for (let x = fx0; x < fx1; x++) {
-      const t = (y - fy0) / Math.max(1, fy1 - fy0);
-      const light = 0.88 + 0.08 * (1 - Math.abs((x - (fx0 + fx1) / 2) / ((fx1 - fx0) / 2)));
-      setPx(data, width, x, y, clamp(210 * light + t * 8), clamp(218 * light + t * 6), clamp(228 * light));
-    }
-  }
-  const mid = Math.floor((fx0 + fx1) / 2);
-  for (let y = fy0; y < fy1; y++) {
-    for (let x = mid - 8; x < mid + 8; x++) setPx(data, width, x, y, 250, 250, 248);
-  }
-  const hy = Math.floor(fy0 + (fy1 - fy0) * 0.48);
-  for (const hx of [mid - 22, mid + 14]) {
-    for (let y = hy; y < hy + 28; y++) {
-      for (let x = hx; x < hx + 8; x++) setPx(data, width, x, y, 240, 240, 238);
+      setPx(data, width, x, y, 220, 226, 232);
     }
   }
   for (let y = fy1; y < fy1 + 18 && y < height; y++) {
     for (let x = fx0 - frame; x < fx1 + frame; x++) {
       if (x < 0 || x >= width) continue;
-      const t = (y - fy1) / 18;
-      setPx(data, width, x, y, clamp(245 - t * 15), clamp(245 - t * 15), clamp(242 - t * 12));
+      setPx(data, width, x, y, 242, 242, 238);
     }
   }
 }
@@ -111,14 +151,14 @@ function paintCassette(data: Buffer, width: number, height: number, x0: number, 
       if (x < 0 || x >= width || y < 0 || y >= height) continue;
       const t = (y - y0) / Math.max(1, y1 - y0);
       const edge = Math.min(x - x0, x1 - x);
-      const shade = 0.97 - t * 0.06 + 0.03 * smoothstep(0, 6, edge);
+      const shade = 0.98 - t * 0.07 + 0.03 * smoothstep(0, 6, edge);
       const c = Math.round(252 * shade);
       setPx(data, width, x, y, c, c, Math.round(c * 0.99));
     }
   }
   for (let x = x0; x < x1; x++) {
-    setPx(data, width, x, y1, 210, 210, 205);
-    if (y1 + 1 < height) setPx(data, width, x, y1 + 1, 225, 225, 220);
+    setPx(data, width, x, y1, 205, 205, 200);
+    if (y1 + 1 < height) setPx(data, width, x, y1 + 1, 228, 228, 222);
   }
 }
 
@@ -154,8 +194,26 @@ function paintChain(data: Buffer, width: number, height: number, x: number, y0: 
       setPx(data, width, px, y, 235, 235, 230);
     }
   }
-  for (let y = y1; y < Math.min(height, y1 + 10); y++) {
-    for (let dx = -4; dx <= 4; dx++) setPx(data, width, x + dx, y, 248, 248, 245);
+  // Soft loop at bottom
+  for (let y = y1; y < Math.min(height, y1 + 14); y++) {
+    const t = (y - y1) / 14;
+    const spread = Math.floor(3 + t * 5);
+    for (let dx = -spread; dx <= spread; dx++) {
+      if (Math.abs(dx) > spread - t * 2) continue;
+      setPx(data, width, x + dx, y, 248, 248, 245);
+    }
+  }
+}
+
+function paintPullCord(data: Buffer, width: number, height: number, x: number, y0: number, y1: number) {
+  for (let y = y0; y < y1; y++) {
+    for (let dx = -1; dx <= 1; dx++) setPx(data, width, x + dx, y, 238, 238, 234);
+  }
+  // Tassel
+  for (let y = y1; y < Math.min(height, y1 + 16); y++) {
+    for (let dx = -5; dx <= 5; dx++) {
+      if (dx * dx + (y - y1 - 6) * (y - y1 - 6) < 36) setPx(data, width, x + dx, y, 250, 250, 248);
+    }
   }
 }
 
@@ -168,32 +226,46 @@ function paintBottomBar(data: Buffer, width: number, height: number, x0: number,
   }
 }
 
-function paintRoman(data: Buffer, w: number, h: number, x0: number, y0: number, x1: number, y1: number) {
+/**
+ * Roman half-raised (Roman80): flat body + stacked folds at bottom third,
+ * window glass visible below fabric.
+ */
+function paintRomanHalfRaised(
+  data: Buffer,
+  w: number,
+  h: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  dropY: number
+) {
   const rw = Math.max(1, x1 - x0);
-  const rh = Math.max(1, y1 - y0);
-  const foldStart = 0.62;
+  const rh = Math.max(1, dropY - y0);
+  const foldStart = 0.55;
   const folds = 4;
-  for (let y = y0; y < y1; y++) {
+  for (let y = y0; y < dropY; y++) {
     for (let x = x0; x < x1; x++) {
       const u = (x - x0) / rw;
       const v = (y - y0) / rh;
       let shade: number;
       if (v < foldStart) {
-        shade = 0.62 + 0.22 * Math.sin(u * Math.PI);
-        shade *= 0.94 + 0.06 * Math.sin(v * Math.PI * 3);
+        // Flat linen body with soft center light
+        shade = 0.68 + 0.14 * Math.sin(u * Math.PI);
+        shade *= 0.96 + 0.04 * Math.sin(v * Math.PI * 2);
       } else {
         const fv = (v - foldStart) / (1 - foldStart);
         const fi = Math.min(folds - 1, Math.floor(fv * folds));
         const local = (fv - fi / folds) * folds;
-        shade = 0.22 + 0.68 * Math.sin(local * Math.PI);
-        shade *= 0.9 + 0.1 * Math.sin(u * Math.PI * 2.4 + fi);
+        shade = 0.28 + 0.62 * Math.sin(local * Math.PI);
+        shade *= 0.88 + 0.12 * Math.sin(u * Math.PI * 2 + fi * 0.4);
       }
       const side = Math.min(u, 1 - u);
-      shade *= 0.78 + 0.22 * Math.min(1, side * 5);
+      shade *= 0.8 + 0.2 * Math.min(1, side * 6);
+      // Soft hem wave
       if (v > 0.97) {
-        const wave = 0.97 + 0.025 * Math.sin(u * Math.PI * 2);
+        const wave = 0.97 + 0.02 * Math.sin(u * Math.PI * 2);
         if (v > wave) continue;
-        shade *= 0.7;
+        shade *= 0.75;
       }
       const [r, g, b] = greenShade(clamp01(shade));
       setPx(data, w, x, y, r, g, b);
@@ -219,6 +291,10 @@ function paintZebra(data: Buffer, w: number, h: number, x0: number, y0: number, 
   }
 }
 
+/**
+ * Dense horizontal accordion (cellular/pleated).
+ * bands ≈ real product density; optional vertical stitch columns like PX2607.
+ */
 function paintPleated(
   data: Buffer,
   w: number,
@@ -227,23 +303,27 @@ function paintPleated(
   y0: number,
   x1: number,
   y1: number,
-  opts: { dense?: boolean; sheer?: boolean } = {}
+  opts: { dense?: boolean; sheer?: boolean; stitches?: boolean } = {}
 ) {
   const rw = Math.max(1, x1 - x0);
   const rh = Math.max(1, y1 - y0);
-  const bands = opts.dense === false ? 20 : 48;
-  const sheerBoost = opts.sheer ? 0.12 : 0;
+  const bands = opts.dense === false ? 28 : 56;
+  const sheerBoost = opts.sheer ? 0.1 : 0;
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
       const u = (x - x0) / rw;
       const v = (y - y0) / rh;
       const local = v * bands - Math.floor(v * bands);
-      let shade = 0.28 + 0.62 * Math.sin(local * Math.PI) + sheerBoost;
-      const stitch = Math.abs(((u * 5) % 1) - 0.5);
-      if (stitch < 0.035) shade *= 0.82;
-      shade *= 0.88 + 0.12 * Math.sin(u * Math.PI);
+      // Ridge light / valley dark like real pleat photo
+      let shade = 0.22 + 0.7 * Math.sin(local * Math.PI) + sheerBoost;
+      if (opts.stitches) {
+        // 2–3 vertical cord columns
+        const col = Math.abs(((u * 3.2) % 1) - 0.5);
+        if (col < 0.018) shade *= 0.78;
+      }
+      shade *= 0.9 + 0.1 * Math.sin(u * Math.PI);
       const side = Math.min(u, 1 - u);
-      shade *= 0.82 + 0.18 * Math.min(1, side * 8);
+      shade *= 0.85 + 0.15 * Math.min(1, side * 10);
       const [r, g, b] = greenShade(clamp01(shade));
       setPx(data, w, x, y, r, g, b);
     }
@@ -339,82 +419,130 @@ export async function generateChromaTemplate(
   const data = Buffer.alloc(W * H * 4);
   paintWallAndFloor(data, W, H);
 
-  const marginX = Math.floor(W * 0.16);
-  const marginTop = Math.floor(H * 0.12);
-  const marginBot = Math.floor(H * 0.16);
+  const marginX = Math.floor(W * 0.15);
+  const marginTop = Math.floor(H * 0.11);
+  const marginBot = Math.floor(H * 0.15);
   const box: FrameBox = {
     fx0: marginX,
     fx1: W - marginX,
-    fy0: marginTop + 36,
+    fy0: marginTop + 40,
     fy1: H - marginBot,
-    frame: 36,
+    frame: 40,
   };
-  paintWhiteFrame(data, W, H, box);
 
-  const fabricL = box.fx0 + 4;
-  const fabricR = box.fx1 - 4;
-  const fabricT = box.fy0 + 2;
-  const fabricB = box.fy1 - 2;
-  const railY0 = fabricT - 28;
-  const railY1 = fabricT + 4;
+  const fabricL = box.fx0 + 6;
+  const fabricR = box.fx1 - 6;
+  const fabricT = box.fy0 + 4;
+  const fabricB = box.fy1 - 4;
+  const mid = Math.floor((box.fx0 + box.fx1) / 2);
+  const mullionHalf = 10;
 
   switch (style) {
-    case "roman":
-      paintCassette(data, W, H, fabricL - 20, fabricR + 20, railY0, railY1);
-      paintRoman(data, W, H, fabricL, fabricT + 6, fabricR, fabricB);
-      paintChain(data, W, H, fabricR + 14, railY1, Math.floor(fabricB - 40));
+    case "roman": {
+      // Roman80: simple frame, cassette, half-raised body, glass below, pull on right
+      paintSimpleFrame(data, W, H, box);
+      const railY0 = fabricT - 32;
+      const railY1 = fabricT + 6;
+      paintCassette(data, W, H, fabricL - 24, fabricR + 24, railY0, railY1);
+      const drop = Math.floor(fabricT + (fabricB - fabricT) * 0.58);
+      paintRomanHalfRaised(data, W, H, fabricL, fabricT + 8, fabricR, drop);
+      paintPullCord(data, W, H, fabricR + 18, railY1, Math.floor(drop + 30));
       break;
+    }
     case "zebra":
-      paintCassette(data, W, H, fabricL - 20, fabricR + 20, railY0, railY1);
-      paintZebra(data, W, H, fabricL, fabricT + 4, fabricR, fabricB);
-      paintChain(data, W, H, fabricR + 14, railY1, Math.floor(fabricB - 30));
+      paintSimpleFrame(data, W, H, box);
+      paintCassette(data, W, H, fabricL - 20, fabricR + 20, fabricT - 28, fabricT + 4);
+      paintZebra(data, W, H, fabricL, fabricT + 6, fabricR, fabricB);
+      paintChain(data, W, H, fabricR + 14, fabricT + 6, Math.floor(fabricB - 30));
       break;
-    case "pleated-manual":
-      paintCassette(data, W, H, fabricL - 16, fabricR + 16, railY0, railY1);
-      paintPleated(data, W, H, fabricL, fabricT + 4, fabricR, fabricB, { dense: true });
+
+    case "pleated-manual": {
+      // PX2607: French doors, pleats fill EACH pane, no top cassette
+      paintFrenchFrame(data, W, H, box);
+      const inset = 4;
+      // Left pane
+      paintPleated(
+        data,
+        W,
+        H,
+        box.fx0 + inset,
+        box.fy0 + inset,
+        mid - mullionHalf - 2,
+        box.fy1 - inset,
+        { dense: true, stitches: true }
+      );
+      // Right pane
+      paintPleated(
+        data,
+        W,
+        H,
+        mid + mullionHalf + 2,
+        box.fy0 + inset,
+        box.fx1 - inset,
+        box.fy1 - inset,
+        { dense: true, stitches: true }
+      );
       break;
-    case "pleated-chain":
-      paintCassette(data, W, H, fabricL - 16, fabricR + 16, railY0, railY1);
-      paintPleated(data, W, H, fabricL, fabricT + 4, fabricR, fabricB, { dense: true });
-      paintChain(data, W, H, fabricL - 18, railY1, Math.floor(fabricB - 20));
+    }
+
+    case "pleated-chain": {
+      // PNF1210: single opening, top cassette, full-width dense horizontal, chain LEFT with loop
+      paintSimpleFrame(data, W, H, box);
+      paintCassette(data, W, H, fabricL - 18, fabricR + 18, fabricT - 30, fabricT + 6);
+      paintPleated(data, W, H, fabricL, fabricT + 8, fabricR, fabricB - 4, { dense: true });
+      paintBottomBar(data, W, H, fabricL, fabricR, fabricB - 8);
+      paintChain(data, W, H, fabricL - 22, fabricT + 8, Math.floor(fabricB - 10));
       break;
+    }
+
     case "pleated-sheer":
-      paintCassette(data, W, H, fabricL - 16, fabricR + 16, railY0, railY1);
-      paintPleated(data, W, H, fabricL, fabricT + 4, fabricR, fabricB, { dense: true, sheer: true });
-      paintChain(data, W, H, fabricL - 18, railY1, Math.floor(fabricB - 20));
+      paintSimpleFrame(data, W, H, box);
+      paintCassette(data, W, H, fabricL - 16, fabricR + 16, fabricT - 28, fabricT + 4);
+      paintPleated(data, W, H, fabricL, fabricT + 6, fabricR, fabricB, { dense: true, sheer: true });
+      paintChain(data, W, H, fabricL - 18, fabricT + 6, Math.floor(fabricB - 20));
       break;
+
     case "shade": {
-      paintCassette(data, W, H, fabricL - 20, fabricR + 20, railY0, railY1);
-      const drop = Math.floor(fabricT + (fabricB - fabricT) * 0.62);
-      paintShade(data, W, H, fabricL, fabricT + 4, fabricR, drop);
+      paintSimpleFrame(data, W, H, box);
+      paintCassette(data, W, H, fabricL - 20, fabricR + 20, fabricT - 28, fabricT + 4);
+      const drop = Math.floor(fabricT + (fabricB - fabricT) * 0.7);
+      paintShade(data, W, H, fabricL, fabricT + 6, fabricR, drop);
       paintBottomBar(data, W, H, fabricL, fabricR, drop);
-      paintChain(data, W, H, fabricR + 14, railY1, drop + 20);
+      paintChain(data, W, H, fabricR + 14, fabricT + 6, drop + 20);
       break;
     }
     case "double": {
-      paintCassette(data, W, H, fabricL - 22, fabricR + 22, railY0, railY1);
-      paintPleated(data, W, H, fabricL + 6, fabricT + 4, fabricR - 6, fabricB, { dense: true, sheer: true });
+      paintSimpleFrame(data, W, H, box);
+      paintCassette(data, W, H, fabricL - 22, fabricR + 22, fabricT - 28, fabricT + 4);
+      paintPleated(data, W, H, fabricL + 6, fabricT + 6, fabricR - 6, fabricB, {
+        dense: true,
+        sheer: true,
+      });
       const drop = Math.floor(fabricT + (fabricB - fabricT) * 0.55);
-      paintShade(data, W, H, fabricL, fabricT + 4, fabricR, drop);
+      paintShade(data, W, H, fabricL, fabricT + 6, fabricR, drop);
       paintBottomBar(data, W, H, fabricL, fabricR, drop);
-      paintChain(data, W, H, fabricR + 14, railY1, drop + 20);
+      paintChain(data, W, H, fabricR + 14, fabricT + 6, drop + 20);
       break;
     }
     case "roller":
-      paintCassette(data, W, H, fabricL - 16, fabricR + 16, railY0, railY1);
-      paintRoller(data, W, H, fabricL, fabricT + 4, fabricR, fabricB);
-      paintChain(data, W, H, fabricL - 18, railY1, Math.floor(fabricB - 20));
+      paintSimpleFrame(data, W, H, box);
+      paintCassette(data, W, H, fabricL - 16, fabricR + 16, fabricT - 28, fabricT + 4);
+      paintRoller(data, W, H, fabricL, fabricT + 6, fabricR, fabricB);
+      paintChain(data, W, H, fabricL - 18, fabricT + 6, Math.floor(fabricB - 20));
       break;
     case "panel":
+      paintSimpleFrame(data, W, H, box);
       paintCassette(data, W, H, fabricL - 10, fabricR + 10, fabricT - 14, fabricT + 2);
       paintPanel(data, W, H, fabricL, fabricT + 4, fabricR, fabricB + 20);
       break;
     case "wave":
+      paintFrenchFrame(data, W, H, box);
       paintRod(data, W, H, fabricL - 40, fabricR + 40, fabricT - 8);
       paintWave(data, W, H, fabricL - 20, fabricT, fabricR + 20, fabricB + 40);
       break;
     case "drape":
     default:
+      paintFrenchFrame(data, W, H, box);
       paintRod(data, W, H, fabricL - 50, fabricR + 50, fabricT - 10);
       paintDrape(data, W, H, fabricL - 40, fabricT, fabricR + 40, fabricB + 50);
       break;
