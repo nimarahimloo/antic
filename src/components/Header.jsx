@@ -10,7 +10,6 @@ const NAV = [
   { label: "درباره ما", to: "/about" },
   { label: "تماس", to: "/contact" },
   { label: "مشاور طراحی", to: "/consultant" },
-  { label: "اتصال AI", to: "/connect" },
 ];
 
 export default function Header() {
@@ -25,7 +24,9 @@ export default function Header() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => { setOpen(false); }, [location]);
+  useEffect(() => {
+    setOpen(false);
+  }, [location]);
 
   return (
     <header
@@ -37,12 +38,16 @@ export default function Header() {
     >
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-10">
         <Link to="/" className="group flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/50 font-display text-lg font-bold text-primary transition-colors group-hover:border-accent">
-            پ
-          </span>
+          <img
+            src="/brand/mark.svg"
+            alt="Antic Curtain"
+            className="h-11 w-11 object-contain transition-transform group-hover:scale-105"
+            width={44}
+            height={44}
+          />
           <span className="flex flex-col leading-none">
             <span className="font-display text-lg font-bold text-foreground">پرده آنتیک</span>
-            <span className="font-body text-[10px] text-primary">ANTIQUE DRAPERY</span>
+            <span className="font-body text-[10px] tracking-wider text-primary">ANTIC CURTAIN</span>
           </span>
         </Link>
 
@@ -76,7 +81,7 @@ export default function Header() {
               <Link
                 key={item.label}
                 to={item.to}
-                className="border-b border-secondary/40 py-3 font-body text-sm text-foreground/85"
+                className="="border-b border-secondary/40 py-3 font-body text-sm text-foreground/85"
               >
                 {item.label}
               </Link>
