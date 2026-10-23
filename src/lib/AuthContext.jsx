@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
-import { base44, clearToken, setToken } from "@/api/base44Client";
+import { api, clearToken, setToken } from "@/api/client";
 
 const AuthContext = createContext();
 const TOKEN_KEY = "antic_access_token";
@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
       setAuthError(null);
 
       try {
-        const publicSettings = await base44.app.getPublicSettings();
+        const publicSettings = await api.app.getPublicSettings();
         setAppPublicSettings(publicSettings);
       } catch (e) {
         console.warn("Public settings unavailable (backend offline?)", e);
@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(false);
         return;
       }
-      const currentUser = await base44.auth.me();
+      const currentUser = await api.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
     } catch {
@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, password) => {
-    const res = await base44.auth.login(email, password);
+    const res = await api.auth.login(email, password);
     setUser(res.user);
     setIsAuthenticated(true);
     setAuthError(null);
@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (email, password, full_name) => {
-    const res = await base44.auth.register(email, password, full_name);
+    const res = await api.auth.register(email, password, full_name);
     setUser(res.user);
     setIsAuthenticated(true);
     setAuthError(null);
@@ -91,14 +91,14 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
     clearToken();
     if (shouldRedirect) {
-      base44.auth.logout(window.location.origin + "/");
+      api.auth.logout(window.location.origin + "/");
     } else {
-      base44.auth.logout();
+      api.auth.logout();
     }
   };
 
   const navigateToLogin = () => {
-    base44.auth.redirectToLogin(window.location.href);
+    api.auth.redirectToLogin(window.location.href);
   };
 
   return (
