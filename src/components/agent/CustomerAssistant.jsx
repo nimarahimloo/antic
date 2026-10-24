@@ -1,10 +1,10 @@
 import FloatingBot from "@/components/agent/FloatingBot";
 
 const STARTERS = [
-  "برای نشیمن مدرن چی پیشنهاد می‌کنی؟",
-  "اتاق خواب بلک‌اوت می‌خوام",
-  "سلیقه‌م کلاسیکه",
-  "زبرا دارید؟",
+  "نشیمن روشن و دلباز",
+  "اتاق خواب تاریک بلک‌اوت",
+  "پذیرایی کلاسیک لوکس",
+  "زبرا برای دفتر",
 ];
 
 export default function CustomerAssistant() {
@@ -12,9 +12,9 @@ export default function CustomerAssistant() {
     <FloatingBot
       mode="customer"
       agentName="design_consultant"
-      storageKey="antic_bot_customer"
+      storageKey="antic_bot_customer_v3"
       title="دستیار طراحی آنتیک"
-      subtitle="انتخاب پرده و دکور با سلیقه تو"
+      subtitle="مثل یک مشاور دوستانه کنارته"
       starters={STARTERS}
       accentClass="bg-primary text-primary-foreground"
     />
