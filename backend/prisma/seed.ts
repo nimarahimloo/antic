@@ -9,6 +9,8 @@ type CatDef = {
   slug: string;
   order: number;
   parentSlug?: string | null;
+  description?: string;
+  subs?: { name: string; slug: string }[];
 };
 
 const SLUG_MECHANISM: Record<string, string> = {
@@ -29,6 +31,7 @@ const SLUG_MECHANISM: Record<string, string> = {
   office: "zebra",
 };
 
+/** یک جدول مادر برای کاتالوگ + نمونه‌های اجرا */
 const CURTAIN_ROOTS: CatDef[] = [
   { name: "شید", slug: "shade", order: 1 },
   { name: "رومن", slug: "roman", order: 2 },
@@ -45,6 +48,48 @@ const CURTAIN_ROOTS: CatDef[] = [
   { name: "تور", slug: "sheer", order: 13 },
   { name: "پرده آشپزخانه", slug: "kitchen", order: 14 },
   { name: "پرده اداری", slug: "office", order: 15 },
+  // فضاهای نمونه اجرا (بدون mechanism فنی — فقط پروژه)
+  {
+    name: "پذیرایی",
+    slug: "living-room",
+    order: 20,
+    description: "نمونه‌های اجرا در فضای پذیرایی و نشیمن",
+    subs: [
+      { name: "کلاسیک", slug: "classic" },
+      { name: "مدرن", slug: "modern" },
+      { name: "نئوکلاسیک", slug: "neo-classic" },
+    ],
+  },
+  {
+    name: "اتاق خواب",
+    slug: "bedroom",
+    order: 21,
+    description: "پرده‌های اتاق خواب و فضای خصوصی",
+    subs: [
+      { name: "مستر", slug: "master" },
+      { name: "کودک", slug: "kids" },
+    ],
+  },
+  {
+    name: "هتل و اقامتگاه",
+    slug: "hotel",
+    order: 22,
+    description: "پروژه‌های هتل، سوئیت و اقامتگاه",
+    subs: [
+      { name: "اتاق مهمان", slug: "guest-room" },
+      { name: "لابی", slug: "lobby" },
+    ],
+  },
+  {
+    name: "ویلا و حیاط",
+    slug: "villa",
+    order: 23,
+    description: "اجرا در ویلا و فضاهای باز",
+    subs: [
+      { name: "سالن", slug: "hall" },
+      { name: "تراس", slug: "terrace" },
+    ],
+  },
 ];
 
 const CURTAIN_SUBS: CatDef[] = [
@@ -62,79 +107,6 @@ const CURTAIN_SUBS: CatDef[] = [
   { name: "کرکره فلزی / آلومینیومی", slug: "metal-blind", order: 402, parentSlug: "roller" },
   { name: "هازان چاپی", slug: "printed-hazan", order: 501, parentSlug: "printed" },
   { name: "زبرا چاپی", slug: "zebra-printed", order: 601, parentSlug: "zebra" },
-];
-
-/** دسته‌های نمونه‌های اجرا — نام‌های مشابه کاتالوگ + فضاهای اضافه */
-const PORTFOLIO_CATS: {
-  name: string;
-  slug: string;
-  order: number;
-  description: string;
-  subs: { name: string; slug: string }[];
-}[] = [
-  {
-    name: "پذیرایی",
-    slug: "living-room",
-    order: 1,
-    description: "نمونه‌های اجرا در فضای پذیرایی و نشیمن",
-    subs: [
-      { name: "کلاسیک", slug: "classic" },
-      { name: "مدرن", slug: "modern" },
-      { name: "نئوکلاسیک", slug: "neo-classic" },
-    ],
-  },
-  {
-    name: "اتاق خواب",
-    slug: "bedroom",
-    order: 2,
-    description: "پرده‌های اتاق خواب و فضای خصوصی",
-    subs: [
-      { name: "مستر", slug: "master" },
-      { name: "کودک", slug: "kids" },
-    ],
-  },
-  {
-    name: "آشپزخانه",
-    slug: "kitchen",
-    order: 3,
-    description: "نمونه‌های پرده و شید آشپزخانه",
-    subs: [{ name: "شید", slug: "shade" }, { name: "رومن", slug: "roman" }],
-  },
-  {
-    name: "اداری",
-    slug: "office",
-    order: 4,
-    description: "اجرای پرده در دفاتر و فضاهای کاری",
-    subs: [{ name: "اتاق کنفرانس", slug: "meeting" }, { name: "اتاق مدیریت", slug: "manager" }],
-  },
-  {
-    name: "هتل و اقامتگاه",
-    slug: "hotel",
-    order: 5,
-    description: "پروژه‌های هتل، سوئیت و اقامتگاه",
-    subs: [{ name: "اتاق مهمان", slug: "guest-room" }, { name: "لابی", slug: "lobby" }],
-  },
-  {
-    name: "ویلا و حیاط",
-    slug: "villa",
-    order: 6,
-    description: "اجرا در ویلا و فضاهای باز",
-    subs: [{ name: "سالن", slug: "hall" }, { name: "تراس", slug: "terrace" }],
-  },
-  {
-    name: "شید و زبرا",
-    slug: "shade-zebra",
-    order: 7,
-    description: "نمونه‌های سیستم‌های شید و زبرا",
-    subs: [{ name: "شید", slug: "shade" }, { name: "زبرا", slug: "zebra" }],
-  },
-  {
-    name: "پلیسه و رومن",
-    slug: "pleated-roman",
-    order: 8,
-    description: "نمونه‌های پلیسه و رومن",
-    subs: [{ name: "پلیسه", slug: "pleated" }, { name: "رومن", slug: "roman" }],
-  },
 ];
 
 const SHOP_ACCESSORY_CATS: CatDef[] = [
@@ -195,69 +167,6 @@ const SAMPLE_ACCESSORY_PRODUCTS = [
   },
 ];
 
-const SAMPLE_MODELS = [
-  {
-    code: "SH-001",
-    name: "شید بلک‌اوت",
-    categorySlug: "shade",
-    subcategory: "shade-blackout",
-    fabric: "بلک‌اوت",
-    color: "ذغالی",
-    colorCode: "#3B352C",
-    material: "cotton",
-    texture: "مات",
-    description: "شید بلک‌اوت از کاتالوگ",
-  },
-  {
-    code: "PL-001",
-    name: "پلیسه دستی",
-    categorySlug: "pleated",
-    subcategory: "pleated-manual",
-    fabric: "پلیسه",
-    color: "سفید",
-    colorCode: "#F0EDE5",
-    material: "cotton",
-    texture: "آکاردئون",
-    description: "پلیسه دستی",
-  },
-  {
-    code: "ZB-001",
-    name: "پرده زبرا",
-    categorySlug: "zebra",
-    subcategory: "zebra-printed",
-    fabric: "پلی‌استر",
-    color: "نقره‌ای",
-    colorCode: "#B8B8B8",
-    material: "cotton",
-    texture: "نوار",
-    description: "زبرا / زبرا چاپی",
-  },
-  {
-    code: "RM-001",
-    name: "رومن",
-    categorySlug: "roman",
-    subcategory: "shade-roman",
-    fabric: "کتان",
-    color: "کرم",
-    colorCode: "#E8DCC8",
-    material: "cotton",
-    texture: "صاف",
-    description: "رومن کلاسیک",
-  },
-  {
-    code: "TR-001",
-    name: "تور",
-    categorySlug: "sheer",
-    subcategory: "",
-    fabric: "تور",
-    color: "سفید",
-    colorCode: "#FAFAFA",
-    material: "sheer",
-    texture: "توری",
-    description: "تور پرده",
-  },
-];
-
 async function seedAdmin() {
   const email = process.env.ADMIN_EMAIL || "admin@antic.local";
   const password = process.env.ADMIN_PASSWORD || "admin123";
@@ -311,51 +220,60 @@ async function purgeNonAccessoryShopData() {
 
 async function seedCurtainCategories() {
   for (const root of CURTAIN_ROOTS) {
-    const children = CURTAIN_SUBS.filter((s) => s.parentSlug === root.slug);
+    const childrenFromSubs = CURTAIN_SUBS.filter((s) => s.parentSlug === root.slug).map((ch) => ({
+      name: ch.name,
+      slug: ch.slug,
+    }));
+    const children = root.subs?.length ? root.subs : childrenFromSubs;
+
     await prisma.curtainCategory.upsert({
       where: { slug: root.slug },
       create: {
         name: root.name,
         slug: root.slug,
         order: root.order,
+        description: root.description || null,
         mechanism: SLUG_MECHANISM[root.slug] || null,
-        subcategories: JSON.stringify(
-          children.map((ch) => ({ name: ch.name, slug: ch.slug }))
-        ),
+        subcategories: JSON.stringify(children),
       },
       update: {
         name: root.name,
         order: root.order,
+        description: root.description || undefined,
         mechanism: SLUG_MECHANISM[root.slug] || null,
-        subcategories: JSON.stringify(
-          children.map((ch) => ({ name: ch.name, slug: ch.slug }))
-        ),
+        subcategories: JSON.stringify(children),
       },
     });
   }
-  console.log(`Curtain categories: ${CURTAIN_ROOTS.length} roots`);
-}
 
-async function seedPortfolioCategories() {
-  for (const c of PORTFOLIO_CATS) {
-    await prisma.portfolioCategory.upsert({
-      where: { slug: c.slug },
-      create: {
-        name: c.name,
-        slug: c.slug,
-        order: c.order,
-        description: c.description,
-        subcategories: JSON.stringify(c.subs),
-      },
-      update: {
-        name: c.name,
-        order: c.order,
-        description: c.description,
-        subcategories: JSON.stringify(c.subs),
-      },
-    });
+  // مهاجرت: هر PortfolioCategory قدیمی را به CurtainCategory منتقل کن
+  try {
+    const old = await prisma.portfolioCategory.findMany();
+    for (const p of old) {
+      await prisma.curtainCategory.upsert({
+        where: { slug: p.slug },
+        create: {
+          name: p.name,
+          slug: p.slug,
+          order: p.order + 50,
+          description: p.description,
+          image: p.image,
+          subcategories: p.subcategories,
+        },
+        update: {
+          name: p.name,
+          description: p.description ?? undefined,
+          image: p.image ?? undefined,
+          subcategories: p.subcategories ?? undefined,
+        },
+      });
+    }
+    if (old.length) console.log(`Migrated ${old.length} PortfolioCategory → CurtainCategory`);
+  } catch {
+    /* جدول خالی یا مدل حذف‌شده */
   }
-  console.log(`Portfolio categories: ${PORTFOLIO_CATS.length}`);
+
+  console.log(`Curtain categories (unified): ${CURTAIN_ROOTS.length} roots`);
 }
 
 async function seedShopAccessoryCategories() {
@@ -422,16 +340,14 @@ async function seedAccessoryProducts(slugToId: Map<string, string>) {
   console.log(`Shop accessory products: ${SAMPLE_ACCESSORY_PRODUCTS.length}`);
 }
 
-async function seedModels() {
+/** مدل نمونه فقط اگر جدول کاملاً خالی باشد — بدون داده جعلی وقتی مدل واقعی هست */
+async function seedModelsIfEmpty() {
   const count = await prisma.curtainModel.count();
   if (count > 0) {
-    console.log(`Curtain models already present (${count}) — skip samples`);
+    console.log(`Curtain models present (${count}) — skip seed models`);
     return;
   }
-  for (const m of SAMPLE_MODELS) {
-    await prisma.curtainModel.create({ data: m });
-  }
-  console.log(`Sample curtain models: ${SAMPLE_MODELS.length}`);
+  console.log("No curtain models — admin should add real catalog data");
 }
 
 async function seedVirtualWindow() {
@@ -451,12 +367,11 @@ async function main() {
   await seedAdmin();
   await purgeNonAccessoryShopData();
   await seedCurtainCategories();
-  await seedPortfolioCategories();
   const slugToId = await seedShopAccessoryCategories();
   await seedAccessoryProducts(slugToId);
-  await seedModels();
+  await seedModelsIfEmpty();
   await seedVirtualWindow();
-  console.log("Seed complete.");
+  console.log("Seed complete (unified categories).");
 }
 
 main()
