@@ -1,7 +1,8 @@
 /**
- * پیش‌نمایش کاتالوگ:
- * سایت عمومی → پنجرهٔ مجازی (قاب + دیوار + پرده با پارچهٔ همان مدل)
- * ادمین → نمونه نصب سرور / قالب زنده / پنجره
+ * پیش‌نمایش یکپارچه:
+ * - سایت: اگر نمونه نصب (قالب+پارچه) باشد همان را نشان بده — این «قالب روی پنجره» است
+ *   وگرنه پنجره مجازی WebGL با پارچهٔ مدل
+ * - ادمین: تب‌ها برای مقایسه؛ پیش‌فرض پنجره
  */
 import { useState } from "react";
 import VirtualWindow from "@/components/catalog/VirtualWindow";
@@ -15,9 +16,12 @@ import {
 import { useRenderTemplates } from "@/hooks/useRenderTemplates";
 import { mediaUrl } from "@/lib/mediaUrl";
 
-function WindowChrome({ children }) {
+function RoomShell({ children }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-secondary/70 bg-card shadow-[0_12px_40px_rgba(0,0,0,0.2)]">
+    <div
+      className="relative overflow-hidden rounded-2xl border border-[#2a241c]/80 shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
+      style={{ background: "#75634f" }}
+    >
       {children}
     </div>
   );
@@ -37,31 +41,49 @@ export default function CurtainPreview({ fabric, publicMode = false }) {
   const styleLabel = MECHANISM_LABELS[style] || style;
   const tileScale = styleFabricScale(style);
   const fabricNorm = fabric
-    ? { ...fabric, image: fabricSrc || fabric.image }
+    ? {
+        ...fabric,
+        image: fabricSrc || fabric.image,
+        // sheer از فیلد پارچه هم تشخیص داده شود
+        fabric: fabric.fabric,
+        material: fabric.material,
+      }
     : null;
 
-  // ── سایت: همیشه پنجره واقعی با پارچهٔ مدل انتخاب‌شده ──
+  // ── سایت عمومی ──
+  // اولویت: نمونه نصب = خروجی موتور قالب+پارچه (همان مسیر ادمین)
+  // اگر نبود: پنجره مجازی با پارچه زنده
   if (publicMode) {
     return (
       <div id="curtain-render-preview">
-        <WindowChrome>
-          {fabricNorm ? (
+        <RoomShell>
+          {hasInstall ? (
+            <div className="aspect-[4/3]">
+              <img
+                src={installSrc}
+                alt={`نصب ${fabric?.code || ""}`}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ) : fabricNorm ? (
             <VirtualWindow fabric={fabricNorm} open={0.28} scale={0.72} />
           ) : (
-            <div className="flex aspect-[4/3] items-center justify-center bg-card">
+            <div className="flex aspect-[4/3] items-center justify-center">
               <p className="font-body text-xs text-muted-foreground">مدلی انتخاب نشده</p>
             </div>
           )}
-        </WindowChrome>
+        </RoomShell>
         <p className="mt-2 text-center text-[10px] leading-5 text-muted-foreground">
-          پرده روی پنجره · پارچه از مدل انتخاب‌شده · بکشید تا باز/بالا شود
+          {hasInstall
+            ? "نمونه نصب از قالب دسته + پارچهٔ همین مدل (مسیر ادمین)"
+            : "پنجره مجازی · پارچه از مدل · بکشید تا باز/بالا شود"}
         </p>
       </div>
     );
   }
 
-  // ── ادمین: پنجره / نمونه نصب / قالب زنده ──
-  const showWindow = mode === "window" || (!hasInstall && !hasPhoto);
+  // ── ادمین ──
+  const showWindow = mode === "window";
   const showInstall = mode === "install" && hasInstall;
   const showPhoto = mode === "photo" && hasPhoto;
 
@@ -72,7 +94,7 @@ export default function CurtainPreview({ fabric, publicMode = false }) {
           {showWindow
             ? "پنجره مجازی"
             : showInstall
-              ? "نمونه نصب"
+              ? "نمونه نصب (= قالب + پارچه روی سرور)"
               : showPhoto
                 ? `قالب زنده · ${styleLabel}`
                 : "پیش‌نمایش"}
@@ -118,16 +140,12 @@ export default function CurtainPreview({ fabric, publicMode = false }) {
         </div>
       </div>
 
-      <WindowChrome>
+      <RoomShell>
         {showWindow && fabricNorm ? (
           <VirtualWindow fabric={fabricNorm} open={0.28} scale={0.72} />
         ) : showInstall ? (
           <div className="aspect-[4/3]">
-            <img
-              src={installSrc}
-              alt={`نصب ${fabric?.code || ""}`}
-              className="h-full w-full object-cover"
-            />
+            <img src={installSrc} alt="" className="h-full w-full object-cover" />
           </div>
         ) : showPhoto ? (
           <div className="aspect-[4/3]">
@@ -147,7 +165,12 @@ export default function CurtainPreview({ fabric, publicMode = false }) {
             بدون مدل
           </div>
         )}
-      </WindowChrome>
+      </RoomShell>
+
+      <p className="mt-2 text-[10px] leading-5 text-muted-foreground">
+        «نمونه نصب» و «قالب زنده» همان موتور chroma هستند. «پنجره» رندر تعاملی سه‌بعدی است.
+        برای یکی شدن ظاهر، قالب دسته را بسازید و batch بزنید.
+      </p>
     </div>
   );
 }
