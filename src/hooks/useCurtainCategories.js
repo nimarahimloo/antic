@@ -41,6 +41,7 @@ export function normalizeCategory(row) {
     image: row.image || null,
     description: row.description || "",
     order: Number(row.order) || 0,
+    mechanism: row.mechanism || null,
     subcategories: parseSubs(row.subcategories),
   };
 }
@@ -107,4 +108,14 @@ export function useCurtainCategories() {
 export function refreshCurtainCategories() {
   cache = null;
   inflight = null;
+}
+
+/** نقشه slug → mechanism از کش دسته‌ها (برای resolveStyle) */
+export function getCategoryMechanismMap() {
+  const list = cache || [];
+  const map = {};
+  for (const c of list) {
+    if (c.slug && c.mechanism) map[c.slug] = c.mechanism;
+  }
+  return map;
 }
