@@ -34,16 +34,15 @@ export function getQueueState() {
 
 type ResolvedTemplate = {
   image: string;
-  source: "install_reference" | "render_template";
+  source: "render_template" | "install_reference";
   key: string;
-  mode: "hybrid" | "chroma";
-  chromaImage?: string | null;
+  mode: "chroma" | "hybrid";
 };
 
 /**
- * اولویت:
- *  1) InstallReference (عکس واقعی) → hybrid: auto-chroma از عکس + پارچه
- *  2) RenderTemplate سبز → chroma کلاسیک
+ * اولویت (بعد از آپلود قالب سبز تمیز توسط ادمین):
+ *  1) RenderTemplate سبز → بهترین کیفیت نگاشت پارچه
+ *  2) InstallReference → hybrid auto-chroma از عکس واقعی
  */
 async function resolveTemplateCandidates(opts: {
   categorySlug?: string | null;
@@ -56,30 +55,7 @@ async function resolveTemplateCandidates(opts: {
   const out: ResolvedTemplate[] = [];
   const seen = new Set<string>();
 
-  for (const k of unique) {
-    const ref = await prisma.installReference.findFirst({
-      where: { style: k },
-      orderBy: { updatedAt: "desc" },
-    });
-    if (ref?.image) {
-      const id = `ref:${k}:${ref.image}`;
-      if (!seen.has(id)) {
-        seen.add(id);
-        const chroma = await prisma.renderTemplate.findFirst({
-          where: { style: k },
-          orderBy: { updatedAt: "desc" },
-        });
-        out.push({
-          image: ref.image,
-          source: "install_reference",
-          key: k,
-          mode: "hybrid",
-          chromaImage: chroma?.image || null,
-        });
-      }
-    }
-  }
-
+  // 1) Admin green chroma first (user-uploaded quality templates)
   for (const k of unique) {
     const tpl = await prisma.renderTemplate.findFirst({
       where: { style: k },
@@ -94,6 +70,26 @@ async function resolveTemplateCandidates(opts: {
           source: "render_template",
           key: k,
           mode: "chroma",
+        });
+      }
+    }
+  }
+
+  // 2) Real product photo hybrid
+  for (const k of unique) {
+    const ref = await prisma.installReference.findFirst({
+      where: { style: k },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (ref?.image) {
+      const id = `ref:${k}:${ref.image}`;
+      if (!seen.has(id)) {
+        seen.add(id);
+        out.push({
+          image: ref.image,
+          source: "install_reference",
+          key: k,
+          mode: "hybrid",
         });
       }
     }
@@ -152,8 +148,8 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
   const candidates = await resolveTemplateCandidates({ categorySlug, style });
   if (!candidates.length) {
     throw new Error(
-      `برای دسته «${categorySlug || "—"}» قالب نیست. ` +
-        `عکس واقعی محصول را در «نمونه‌های اجرای واقعی» آپلود کنید (یک بار برای هر دسته کافی است).`
+      `برای دسته «${categorySlug || "—"}» قالب سبز یا عکس مرجع نیست. ` +
+        `قالب سبز رومن/پلیسه را در بخش قالب‌ها آپلود کنید.`
     );
   }
 
@@ -166,27 +162,26 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
   for (const resolved of candidates) {
     try {
       const result =
-        resolved.mode === "hybrid"
-          ? await renderFromProductPhoto({
-              photoPathOrUrl: resolved.image,
-              fabricPathOrUrl: model.image,
-              outDir: path.resolve(uploadDir),
-              style,
-              material,
-              chromaPathOrUrl: resolved.chromaImage,
-            })
-          : await renderInstallImage({
+        resolved.mode === "chroma"
+          ? await renderInstallImage({
               templatePathOrUrl: resolved.image,
               fabricPathOrUrl: model.image,
               outDir: path.resolve(uploadDir),
               material,
               style,
+            })
+          : await renderFromProductPhoto({
+              photoPathOrUrl: resolved.image,
+              fabricPathOrUrl: model.image,
+              outDir: path.resolve(uploadDir),
+              style,
+              material,
             });
 
       const threshold = autoApproveThreshold();
       const autoOk = result.qualityScore >= threshold;
       const status = autoOk ? "approved" : "pending";
-      const label = resolved.mode === "hybrid" ? "ترکیب مرجع+chroma" : "chroma";
+      const label = resolved.mode === "chroma" ? "قالب سبز" : "عکس مرجع";
       const review = autoOk
         ? `${label} · امتیاز ${result.qualityScore}/10 · تأیید خودکار · ${resolved.source}`
         : `${label} · امتیاز ${result.qualityScore}/10 · پوشش ${Math.round(result.coverage * 100)}٪ · ${resolved.source}`;

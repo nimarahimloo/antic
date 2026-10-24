@@ -1,6 +1,6 @@
 /**
  * Install engine: chroma template + fabric map.
- * Fabric scale ≈ 1 means one fabric image spans the green region (no postage-stamp tiling).
+ * UV is mapped to the GREEN bounding box (not full image) so fabric scale is natural.
  */
 
 import fs from "fs";
@@ -81,6 +81,10 @@ type TemplateCache = {
   coverage: number;
   top: number;
   logStd: number;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
 };
 
 const templateCache = new Map<string, TemplateCache>();
@@ -95,18 +99,17 @@ function materialParams(material?: string, logStd?: number) {
           ? 0.16
           : 0.26;
   const contrast = Math.min(1.8, Math.max(0.6, target / Math.max(logStd ?? 0.12, 0.05)));
-  // tile base ~1 → one fabric width across green area; styleTileFactor fine-tunes
   switch ((material || "cotton").toLowerCase()) {
     case "velvet":
-      return { id: 1, contrast, sheen: 0.45, detail: 0.22, tile: 1.0, warp: 0.04, ao: 0.42 };
+      return { id: 1, contrast, sheen: 0.45, detail: 0.22, tile: 1.0, warp: 0.03, ao: 0.42 };
     case "silk":
     case "satin":
-      return { id: 2, contrast, sheen: 0.5, detail: 0.2, tile: 1.0, warp: 0.03, ao: 0.3 };
+      return { id: 2, contrast, sheen: 0.5, detail: 0.2, tile: 1.0, warp: 0.025, ao: 0.3 };
     case "sheer":
     case "voile":
-      return { id: 3, contrast, sheen: 0.1, detail: 0.14, tile: 1.05, warp: 0.02, ao: 0.18 };
+      return { id: 3, contrast, sheen: 0.1, detail: 0.14, tile: 1.0, warp: 0.02, ao: 0.18 };
     default:
-      return { id: 0, contrast, sheen: 0.06, detail: 0.28, tile: 1.0, warp: 0.03, ao: 0.4 };
+      return { id: 0, contrast, sheen: 0.06, detail: 0.26, tile: 1.0, warp: 0.025, ao: 0.38 };
   }
 }
 
@@ -126,7 +129,7 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
   }
 
   const { data, info } = await sharp(buf)
-    .resize(tw, th, { fit: "fill", kernel: sharp.kernel.lanczos3 })
+    .resize(tw, th, { fit: "inside", kernel: sharp.kernel.lanczos3 })
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
@@ -134,18 +137,28 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
   let sumLin = 0;
   let nKey = 0;
   let top = info.height;
+  let minX = info.width,
+    maxX = 0,
+    minY = info.height,
+    maxY = 0;
   const logs: number[] = [];
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i] / 255;
-    const g = data[i + 1] / 255;
-    const b = data[i + 2] / 255;
-    if (g - Math.max(r, b) > 0.12) {
-      const linG = Math.pow(g, 2.2);
-      sumLin += linG;
-      nKey++;
-      logs.push(Math.log(linG + 1e-3));
-      const y = Math.floor(i / 4 / info.width);
-      if (y < top) top = y;
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      const i = (y * info.width + x) * 4;
+      const r = data[i] / 255;
+      const g = data[i + 1] / 255;
+      const b = data[i + 2] / 255;
+      if (g - Math.max(r, b) > 0.12) {
+        const linG = Math.pow(g, 2.2);
+        sumLin += linG;
+        nKey++;
+        logs.push(Math.log(linG + 1e-3));
+        if (y < top) top = y;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
     }
   }
   const meanLin = nKey ? sumLin / nKey : 1;
@@ -156,7 +169,16 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
     : 0.12;
 
   if (coverage < 0.02) {
-    throw new Error("قالب chroma پوشش سبز کافی ندارد؛ از «ساخت قالب» با ناحیه سبز استفاده کنید.");
+    throw new Error("قالب chroma پوشش سبز کافی ندارد؛ از «ساخت قالب» یا آپلود سبز استفاده کنید.");
+  }
+
+  if (maxX <= minX) {
+    minX = 0;
+    maxX = info.width - 1;
+  }
+  if (maxY <= minY) {
+    minY = 0;
+    maxY = info.height - 1;
   }
 
   const entry: TemplateCache = {
@@ -168,6 +190,10 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
     coverage,
     top: 1 - top / info.height,
     logStd,
+    minX,
+    maxX,
+    minY,
+    maxY,
   };
   if (templateCache.size > 24) {
     const first = templateCache.keys().next().value;
@@ -178,7 +204,7 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
 }
 
 function sampleFab(fd: Buffer, fw: number, fh: number, u: number, v: number): [number, number, number] {
-  // Clamp to edge (no ugly seam tiling) when sample is near border after scale≈1
+  // Clamp to edge — one fabric panel across green, no postage-stamp repeat
   const x = Math.min(fw - 1.001, Math.max(0, u));
   const y = Math.min(fh - 1.001, Math.max(0, v));
   const x0 = x | 0;
@@ -215,18 +241,17 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const tpl = await decodeTemplate(input.templatePathOrUrl, maxWidth);
   const mat = materialParams(input.material, tpl.logStd);
 
-  // fabricScale: fraction of green width covered by one fabric image (≈1 = natural)
+  // ~1 = one fabric image spans the green region width
   const fabricScale = Math.min(
-    1.35,
-    Math.max(0.7, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
+    1.2,
+    Math.max(0.85, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
   );
 
   const fabricBuf = await loadBuffer(input.fabricPathOrUrl);
   const fabMeta = await sharp(fabricBuf).metadata();
   const aspect = (fabMeta.width || 1) / (fabMeta.height || 1);
 
-  // Keep fabric resolution high so weave detail survives stretch
-  const fabW = Math.max(512, Math.min(1600, Math.round(tpl.w * 1.1)));
+  const fabW = Math.max(512, Math.min(1600, Math.round(tpl.w * 1.15)));
   const fabH = Math.max(256, Math.min(1600, Math.round(fabW / aspect)));
 
   const { data: fd, info: fi } = await sharp(fabricBuf)
@@ -255,9 +280,12 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const td = tpl.data;
   const out = Buffer.alloc(w * h * 4);
 
-  // One fabric span ≈ fabricScale * full image width of green region
-  const tileX = w * fabricScale;
+  // UV relative to GREEN bbox — critical for natural scale
+  const gW = Math.max(1, tpl.maxX - tpl.minX);
+  const gH = Math.max(1, tpl.maxY - tpl.minY);
+  const tileX = gW * fabricScale;
   const tileY = tileX / aspect;
+
   let keySum = 0;
   let keyN = 0;
 
@@ -300,23 +328,20 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       s *= Math.pow(Math.min(2, Math.max(0.5, micro)), mat.detail);
       s = Math.pow(Math.max(s, 0), Math.min(mat.contrast, 1.05));
 
-      const py = (tpl.top - y / h) * h;
-      const compress = 1 - 0.08 * smoothstep(0.75, 0.3, s);
-      const warp = mat.warp ?? 0.03;
-      // Map x across [0, fabric width] once per fabricScale
-      const u = (x / tileX) * fi.width + gx * warp * fi.width * 0.15;
-      const v = (py / (tileY * compress)) * fi.height + gy * warp * fi.height * 0.08;
+      // Position inside green bbox → fabric UV (one panel)
+      const localX = x - tpl.minX;
+      const localY = y - tpl.minY;
+      const warp = mat.warp ?? 0.025;
+      const u = (localX / tileX) * fi.width + gx * warp * fi.width * 0.1;
+      const v = (localY / Math.max(tileY * 0.92, 1)) * fi.height + gy * warp * fi.height * 0.06;
       const [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u, v);
 
       const flr = toLin(fr),
         flg = toLin(fg),
         flb = toLin(fb);
-      const ratioR = Math.min(1.25, Math.max(0.8, flr / Math.max(meanR, 0.004)));
-      const ratioG = Math.min(1.25, Math.max(0.8, flg / Math.max(meanG, 0.004)));
-      const ratioB = Math.min(1.25, Math.max(0.8, flb / Math.max(meanB, 0.004)));
-      const flatR = flr * 0.88 + meanR * ratioR * 0.12;
-      const flatG = flg * 0.88 + meanG * ratioG * 0.12;
-      const flatB = flb * 0.88 + meanB * ratioB * 0.12;
+      const flatR = flr * 0.9 + meanR * 0.1;
+      const flatG = flg * 0.9 + meanG * 0.1;
+      const flatB = flb * 0.9 + meanB * 0.1;
 
       const ao = mat.ao != null ? 1 - (1 - smoothstep(0.25, 1.15, s)) * mat.ao * 0.7 : 1;
       let cr = flatR * s * ao,

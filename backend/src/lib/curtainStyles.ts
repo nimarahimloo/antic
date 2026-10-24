@@ -112,32 +112,31 @@ export function guessMaterial(model: {
 }
 
 /**
- * سهم عرض ناحیه پارچه که یک تصویر پارچه می‌پوشاند (~1 = یک‌بار پهن).
- * هم‌تراز frontend styleFabricScale.
+ * ~1 = یک تصویر پارچه عرض ناحیه سبز را می‌پوشاند (بدون تکرار ریز).
  */
 export function styleTileFactor(style?: string) {
   switch (style) {
     case "zebra":
-      return 1.05;
+      return 1.0;
     case "roman":
-      return 1.1;
+      return 1.0;
     case "shade":
     case "double":
-      return 1.12;
+      return 1.0;
     case "roller":
-      return 1.08;
+      return 1.0;
     case "panel":
-      return 0.95;
+      return 0.98;
     case "pleated-manual":
     case "pleated-chain":
     case "pleated-sheer":
       return 1.0;
     case "wave":
-      return 0.9;
+      return 0.95;
     case "drape":
-      return 0.85;
+      return 0.9;
     default:
-      return 1.05;
+      return 1.0;
   }
 }
 
