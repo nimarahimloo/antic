@@ -1,15 +1,11 @@
 /**
  * Hybrid install pipeline (3 parts):
- *  1) InstallReference  = real product photo (Roman80, PNF1210, …) → scene + folds
- *  2) Optional green RenderTemplate = shape prior when available
+ *  1) InstallReference  = real product photo → scene + folds
+ *  2) Optional green RenderTemplate = shape prior
  *  3) Fabric from CurtainModel
  *
- * Flow: detect curtain on reference → paint chroma (green×luminance) →
- * same fabric engine as installEngine → photoreal output.
- * No per-model manual work; one reference photo per category is enough.
- *
- * Flat styles (shade / roman / roller / double) use near-zero warp so
- * geometric patterns stay undistorted.
+ * Flat styles use percentile core rectangle UV (same as installEngine)
+ * so geometric patterns stay undistorted.
  */
 
 import fs from "fs";
@@ -24,7 +20,6 @@ export type ProductRetextureInput = {
   outDir: string;
   maxWidth?: number;
   style?: string;
-  /** optional green template path — used as shape prior when layouts are similar */
   chromaPathOrUrl?: string | null;
   material?: string;
 };
@@ -125,7 +120,6 @@ function dist3(r: number, g: number, b: number, wr: number, wg: number, wb: numb
   return Math.hypot(r - wr, g - wg, b - wb);
 }
 
-/** Style-aware vertical band where curtain fabric lives on product shots */
 function styleBand(style?: string): { y0: number; y1: number; x0: number; x1: number } {
   const s = (style || "").toLowerCase();
   if (s.includes("roman")) return { y0: 0.06, y1: 0.62, x0: 0.16, x1: 0.84 };
@@ -140,10 +134,6 @@ function styleBand(style?: string): { y0: number; y1: number; x0: number; x1: nu
   return { y0: 0.07, y1: 0.72, x0: 0.14, x1: 0.86 };
 }
 
-/**
- * Build soft fabric mask on a real product photo.
- * Strictly excludes white glass/frame and flat wall.
- */
 function buildMask(
   data: Buffer,
   w: number,
@@ -183,7 +173,6 @@ function buildMask(
       const v = variance[y * w + x];
       const dWall = dist3(r, g, b, wall.r, wall.g, wall.b);
 
-      // Hard exclude glass / frame / cassette / pure white
       if (lum > 0.84 && sat < 0.11) {
         mask[y * w + x] = 0;
         continue;
@@ -196,7 +185,6 @@ function buildMask(
         mask[y * w + x] = 0;
         continue;
       }
-      // Flat wall
       if (dWall < 0.065 && v < vThresh * 0.9 && sat < 0.14) {
         mask[y * w + x] = 0;
         continue;
@@ -213,10 +201,8 @@ function buildMask(
 
       if (inBand && lum > 0.18 && lum < 0.82) {
         if (v > vThresh * 0.35 || dWall > 0.025) k = Math.max(k, 0.52);
-        // Uniform fabric face (roman body)
         if (lum < 0.78 && dWall > 0.012 && v > vThresh * 0.2) k = Math.max(k, 0.58);
       } else if (!inBand) {
-        // Outside band: only strong signals
         if (k < 0.55) k = 0;
       }
 
@@ -228,7 +214,6 @@ function buildMask(
     }
   }
 
-  // Light pinhole fill inside fabric only
   const dens = new Float32Array(mask);
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
@@ -271,7 +256,6 @@ function buildMask(
   };
 }
 
-/** Paint fabric region as green chroma while keeping scene elsewhere */
 function paintChroma(
   data: Buffer,
   w: number,
@@ -297,10 +281,8 @@ function paintChroma(
         continue;
       }
 
-      // Green keyed by original luminance (folds become shading on green)
       const lum = pixelLum(data, i);
       const shade = clamp01(lum / Math.max(meanLum, 0.05));
-      // Mid-green range that installEngine keys well (g-dominant)
       const gVal = clamp(40 + shade * 180);
       const rVal = clamp(8 + shade * 25);
       const bVal = clamp(8 + shade * 25);
@@ -345,7 +327,15 @@ function sampleFab(fd: Buffer, fw: number, fh: number, u: number, v: number): [n
   return [r, g, b];
 }
 
-/** Map fabric onto in-memory chroma buffer (same algorithm as installEngine) */
+function percentile(sorted: number[], p: number): number {
+  if (!sorted.length) return 0;
+  const i = (sorted.length - 1) * p;
+  const lo = Math.floor(i);
+  const hi = Math.ceil(i);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] * (hi - i) + sorted[hi] * (i - lo);
+}
+
 async function mapFabricOntoChroma(
   chroma: Buffer,
   w: number,
@@ -357,15 +347,12 @@ async function mapFabricOntoChroma(
   const sharp = await getSharp();
   const flat = isFlatStyle(style);
 
-  // Analyze green key + find green bbox for proper UV
   let sumLin = 0,
-    nKey = 0,
-    top = h;
-  let minX = w,
-    maxX = 0,
-    minY = h,
-    maxY = 0;
+    nKey = 0;
   const logs: number[] = [];
+  const xs: number[] = [];
+  const ys: number[] = [];
+
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
@@ -377,11 +364,8 @@ async function mapFabricOntoChroma(
         sumLin += linG;
         nKey++;
         logs.push(Math.log(linG + 1e-3));
-        if (y < top) top = y;
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
+        xs.push(x);
+        ys.push(y);
       }
     }
   }
@@ -396,14 +380,12 @@ async function mapFabricOntoChroma(
     throw new Error("chroma ساخته‌شده از عکس مرجع پوشش سبز کافی ندارد");
   }
 
-  if (maxX <= minX) {
-    minX = 0;
-    maxX = w - 1;
-  }
-  if (maxY <= minY) {
-    minY = 0;
-    maxY = h - 1;
-  }
+  xs.sort((a, b) => a - b);
+  ys.sort((a, b) => a - b);
+  const coreMinX = Math.floor(percentile(xs, 0.08));
+  const coreMaxX = Math.ceil(percentile(xs, 0.92));
+  const coreMinY = Math.floor(percentile(ys, 0.06));
+  const coreMaxY = Math.ceil(percentile(ys, 0.94));
 
   const target =
     material === "velvet"
@@ -417,12 +399,12 @@ async function mapFabricOntoChroma(
   const warp = styleWarpFactor(style);
   const mat = {
     contrast,
-    detail: material === "sheer" ? 0.12 : flat ? 0.16 : 0.26,
+    detail: material === "sheer" ? 0.1 : flat ? 0.14 : 0.26,
     tile: 1.0 * styleTileFactor(style),
     warp,
-    ao: material === "sheer" ? 0.16 : flat ? 0.24 : 0.38,
+    ao: material === "sheer" ? 0.14 : flat ? 0.22 : 0.38,
   };
-  const fabricScale = Math.min(1.18, Math.max(0.88, mat.tile));
+  const fabricScale = Math.min(1.12, Math.max(0.92, mat.tile));
 
   const fabricBuf = await loadBuffer(fabricPath);
   const fabMeta = await sharp(fabricBuf).metadata();
@@ -450,12 +432,9 @@ async function mapFabricOntoChroma(
   meanG = nF ? meanG / nF : 0.4;
   meanB = nF ? meanB / nF : 0.4;
 
-  // UV relative to green bbox (same as installEngine)
-  const gW = Math.max(1, maxX - minX);
-  const gH = Math.max(1, maxY - minY);
+  const gW = Math.max(1, coreMaxX - coreMinX);
   const tileX = gW * fabricScale;
-  // Flat styles: keep vertical scale proportional → no stretch on geometric patterns
-  const tileY = flat ? tileX / aspect : (tileX / aspect) * 0.92;
+  const tileY = tileX / aspect;
   const out = Buffer.alloc(w * h * 4);
 
   for (let y = 0; y < h; y++) {
@@ -493,27 +472,25 @@ async function mapFabricOntoChroma(
       s *= Math.pow(Math.min(2, Math.max(0.5, micro)), mat.detail);
       s = Math.pow(Math.max(s, 0), Math.min(mat.contrast, 1.05));
 
-      // Position inside green bbox → fabric UV
-      const localX = x - minX;
-      const localY = y - minY;
+      const localX = x - coreMinX;
+      const localY = y - coreMinY;
 
-      // Flat styles: pure planar mapping, almost zero gradient warp
       const u =
         (localX / tileX) * fi.width +
-        (flat ? 0 : gx * mat.warp * fi.width * 0.12);
+        (flat ? 0 : gx * mat.warp * fi.width * 0.1);
       const v =
         (localY / Math.max(tileY, 1)) * fi.height +
-        (flat ? 0 : gy * mat.warp * fi.height * 0.07);
+        (flat ? 0 : gy * mat.warp * fi.height * 0.06);
 
       const [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u, v);
 
       const flr = toLin(fr),
         flg = toLin(fg),
         flb = toLin(fb);
-      const flatR = flr * 0.9 + meanR * 0.1;
-      const flatG = flg * 0.9 + meanG * 0.1;
-      const flatB = flb * 0.9 + meanB * 0.1;
-      const ao = 1 - (1 - smoothstep(0.25, 1.15, s)) * mat.ao * 0.7;
+      const flatR = flr * 0.92 + meanR * 0.08;
+      const flatG = flg * 0.92 + meanG * 0.08;
+      const flatB = flb * 0.92 + meanB * 0.08;
+      const ao = 1 - (1 - smoothstep(0.25, 1.15, s)) * mat.ao * 0.65;
       const cr = flatR * s * ao;
       const cg = flatG * s * ao;
       const cb = flatB * s * ao;
@@ -560,7 +537,6 @@ export async function renderFromProductPhoto(
     );
   }
 
-  // Auto-chroma from reference (template + reference fused)
   const chroma = paintChroma(pd, w, h, mask, meanLum);
 
   const mapped = await mapFabricOntoChroma(
