@@ -52,7 +52,15 @@ const ALLOWED: Record<string, Set<string>> = {
     "installPending",
     "description",
   ]),
-  CurtainCategory: new Set(["name", "slug", "description", "image", "order", "subcategories"]),
+  CurtainCategory: new Set([
+    "name",
+    "slug",
+    "description",
+    "image",
+    "order",
+    "mechanism",
+    "subcategories",
+  ]),
   Project: new Set([
     "title",
     "spaceType",
