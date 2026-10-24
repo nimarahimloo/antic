@@ -1,9 +1,10 @@
 /**
- * پیش‌نمایش کاتالوگ — یک مسیر با ادمین:
- * سایت: فقط install_image
- * ادمین: نصب یا قالب زنده
+ * پیش‌نمایش کاتالوگ:
+ * سایت عمومی → پنجرهٔ مجازی (قاب + دیوار + پرده با پارچهٔ همان مدل)
+ * ادمین → نمونه نصب سرور / قالب زنده / پنجره
  */
 import { useState } from "react";
+import VirtualWindow from "@/components/catalog/VirtualWindow";
 import PhotoCurtain from "@/components/catalog/photo/PhotoCurtain";
 import {
   resolveStyle,
@@ -14,18 +15,16 @@ import {
 import { useRenderTemplates } from "@/hooks/useRenderTemplates";
 import { mediaUrl } from "@/lib/mediaUrl";
 
-function WindowFrame({ children }) {
+function WindowChrome({ children }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border-2 border-[#c8b89a]/80 bg-[#1a1510] shadow-[inset_0_0_0_6px_#f5f0e6,0_12px_40px_rgba(0,0,0,0.18)]">
-      <div className="h-3 bg-gradient-to-b from-[#efe6d6] to-[#d4c4a8]" />
-      <div className="relative aspect-[4/3] bg-[#e8eef4]">{children}</div>
-      <div className="h-4 bg-gradient-to-b from-[#d4c4a8] to-[#b8a888]" />
+    <div className="relative overflow-hidden rounded-2xl border border-secondary/70 bg-card shadow-[0_12px_40px_rgba(0,0,0,0.2)]">
+      {children}
     </div>
   );
 }
 
 export default function CurtainPreview({ fabric, publicMode = false }) {
-  const [mode, setMode] = useState("install");
+  const [mode, setMode] = useState("window");
   const templates = useRenderTemplates();
 
   const style = fabric ? resolveStyle(fabric) : "drape";
@@ -37,54 +36,59 @@ export default function CurtainPreview({ fabric, publicMode = false }) {
   const hasPhoto = Boolean(templateUrl && fabricSrc);
   const styleLabel = MECHANISM_LABELS[style] || style;
   const tileScale = styleFabricScale(style);
+  const fabricNorm = fabric
+    ? { ...fabric, image: fabricSrc || fabric.image }
+    : null;
 
+  // ── سایت: همیشه پنجره واقعی با پارچهٔ مدل انتخاب‌شده ──
   if (publicMode) {
     return (
       <div id="curtain-render-preview">
-        <WindowFrame>
-          {hasInstall ? (
-            <img
-              src={installSrc}
-              alt={`نصب ${fabric.code || ""}`}
-              className="h-full w-full object-cover"
-            />
-          ) : fabricSrc ? (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#dfe6ee] p-6">
-              <img
-                src={fabricSrc}
-                alt={fabric.code || ""}
-                className="max-h-[70%] max-w-[80%] rounded-lg object-contain shadow-md"
-              />
-              <p className="font-body text-[11px] text-muted-foreground">
-                نمونه نصب این مدل هنوز از پنل ادمین ساخته نشده است.
-              </p>
-            </div>
+        <WindowChrome>
+          {fabricNorm ? (
+            <VirtualWindow fabric={fabricNorm} open={0.28} scale={0.72} />
           ) : (
-            <div className="flex h-full items-center justify-center">
+            <div className="flex aspect-[4/3] items-center justify-center bg-card">
               <p className="font-body text-xs text-muted-foreground">مدلی انتخاب نشده</p>
             </div>
           )}
-        </WindowFrame>
-        {hasInstall && (
-          <p className="mt-2 text-center text-[10px] text-muted-foreground">
-            همان نمونه نصب تولیدشده در پنل ادمین برای این مدل
-          </p>
-        )}
+        </WindowChrome>
+        <p className="mt-2 text-center text-[10px] leading-5 text-muted-foreground">
+          پرده روی پنجره · پارچه از مدل انتخاب‌شده · بکشید تا باز/بالا شود
+        </p>
       </div>
     );
   }
 
-  const showInstall = (mode === "install" || !hasPhoto) && hasInstall;
+  // ── ادمین: پنجره / نمونه نصب / قالب زنده ──
+  const showWindow = mode === "window" || (!hasInstall && !hasPhoto);
+  const showInstall = mode === "install" && hasInstall;
   const showPhoto = mode === "photo" && hasPhoto;
-  const fabricForPhoto = fabricSrc ? { ...fabric, image: fabricSrc } : fabric;
 
   return (
     <div id="curtain-render-preview">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="font-display font-bold text-primary">
-          {showInstall ? "نمونه نصب" : showPhoto ? `قالب زنده · ${styleLabel}` : "پیش‌نمایش"}
+          {showWindow
+            ? "پنجره مجازی"
+            : showInstall
+              ? "نمونه نصب"
+              : showPhoto
+                ? `قالب زنده · ${styleLabel}`
+                : "پیش‌نمایش"}
         </span>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setMode("window")}
+            className={`rounded-full border px-2.5 py-1 text-[10px] ${
+              showWindow
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-secondary/60 text-muted-foreground"
+            }`}
+          >
+            پنجره
+          </button>
           {hasInstall && (
             <button
               type="button"
@@ -114,22 +118,36 @@ export default function CurtainPreview({ fabric, publicMode = false }) {
         </div>
       </div>
 
-      <WindowFrame>
-        {showInstall ? (
-          <img src={installSrc} alt={`نصب ${fabric.code || ""}`} className="h-full w-full object-cover" />
+      <WindowChrome>
+        {showWindow && fabricNorm ? (
+          <VirtualWindow fabric={fabricNorm} open={0.28} scale={0.72} />
+        ) : showInstall ? (
+          <div className="aspect-[4/3]">
+            <img
+              src={installSrc}
+              alt={`نصب ${fabric?.code || ""}`}
+              className="h-full w-full object-cover"
+            />
+          </div>
         ) : showPhoto ? (
-          <PhotoCurtain template={templateUrl} fabric={fabricForPhoto} scale={tileScale} styleKey={style} />
+          <div className="aspect-[4/3]">
+            <PhotoCurtain
+              template={templateUrl}
+              fabric={fabricNorm}
+              scale={tileScale}
+              styleKey={style}
+            />
+          </div>
         ) : fabricSrc ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 p-6">
+          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 p-6">
             <img src={fabricSrc} alt="" className="max-h-[70%] max-w-[80%] object-contain" />
-            <p className="text-center text-[11px] text-muted-foreground">
-              نمونه نصب هنوز ساخته نشده — در داشبورد «تولید» را بزنید.
-            </p>
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">بدون مدل</div>
+          <div className="flex aspect-[4/3] items-center justify-center text-xs text-muted-foreground">
+            بدون مدل
+          </div>
         )}
-      </WindowFrame>
+      </WindowChrome>
     </div>
   );
 }

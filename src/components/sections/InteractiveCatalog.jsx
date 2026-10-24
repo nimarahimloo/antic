@@ -11,7 +11,6 @@ export default function InteractiveCatalog({ initialCategory }) {
   const { categories: CATEGORIES, loading: catsLoading } = useCurtainCategories();
 
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || "");
-  /** خالی = همه زیردسته‌ها */
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [gridItems, setGridItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -87,10 +86,10 @@ export default function InteractiveCatalog({ initialCategory }) {
           <div>
             <span className="eyebrow mb-2 block">انتخاب مدل</span>
             <h2 className="font-display text-xl font-black text-foreground lg:text-3xl">
-              قاب پنجره · <span className="text-gold-gradient">نمونه نصب واقعی</span>
+              پنجره مجازی · <span className="text-gold-gradient">پارچه واقعی</span>
             </h2>
             <p className="mt-2 max-w-lg font-body text-sm leading-7 text-muted-foreground">
-              دسته‌ها از پنل ادمین. مدل را انتخاب کنید؛ تصویر بزرگ همان نمونه نصب همان مدل است.
+              مدل را انتخاب کنید؛ همان پارچه روی پنجره می‌نشیند. با کشیدن، پرده باز یا بالا می‌شود.
             </p>
           </div>
           <Link to="/#contact" className="btn-ghost-gold shrink-0">
