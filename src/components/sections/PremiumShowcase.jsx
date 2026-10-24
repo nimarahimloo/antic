@@ -1,14 +1,11 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
-import { useCurtainCategories } from "@/hooks/useCurtainCategories";
+import { useCurtainCategories, pickFeaturedCategories } from "@/hooks/useCurtainCategories";
 
-/** دسته‌هایی که توضیح دارند یا در نیمهٔ اول ترتیب‌اند — از همان API */
 export default function PremiumShowcase() {
   const { categories, loading } = useCurtainCategories();
-
-  const featured = categories.filter((c) => c.description).slice(0, 6);
-  const items = featured.length >= 2 ? featured : categories.slice(0, 4);
+  const items = pickFeaturedCategories(categories, 6);
 
   if (loading && !items.length) return null;
   if (!items.length) return null;
@@ -23,7 +20,7 @@ export default function PremiumShowcase() {
             مجموعه‌های <span className="text-gold-gradient">خاص</span>
           </h2>
           <p className="mx-auto mt-5 max-w-xl font-body text-sm leading-7 text-muted-foreground">
-            از دسته‌بندی‌های ثبت‌شده در پنل ادمین — هر تغییری آنجا، اینجا هم دیده می‌شود.
+            منبع واحد: `CurtainCategory` در پنل ادمین.
           </p>
         </div>
 
