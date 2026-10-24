@@ -4,47 +4,43 @@ import { motion } from "framer-motion";
 import { Search, Phone, X } from "lucide-react";
 import CurtainPreview from "@/components/catalog/CurtainPreview";
 import CatalogCard from "@/components/catalog/CatalogCard";
-import { ALL_CATEGORIES as FALLBACK_CATEGORIES } from "@/lib/catalogData";
+import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { base44 } from "@/api/base44Client";
 
-/**
- * کاتالوگ تعاملی:
- * سمت چپ = قاب پنجره (همان install_image ادمین)
- * سمت راست = انتخاب مدل از همان دیتابیس ادمین
- */
 export default function InteractiveCatalog({ initialCategory }) {
-  const [dbCategories, setDbCategories] = useState(null);
+  const { categories: CATEGORIES, loading: catsLoading } = useCurtainCategories();
 
-  useEffect(() => {
-    base44.entities.CurtainCategory.list("order", 100)
-      .then((data) => setDbCategories(data?.length ? data : null))
-      .catch(() => setDbCategories(null));
-  }, []);
-
-  const CATEGORIES = dbCategories || FALLBACK_CATEGORIES;
-
-  const [selectedCategory, setSelectedCategory] = useState(
-    initialCategory && CATEGORIES.find((c) => c.slug === initialCategory)
-      ? initialCategory
-      : CATEGORIES[0]?.slug
-  );
-  const category = CATEGORIES.find((c) => c.slug === selectedCategory);
-  const [selectedSubcategory, setSelectedSubcategory] = useState(
-    category?.subcategories?.[0]?.slug || ""
-  );
-
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory || "");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [gridItems, setGridItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState(null);
   const [search, setSearch] = useState("");
   const [categoryCounts, setCategoryCounts] = useState({});
 
+  // وقتی دسته‌ها از API آمدند، دستهٔ اولیه را ست کن
+  useEffect(() => {
+    if (!CATEGORIES.length) return;
+    if (initialCategory && CATEGORIES.find((c) => c.slug === initialCategory)) {
+      setSelectedCategory(initialCategory);
+    } else if (!selectedCategory || !CATEGORIES.find((c) => c.slug === selectedCategory)) {
+      setSelectedCategory(CATEGORIES[0].slug);
+    }
+  }, [CATEGORIES, initialCategory]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const category = CATEGORIES.find((c) => c.slug === selectedCategory);
+
   useEffect(() => {
     const cat = CATEGORIES.find((c) => c.slug === selectedCategory);
     setSelectedSubcategory(cat?.subcategories?.[0]?.slug || "");
-  }, [selectedCategory]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedCategory, CATEGORIES]);
 
   useEffect(() => {
+    if (!selectedCategory && !search.trim()) {
+      setGridItems([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const q = search.trim();
     const filter = {};
@@ -95,8 +91,7 @@ export default function InteractiveCatalog({ initialCategory }) {
               قاب پنجره · <span className="text-gold-gradient">نمونه نصب واقعی</span>
             </h2>
             <p className="mt-2 max-w-lg font-body text-sm leading-7 text-muted-foreground">
-              مدل را از راست انتخاب کنید. تصویر بزرگ همان نمونه‌ای است که در پنل ادمین برای این مدل ساخته
-              شده — یک منبع، یک تصویر.
+              دسته‌ها از پنل ادمین می‌آیند. مدل را انتخاب کنید؛ تصویر بزرگ همان نمونه نصب همان مدل است.
             </p>
           </div>
           <Link to="/#contact" className="btn-ghost-gold shrink-0">
@@ -126,38 +121,43 @@ export default function InteractiveCatalog({ initialCategory }) {
         </div>
 
         <div className="mb-8 flex gap-2 overflow-x-auto no-scrollbar pb-1" dir="rtl">
-          {CATEGORIES.map((cat) => (
-            <button
-              type="button"
-              key={cat.slug}
-              onClick={() => {
-                setSearch("");
-                setSelectedCategory(cat.slug);
-              }}
-              className={`shrink-0 rounded-full border px-5 py-2.5 font-display text-xs font-bold transition-all duration-300 ${
-                selectedCategory === cat.slug && !search.trim()
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-secondary/70 text-muted-foreground hover:border-primary hover:text-primary"
-              }`}
-            >
-              {cat.name}
-              {categoryCounts[cat.slug] != null && (
-                <span
-                  className={`mr-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold ${
-                    selectedCategory === cat.slug && !search.trim()
-                      ? "bg-primary-foreground/20 text-primary-foreground"
-                      : "bg-secondary/60 text-muted-foreground"
-                  }`}
-                >
-                  {categoryCounts[cat.slug]}
-                </span>
-              )}
-            </button>
-          ))}
+          {catsLoading && !CATEGORIES.length ? (
+            [...Array(5)].map((_, i) => (
+              <div key={i} className="h-9 w-24 shrink-0 animate-pulse rounded-full bg-secondary/40" />
+            ))
+          ) : (
+            CATEGORIES.map((cat) => (
+              <button
+                type="button"
+                key={cat.slug}
+                onClick={() => {
+                  setSearch("");
+                  setSelectedCategory(cat.slug);
+                }}
+                className={`shrink-0 rounded-full border px-5 py-2.5 font-display text-xs font-bold transition-all duration-300 ${
+                  selectedCategory === cat.slug && !search.trim()
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-secondary/70 text-muted-foreground hover:border-primary hover:text-primary"
+                }`}
+              >
+                {cat.name}
+                {categoryCounts[cat.slug] != null && (
+                  <span
+                    className={`mr-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold ${
+                      selectedCategory === cat.slug && !search.trim()
+                        ? "bg-primary-foreground/20 text-primary-foreground"
+                        : "bg-secondary/60 text-muted-foreground"
+                    }`}
+                  >
+                    {categoryCounts[cat.slug]}
+                  </span>
+                )}
+              </button>
+            ))
+          )}
         </div>
 
         <div className="grid gap-8 lg:grid-cols-5">
-          {/* قاب پنجره اصلی — همیشه سر جایش */}
           <div className="lg:col-span-3">
             <CurtainPreview fabric={selectedModel} publicMode />
 
@@ -244,7 +244,7 @@ export default function InteractiveCatalog({ initialCategory }) {
               ) : gridItems.length === 0 ? (
                 <div className="p-8 text-center">
                   <p className="font-body text-sm text-muted-foreground">
-                    {search.trim() ? "نتیجه‌ای پیدا نشد" : "هنوز مدلی ثبت نشده است"}
+                    {search.trim() ? "نتیجه‌ای پیدا نشد" : "هنوز مدلی در این دسته ثبت نشده است"}
                   </p>
                 </div>
               ) : (
