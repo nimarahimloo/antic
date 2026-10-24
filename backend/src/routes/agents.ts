@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { HttpError, sendError } from "../lib/errors.js";
 import { buildAssistantReply, type ChatMessage } from "../lib/consultant.js";
+import { optionalAuth, type AuthedRequest } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -24,17 +25,46 @@ function prune() {
   }
 }
 
-function welcome(agent: string) {
+function welcome(agent: string): ChatMessage {
   if (agent === "admin_assistant") {
-    return (
-      "سلام — دستیار ادمین آنتیک هستم. هر صفحه‌ای از پنل که باشی می‌بینم و قدم‌به‌قدم کمک می‌کنم: " +
-      "مدل، قالب chroma، متن، دسته، سفارش و درخواست مشاوره. بگو الان چی لازم داری."
-    );
+    return {
+      role: "assistant",
+      content:
+        "سلام — دستیار ادمین آنتیک. می‌توانم از دیتابیس بخوانم و بنویسم (مدل، دسته، سفارش، درخواست). بگو چه کاری انجام شود.",
+      blocks: [
+        {
+          type: "quick_replies",
+          items: [
+            { label: "خلاصه وضعیت", message: "خلاصه وضعیت" },
+            { label: "لیست مدل‌ها", message: "لیست مدل‌ها" },
+            { label: "درخواست‌ها", message: "درخواست‌های مشاوره" },
+          ],
+        },
+      ],
+    };
   }
-  return (
-    "سلام 👋 دستیار طراحی پرده آنتیک هستم. سلیقه‌ت را می‌پرسم و از کاتالوگ واقعی مدل پیشنهاد می‌دهم. " +
-    "فضا، نور و سبک دکوراسیونت را بگو."
-  );
+  return {
+    role: "assistant",
+    content:
+      "سلام 👋 دستیار طراحی پرده آنتیک هستم. فضا و نور را بگو تا از کاتالوگ واقعی مدل پیشنهاد بدهم.",
+    blocks: [
+      {
+        type: "quick_replies",
+        items: [
+          { label: "نشیمن مدرن", message: "نشیمن مدرن می‌خوام" },
+          { label: "خواب بلک‌اوت", message: "اتاق خواب بلک‌اوت می‌خوام" },
+          { label: "کلاسیک لوکس", message: "سلیقه‌م کلاسیک و لوکسه" },
+        ],
+      },
+      {
+        type: "link_buttons",
+        items: [
+          { label: "کاتالوگ", href: "/catalog" },
+          { label: "تماس", href: "/contact" },
+        ],
+      },
+    ],
+  };
 }
 
 router.post("/conversations", async (req, res) => {
@@ -52,7 +82,7 @@ router.post("/conversations", async (req, res) => {
       id,
       agent_name: body.agent_name,
       metadata: body.metadata,
-      messages: [{ role: "assistant", content: welcome(body.agent_name) }],
+      messages: [welcome(body.agent_name)],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -73,7 +103,7 @@ router.get("/conversations/:id", (req, res) => {
   }
 });
 
-router.post("/conversations/:id/messages", async (req, res) => {
+router.post("/conversations/:id/messages", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const conv = store.get(req.params.id);
     if (!conv) throw new HttpError(404, "Conversation not found");
@@ -82,6 +112,14 @@ router.post("/conversations/:id/messages", async (req, res) => {
       .object({
         role: z.enum(["user", "assistant"]).default("user"),
         content: z.string().min(1),
+        attachments: z
+          .array(
+            z.object({
+              type: z.literal("image"),
+              url: z.string().url().or(z.string().startsWith("/")),
+            })
+          )
+          .optional(),
         context: z
           .object({
             path: z.string().optional(),
@@ -92,7 +130,19 @@ router.post("/conversations/:id/messages", async (req, res) => {
       })
       .parse(req.body || {});
 
-    conv.messages.push({ role: body.role, content: body.content });
+    // نوشتن در DB فقط برای ادمین احراز هویت‌شده
+    if (conv.agent_name === "admin_assistant") {
+      if (!req.user || req.user.role !== "admin") {
+        throw new HttpError(403, "Admin authentication required for admin assistant");
+      }
+    }
+
+    const userMsg: ChatMessage = {
+      role: body.role,
+      content: body.content,
+      attachments: body.attachments,
+    };
+    conv.messages.push(userMsg);
     conv.updatedAt = Date.now();
 
     if (body.role === "user") {
@@ -103,29 +153,24 @@ router.post("/conversations/:id/messages", async (req, res) => {
           : {}),
         ...body.context,
       };
-      const { text, meta } = await buildAssistantReply(
+
+      let contentForModel = body.content;
+      if (body.attachments?.length) {
+        contentForModel +=
+          "\n[تصویر پیوست: " + body.attachments.map((a) => a.url).join(", ") + "]";
+      }
+
+      const { text, blocks } = await buildAssistantReply(
         conv.agent_name,
-        body.content,
+        contentForModel,
         history,
         ctx
       );
+
       conv.messages.push({
         role: "assistant",
         content: text,
-        tool_calls: [
-          {
-            status: "completed",
-            display_projection: {
-              label: conv.agent_name === "admin_assistant" ? "دستیار ادمین" : "کاتالوگ محلی",
-            },
-            arguments_string: JSON.stringify({
-              query: body.content.slice(0, 120),
-              intent: meta.intent,
-              path: meta.path,
-            }),
-            results: JSON.stringify(meta),
-          },
-        ],
+        blocks: blocks || [],
       });
       conv.updatedAt = Date.now();
     }
