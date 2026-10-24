@@ -20,7 +20,6 @@ import About from '@/pages/About';
 import Contact from '@/pages/Contact';
 import Connect from '@/pages/Connect';
 import CurtainDetail from '@/pages/CurtainDetail';
-import DesignConsultant from '@/pages/DesignConsultant';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Checkout from '@/pages/Checkout';
@@ -74,7 +73,6 @@ const AuthenticatedApp = () => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/connect" element={<Connect />} />
           <Route path="/curtain/:id" element={<CurtainDetail />} />
-          <Route path="/consultant" element={<DesignConsultant />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/checkout/result" element={<CheckoutResult />} />
         </Route>
