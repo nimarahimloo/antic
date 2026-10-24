@@ -49,28 +49,38 @@ model CurtainCategory {
   description   String?
   image         String?
   order         Int      @default(0)
-  /// کلید سبک رندر: drape | wave | panel | roman | zebra | shade | double | roller | pleated-*
   mechanism     String?
   subcategories String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
 
+/// دسته‌بندی نمونه‌های اجرا شده — جدا از CurtainCategory
+model PortfolioCategory {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  image         String?
+  order         Int      @default(0)
+  subcategories String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// نمونه کار اجرا شده — فقط عنوان، توضیح، کاور، گالری + لینک دسته
 model Project {
   id           String   @id @default(cuid())
   title        String
-  spaceType    String
   description  String?
-  location     String?
-  date         String?
   coverImage   String?
   images       String?
-  productsUsed String?
-  featured     Boolean  @default(false)
+  categorySlug String   @default("")
+  subcategory  String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  @@index([spaceType])
+  @@index([categorySlug])
 }
 
 model ConsultationRequest {
@@ -170,17 +180,16 @@ model ShopCategory {
   updatedAt   DateTime @updatedAt
 }
 
-/// سفارش فروشگاه — پرداخت زرین‌پال
 model Order {
   id              String   @id @default(cuid())
-  status          String   @default("pending") // pending | paid | failed | cancelled
+  status          String   @default("pending")
   customerName    String
   customerPhone   String
   customerEmail   String?
   customerAddress String?
-  itemsJson       String   // JSON line items
-  amountToman     Int      // مجموع به تومان
-  amountRial      Int      // برای زرین‌پال (تومان × ۱۰)
+  itemsJson       String
+  amountToman     Int
+  amountRial      Int
   authority       String?  @unique
   refId           String?
   gateway         String   @default("zarinpal")
