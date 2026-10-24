@@ -11,6 +11,7 @@ export default function InteractiveCatalog({ initialCategory }) {
   const { categories: CATEGORIES, loading: catsLoading } = useCurtainCategories();
 
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || "");
+  /** خالی = همه زیردسته‌ها */
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [gridItems, setGridItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,7 +19,6 @@ export default function InteractiveCatalog({ initialCategory }) {
   const [search, setSearch] = useState("");
   const [categoryCounts, setCategoryCounts] = useState({});
 
-  // وقتی دسته‌ها از API آمدند، دستهٔ اولیه را ست کن
   useEffect(() => {
     if (!CATEGORIES.length) return;
     if (initialCategory && CATEGORIES.find((c) => c.slug === initialCategory)) {
@@ -31,9 +31,8 @@ export default function InteractiveCatalog({ initialCategory }) {
   const category = CATEGORIES.find((c) => c.slug === selectedCategory);
 
   useEffect(() => {
-    const cat = CATEGORIES.find((c) => c.slug === selectedCategory);
-    setSelectedSubcategory(cat?.subcategories?.[0]?.slug || "");
-  }, [selectedCategory, CATEGORIES]);
+    setSelectedSubcategory("");
+  }, [selectedCategory]);
 
   useEffect(() => {
     if (!selectedCategory && !search.trim()) {
@@ -91,7 +90,7 @@ export default function InteractiveCatalog({ initialCategory }) {
               قاب پنجره · <span className="text-gold-gradient">نمونه نصب واقعی</span>
             </h2>
             <p className="mt-2 max-w-lg font-body text-sm leading-7 text-muted-foreground">
-              دسته‌ها از پنل ادمین می‌آیند. مدل را انتخاب کنید؛ تصویر بزرگ همان نمونه نصب همان مدل است.
+              دسته‌ها از پنل ادمین. مدل را انتخاب کنید؛ تصویر بزرگ همان نمونه نصب همان مدل است.
             </p>
           </div>
           <Link to="/#contact" className="btn-ghost-gold shrink-0">
@@ -121,40 +120,38 @@ export default function InteractiveCatalog({ initialCategory }) {
         </div>
 
         <div className="mb-8 flex gap-2 overflow-x-auto no-scrollbar pb-1" dir="rtl">
-          {catsLoading && !CATEGORIES.length ? (
-            [...Array(5)].map((_, i) => (
-              <div key={i} className="h-9 w-24 shrink-0 animate-pulse rounded-full bg-secondary/40" />
-            ))
-          ) : (
-            CATEGORIES.map((cat) => (
-              <button
-                type="button"
-                key={cat.slug}
-                onClick={() => {
-                  setSearch("");
-                  setSelectedCategory(cat.slug);
-                }}
-                className={`shrink-0 rounded-full border px-5 py-2.5 font-display text-xs font-bold transition-all duration-300 ${
-                  selectedCategory === cat.slug && !search.trim()
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-secondary/70 text-muted-foreground hover:border-primary hover:text-primary"
-                }`}
-              >
-                {cat.name}
-                {categoryCounts[cat.slug] != null && (
-                  <span
-                    className={`mr-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold ${
-                      selectedCategory === cat.slug && !search.trim()
-                        ? "bg-primary-foreground/20 text-primary-foreground"
-                        : "bg-secondary/60 text-muted-foreground"
-                    }`}
-                  >
-                    {categoryCounts[cat.slug]}
-                  </span>
-                )}
-              </button>
-            ))
-          )}
+          {catsLoading && !CATEGORIES.length
+            ? [...Array(5)].map((_, i) => (
+                <div key={i} className="h-9 w-24 shrink-0 animate-pulse rounded-full bg-secondary/40" />
+              ))
+            : CATEGORIES.map((cat) => (
+                <button
+                  type="button"
+                  key={cat.slug}
+                  onClick={() => {
+                    setSearch("");
+                    setSelectedCategory(cat.slug);
+                  }}
+                  className={`shrink-0 rounded-full border px-5 py-2.5 font-display text-xs font-bold transition-all duration-300 ${
+                    selectedCategory === cat.slug && !search.trim()
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-secondary/70 text-muted-foreground hover:border-primary hover:text-primary"
+                  }`}
+                >
+                  {cat.name}
+                  {categoryCounts[cat.slug] != null && (
+                    <span
+                      className={`mr-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold ${
+                        selectedCategory === cat.slug && !search.trim()
+                          ? "bg-primary-foreground/20 text-primary-foreground"
+                          : "bg-secondary/60 text-muted-foreground"
+                      }`}
+                    >
+                      {categoryCounts[cat.slug]}
+                    </span>
+                  )}
+                </button>
+              ))}
         </div>
 
         <div className="grid gap-8 lg:grid-cols-5">
@@ -208,6 +205,17 @@ export default function InteractiveCatalog({ initialCategory }) {
           <div className="lg:col-span-2">
             {!search.trim() && category?.subcategories?.length > 0 && (
               <div className="mb-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSubcategory("")}
+                  className={`rounded-full border px-4 py-1.5 font-body text-xs transition-colors ${
+                    !selectedSubcategory
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-secondary/60 text-muted-foreground hover:border-primary/50"
+                  }`}
+                >
+                  همه
+                </button>
                 {category.subcategories.map((sub) => (
                   <button
                     type="button"
