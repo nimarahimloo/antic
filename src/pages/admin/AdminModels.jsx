@@ -32,64 +32,41 @@ export default function AdminModels() {
     })
   );
 
+  // فقط فیلدهای ضروری برای بارگذاری سریع
   const fields = [
     {
       key: "image",
-      label: "تکه پارچه (ورق کاتالوگ)",
+      label: "عکس پارچه",
       type: "image",
       required: true,
-      help: "عکس تکه پارچه. بعد از ذخیره، نمونه نصب روی سرور از قالب همان دسته ساخته می‌شود و همان تصویر روی سایت می‌آید.",
     },
     {
       key: "code",
       label: "کد محصول",
       required: true,
-      placeholder: "کد روی ورق کاتالوگ",
+      placeholder: "مثلاً ZB-001",
     },
     {
       key: "name",
-      label: "نام مدل",
-      required: true,
-      placeholder: "همان کد محصول",
+      label: "نام (اختیاری)",
+      placeholder: "خالی = همان کد محصول",
     },
     {
       key: "category_slug",
-      label: "دسته (سبک نصب)",
+      label: "دسته",
       required: true,
       type: "select",
-      help: "قالب نصب از همین دسته خوانده می‌شود.",
     },
     {
       key: "subcategory",
-      label: "زیردسته",
+      label: "زیردسته (اختیاری)",
       type: subOptions.length ? "select" : "text",
     },
     {
-      key: "fabric",
-      label: "نوع پارچه",
-      placeholder: "خودکار از عکس",
+      key: "description",
+      label: "یادداشت (اختیاری)",
+      type: "textarea",
     },
-    {
-      key: "material",
-      label: "جنس (رندر نور)",
-      placeholder: "cotton / velvet / silk / sheer",
-    },
-    {
-      key: "texture",
-      label: "بافت / طرح",
-      placeholder: "صاف، طرح‌دار، …",
-    },
-    {
-      key: "color",
-      label: "رنگ (تقریبی)",
-      placeholder: "خودکار از عکس",
-    },
-    {
-      key: "color_code",
-      label: "کد رنگ (فقط پارچه ساده)",
-      placeholder: "خالی اگر طرح‌دار است",
-    },
-    { key: "description", label: "یادداشت داخلی (اختیاری)", type: "textarea" },
   ];
 
   const columns = [
@@ -114,25 +91,18 @@ export default function AdminModels() {
       ),
     },
     { key: "category_slug", label: "دسته" },
-    { key: "subcategory", label: "زیردسته" },
-    {
-      key: "texture",
-      label: "بافت",
-      render: (v, r) => v || r.fabric || "—",
-    },
     {
       key: "install_status",
       label: "نصب",
       render: (v, r) => {
         if (r.install_pending === "rendering")
-          return <span className="text-[10px] text-primary">در حال رندر…</span>;
+          return <span className="text-[10px] text-primary">رندر…</span>;
         if (r.install_image)
           return (
             <span className="text-[10px] text-primary">
               آماده{r.install_score != null ? ` · ${r.install_score}` : ""}
             </span>
           );
-        if (v === "rejected") return <span className="text-[10px] text-destructive">رد</span>;
         return <span className="text-[10px] text-muted-foreground">—</span>;
       },
     },
