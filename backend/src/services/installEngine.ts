@@ -1,6 +1,6 @@
 /**
  * Install engine: chroma template + fabric map.
- * Flat styles use stable core UV + tiled fabric (close-up photos scale down naturally).
+ * Flat styles use stable core UV + mirror-tiled fabric (hides seams on close-up photos).
  */
 
 import fs from "fs";
@@ -273,23 +273,33 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
   return entry;
 }
 
-/** Seamless tile sampling (modulo) — required when fabricScale < 1 */
-function sampleFabTiled(
+/**
+ * Mirror (reflect) tiling — when UV goes past the fabric edge, bounce back.
+ * Hides seams on non-seamless close-up photos much better than hard wrap.
+ */
+function mirrorCoord(t: number, size: number): number {
+  if (size <= 1) return 0;
+  const period = size * 2 - 2; // reflect period
+  let m = t % period;
+  if (m < 0) m += period;
+  if (m < 0) m = 0;
+  if (m >= size) m = period - m;
+  return Math.min(size - 1.001, Math.max(0, m));
+}
+
+function sampleFabMirror(
   fd: Buffer,
   fw: number,
   fh: number,
   u: number,
   v: number
 ): [number, number, number] {
-  let x = u % fw;
-  if (x < 0) x += fw;
-  let y = v % fh;
-  if (y < 0) y += fh;
-  // soft edge blend near tile boundary to reduce seam
+  const x = mirrorCoord(u, fw);
+  const y = mirrorCoord(v, fh);
   const x0 = x | 0;
   const y0 = y | 0;
-  const x1 = (x0 + 1) % fw;
-  const y1 = (y0 + 1) % fh;
+  const x1 = Math.min(fw - 1, x0 + 1);
+  const y1 = Math.min(fh - 1, y0 + 1);
   const fx = x - x0;
   const fy = y - y0;
   const i00 = (y0 * fw + x0) * 4;
@@ -321,7 +331,6 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const mat = materialParams(input.material, tpl.logStd, input.style);
   const flat = isFlatStyle(input.style);
 
-  // Allow small scale (close-up fabric photos)
   const fabricScale = Math.min(
     1.15,
     Math.max(0.35, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
@@ -367,8 +376,6 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
 
   const gW = Math.max(1, uvMaxX - uvMinX);
 
-  // tileX = how many pixels of green = one full fabric width
-  // smaller fabricScale → more repeats → smaller pattern on curtain
   const tileX = gW * fabricScale;
   const tileY = tileX / aspect;
 
@@ -420,7 +427,7 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
 
       const u = (localX / tileX) * fi.width + (flat ? 0 : gx * warp * fi.width * 0.08);
       const v = (localY / Math.max(tileY, 1)) * fi.height + (flat ? 0 : gy * warp * fi.height * 0.05);
-      const [fr, fg, fb] = sampleFabTiled(fd, fi.width, fi.height, u, v);
+      const [fr, fg, fb] = sampleFabMirror(fd, fi.width, fi.height, u, v);
 
       const flr = toLin(fr),
         flg = toLin(fg),
