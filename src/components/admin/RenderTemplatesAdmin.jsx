@@ -1,13 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Loader2, Sparkles, Upload, RefreshCw } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { refreshRenderTemplates } from "@/hooks/useRenderTemplates";
 import { resolveStyle, MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
+import { filterInstallCategories } from "@/lib/installCategories";
 
-/**
- * Templates are keyed by CurtainCategory.slug from DB — not a hardcoded list.
- * Add/remove categories in admin categories → they appear here automatically.
- */
 export default function RenderTemplatesAdmin() {
   const [categories, setCategories] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -16,11 +13,13 @@ export default function RenderTemplatesAdmin() {
   const [okMsg, setOkMsg] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const installCats = useMemo(() => filterInstallCategories(categories), [categories]);
+
   const reload = useCallback(async () => {
     setLoading(true);
     try {
       const [cats, tpls] = await Promise.all([
-        base44.entities.CurtainCategory.list("order", 100).catch(() => []),
+        base44.entities.CurtainCategory.list("order", 200).catch(() => []),
         base44.entities.RenderTemplate.list("-updated_date", 200).catch(() => []),
       ]);
       setCategories(Array.isArray(cats) ? cats : []);
@@ -53,7 +52,7 @@ export default function RenderTemplatesAdmin() {
       await task();
       refreshRenderTemplates();
       await reload();
-      setOkMsg("قالب ذخیره شد و به دستهٔ کاتالوگ وصل است.");
+      setOkMsg("قالب ذخیره شد.");
     } catch (e) {
       setError(String(e?.data?.error || e?.message || "عملیات ناموفق بود"));
     } finally {
@@ -61,14 +60,12 @@ export default function RenderTemplatesAdmin() {
     }
   }
 
-  /** Server builds chroma from category slug → mechanism geometry */
   const generateOne = (cat) =>
     run(cat.slug, async () => {
       if (base44.render?.templateFromCategory) {
-        await base44.render.templateFromCategory(cat.slug);
+        await base44.render.templateFromCategory(cat.slug, cat.mechanism || undefined);
         return;
       }
-      // fallback: mechanism-only function + entity write under category slug
       const mechanism = resolveStyle({ category_slug: cat.slug });
       const res = await base44.functions.invoke("generateRenderTemplate", { style: mechanism });
       const img = res?.data?.image || res?.image;
@@ -82,10 +79,10 @@ export default function RenderTemplatesAdmin() {
     run("__all__", async () => {
       if (base44.render?.templateAllCategories) {
         const res = await base44.render.templateAllCategories();
-        setOkMsg(`قالب برای ${res?.count ?? categories.length} دسته ساخته شد.`);
+        setOkMsg(`قالب برای ${res?.count ?? installCats.length} دسته فنی ساخته شد.`);
         return;
       }
-      for (const cat of categories) {
+      for (const cat of installCats) {
         await generateOne(cat);
       }
     });
@@ -112,16 +109,15 @@ export default function RenderTemplatesAdmin() {
     <div className="mt-6 rounded-2xl border border-secondary/60 bg-card p-5">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <span className="eyebrow mb-2 block">قالب نصب بر اساس دسته‌بندی کاتالوگ</span>
+          <span className="eyebrow mb-2 block">قالب سبز (chroma) — دسته‌های فنی</span>
           <p className="max-w-2xl text-xs leading-6 text-muted-foreground">
-            لیست از <strong>دسته‌بندی‌های ثبت‌شده در دیتابیس</strong> می‌آید — هاردکد نیست. هر دستهٔ جدید در
-            «دسته‌ها» اینجا ظاهر می‌شود. قالب با <code className="text-[10px]">slug</code> همان دسته ذخیره
-            می‌شود تا مدل‌های آن دسته پیدا کنند.
+            فقط دسته‌هایی که سازوکار نصب دارند (شید، رومن، زبرا، …). فضاهایی مثل پذیرایی در این لیست
+            نیستند.
           </p>
         </div>
         <button
           type="button"
-          disabled={!!busy || !categories.length}
+          disabled={!!busy || !installCats.length}
           onClick={generateAll}
           className="inline-flex items-center gap-1.5 rounded-xl border border-primary/50 px-3 py-2 text-[11px] font-bold text-primary disabled:opacity-50"
         >
@@ -130,27 +126,21 @@ export default function RenderTemplatesAdmin() {
           ) : (
             <RefreshCw className="h-3.5 w-3.5" />
           )}
-          ساخت قالب همه دسته‌ها
+          ساخت قالب همه دسته‌های فنی
         </button>
       </div>
-
-      <p className="mb-4 text-[11px] leading-5 text-muted-foreground">
-        کیفیت هدف: عکس محصول (رومن نیمه‌بالا، پلیسه دو لنگه، پلیسه کاست‌دار). بهترین نتیجه = آپلود عکس نصب
-        واقعی با <strong>ناحیه پارچه کاملاً سبز (chroma)</strong> و همان فرم نصب. «ساخت قالب» هندسه
-        تقریبی همان سازوکار را می‌سازد.
-      </p>
 
       {error && <p className="mb-3 text-xs text-destructive">{error}</p>}
       {okMsg && <p className="mb-3 text-xs text-primary">{okMsg}</p>}
 
-      {!categories.length ? (
+      {!installCats.length ? (
         <p className="rounded-xl border border-dashed border-secondary/70 p-6 text-center text-xs text-muted-foreground">
-          هنوز دسته‌ای در کاتالوگ نیست. از بخش دسته‌بندی‌ها اضافه کنید؛ بعد اینجا قالب بسازید.
+          دسته فنی نیست. در دسته‌بندی کاتالوگ، برای دسته فیلد مکانیزم (مثل shade / roman) بگذارید.
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {categories.map((cat) => {
-            const mechanism = resolveStyle({ category_slug: cat.slug });
+          {installCats.map((cat) => {
+            const mechanism = cat.mechanism || resolveStyle({ category_slug: cat.slug });
             const mechLabel = MECHANISM_LABELS[mechanism] || mechanism;
             const img = imageOf(cat.slug);
             return (
@@ -162,9 +152,7 @@ export default function RenderTemplatesAdmin() {
                 <p className="mt-0.5 font-mono text-[9px] text-muted-foreground" dir="ltr">
                   {cat.slug}
                 </p>
-                <p className="mt-0.5 text-[9px] leading-4 text-muted-foreground">
-                  سازوکار رندر: {mechLabel}
-                </p>
+                <p className="mt-0.5 text-[9px] leading-4 text-muted-foreground">سازوکار: {mechLabel}</p>
                 <div className="mt-2 flex gap-1.5">
                   <button
                     type="button"
@@ -189,7 +177,11 @@ export default function RenderTemplatesAdmin() {
                       accept="image/*"
                       className="hidden"
                       disabled={!!busy}
-                      onChange={(e) => upload(cat, e.target.files?.[0])}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = "";
+                        upload(cat, f);
+                      }}
                     />
                   </label>
                 </div>
@@ -202,5 +194,4 @@ export default function RenderTemplatesAdmin() {
   );
 }
 
-/** @deprecated kept for any leftover imports — prefer categories from DB */
 export const STYLES = [];
