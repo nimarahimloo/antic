@@ -2,13 +2,11 @@
  * Install engine — production path for 20k+ SKUs.
  *
  * Flat styles (shade / roman / roller / double):
- *   - Single fabric panel, clamp UV (no tile / no mirror)
- *   - Orthographic UV on green region
- *   - Color-preserving lighting (fabric hue/sat stay close to photo)
+ *   - Single fabric panel mapped to green region (cover), clamp UV — never tile
+ *   - Orthographic, zero warp
+ *   - Color-preserving lighting
  *
- * Draped styles:
- *   - Mild warp from green gradients
- *   - Same color path
+ * Draped styles: mild warp + same color path
  */
 
 import fs from "fs";
@@ -218,10 +216,6 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
 
   xs.sort((a, b) => a - b);
   ys.sort((a, b) => a - b);
-  const coreMinX = Math.floor(percentile(xs, 0.06));
-  const coreMaxX = Math.ceil(percentile(xs, 0.94));
-  const coreMinY = Math.floor(percentile(ys, 0.05));
-  const coreMaxY = Math.ceil(percentile(ys, 0.95));
 
   const entry: TemplateCache = {
     key: cacheKey,
@@ -236,10 +230,10 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
     maxX,
     minY,
     maxY,
-    coreMinX,
-    coreMaxX,
-    coreMinY,
-    coreMaxY,
+    coreMinX: Math.floor(percentile(xs, 0.06)),
+    coreMaxX: Math.ceil(percentile(xs, 0.94)),
+    coreMinY: Math.floor(percentile(ys, 0.05)),
+    coreMaxY: Math.ceil(percentile(ys, 0.95)),
   };
   if (templateCache.size > 24) {
     const first = templateCache.keys().next().value;
@@ -249,8 +243,8 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
   return entry;
 }
 
-/** Clamp-to-edge sampling — no seams, safe for any fabric photo */
-function sampleFabClamp(
+/** Clamp-to-edge — never tiles, safe for every fabric photo */
+function sampleFab(
   fd: Buffer,
   fw: number,
   fh: number,
@@ -269,22 +263,11 @@ function sampleFabClamp(
   const i10 = (y0 * fw + x1) * 4;
   const i01 = (y1 * fw + x0) * 4;
   const i11 = (y1 * fw + x1) * 4;
-  const r =
-    fd[i00] * (1 - fx) * (1 - fy) +
-    fd[i10] * fx * (1 - fy) +
-    fd[i01] * (1 - fx) * fy +
-    fd[i11] * fx * fy;
-  const g =
-    fd[i00 + 1] * (1 - fx) * (1 - fy) +
-    fd[i10 + 1] * fx * (1 - fy) +
-    fd[i01 + 1] * (1 - fx) * fy +
-    fd[i11 + 1] * fx * fy;
-  const b =
-    fd[i00 + 2] * (1 - fx) * (1 - fy) +
-    fd[i10 + 2] * fx * (1 - fy) +
-    fd[i01 + 2] * (1 - fx) * fy +
-    fd[i11 + 2] * fx * fy;
-  return [r, g, b];
+  return [
+    fd[i00] * (1 - fx) * (1 - fy) + fd[i10] * fx * (1 - fy) + fd[i01] * (1 - fx) * fy + fd[i11] * fx * fy,
+    fd[i00 + 1] * (1 - fx) * (1 - fy) + fd[i10 + 1] * fx * (1 - fy) + fd[i01 + 1] * (1 - fx) * fy + fd[i11 + 1] * fx * fy,
+    fd[i00 + 2] * (1 - fx) * (1 - fy) + fd[i10 + 2] * fx * (1 - fy) + fd[i01 + 2] * (1 - fx) * fy + fd[i11 + 2] * fx * fy,
+  ];
 }
 
 export async function renderInstallImage(input: RenderInput): Promise<RenderResult> {
@@ -296,15 +279,14 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
 
   const fabricScale = Math.min(
     1.05,
-    Math.max(0.7, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
+    Math.max(0.75, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
   );
 
   const fabricBuf = await loadBuffer(input.fabricPathOrUrl);
   const fabMeta = await sharp(fabricBuf).metadata();
   const aspect = (fabMeta.width || 1) / (fabMeta.height || 1);
 
-  // Keep fabric resolution high for sharp geometric patterns
-  const fabW = Math.max(768, Math.min(1800, Math.round(tpl.w * 1.2)));
+  const fabW = Math.max(768, Math.min(1800, Math.round(tpl.w * 1.25)));
   const fabH = Math.max(384, Math.min(1800, Math.round(fabW / aspect)));
 
   const { data: fd, info: fi } = await sharp(fabricBuf)
@@ -318,20 +300,18 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const td = tpl.data;
   const out = Buffer.alloc(w * h * 4);
 
-  // Full green bbox for continuous UV (no left-edge break)
-  const uvMinX = tpl.minX;
-  const uvMinY = tpl.minY;
-  const fullW = Math.max(1, tpl.maxX - tpl.minX);
-  const fullH = Math.max(1, tpl.maxY - tpl.minY);
+  // Green region in template pixels
+  const gMinX = tpl.minX;
+  const gMinY = tpl.minY;
+  const gW = Math.max(1, tpl.maxX - tpl.minX);
+  const gH = Math.max(1, tpl.maxY - tpl.minY);
 
-  // Tile size from core width (stable) so soft edges don't inflate scale
-  const coreW = Math.max(1, tpl.coreMaxX - tpl.coreMinX);
-  const tileX = coreW * fabricScale;
-  const tileY = tileX / aspect;
-
-  // Center the single panel on the green region
-  const offsetU = ((fullW - tileX) / 2 / tileX) * fi.width;
-  const offsetV = ((fullH - tileY) / 2 / tileY) * fi.height;
+  // How many fabric pixels map across the green width (single panel)
+  const spanU = fi.width * fabricScale;
+  const spanV = spanU / aspect;
+  // Center panel on green region
+  const u0 = (fi.width - spanU) / 2;
+  const v0 = (fi.height - spanV) / 2;
 
   let keySum = 0;
   let keyN = 0;
@@ -374,49 +354,39 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       const blurS = (sh(iL) + sh(iR) + sh(iU) + sh(iD) + s) / 5;
       const micro = clamp01(s / Math.max(blurS, 0.02));
       s *= Math.pow(Math.min(1.7, Math.max(0.6, micro)), mat.detail * 0.8);
-      // Soft midtone-preserving contrast
       s = 1 + (s - 1) * Math.min(mat.contrast, 0.9);
 
-      let localX = x - uvMinX;
-      let localY = y - uvMinY;
-      localX = Math.max(0, Math.min(fullW, localX));
-      localY = Math.max(0, Math.min(fullH, localY));
+      // Normalized position inside green region [0,1]
+      const nx = (x - gMinX) / gW;
+      const ny = (y - gMinY) / gH;
+      const nxC = Math.max(0, Math.min(1, nx));
+      const nyC = Math.max(0, Math.min(1, ny));
 
-      const warp = mat.warp;
-      // Single panel, centered; clamp UV — never tile on flat styles
-      let u = (localX / tileX) * fi.width + (flat ? 0 : offsetU) + (flat ? 0 : gx * warp * fi.width * 0.06);
-      let v = (localY / Math.max(tileY, 1)) * fi.height + (flat ? 0 : offsetV) + (flat ? 0 : gy * warp * fi.height * 0.04);
-
-      // Flat: map 0..fullW → full fabric width (cover), still clamp
-      if (flat) {
-        u = (localX / fullW) * fi.width;
-        v = (localY / fullH) * (fi.width / aspect > fi.height ? fi.height : (fullH / fullW) * fi.width);
-        // Prefer aspect-correct cover from fabric center
-        const coverScale = Math.max(fullW / fi.width, fullH / (fi.width / aspect));
-        const mappedW = fi.width * (fullW / (coreW * fabricScale));
-        const mappedH = mappedW / aspect;
-        u = (localX / fullW) * Math.min(fi.width, mappedW) + Math.max(0, (fi.width - mappedW) / 2);
-        v = (localY / fullH) * Math.min(fi.height, mappedH) + Math.max(0, (fi.height - mappedH) / 2);
+      // Single panel UV — clamp only, no tile/mirror
+      let u = u0 + nxC * spanU;
+      let v = v0 + nyC * spanV;
+      if (!flat && mat.warp > 0) {
+        u += gx * mat.warp * fi.width * 0.06;
+        v += gy * mat.warp * fi.height * 0.04;
       }
 
-      const [fr, fg, fb] = sampleFabClamp(fd, fi.width, fi.height, u, v);
+      const [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u, v);
 
       const flr = toLin(fr);
       const flg = toLin(fg);
       const flb = toLin(fb);
 
-      // Lighting only — keep fabric chroma
-      const light = Math.max(0.4, Math.min(1.45, s));
-      const aoAmt = (mat.ao ?? 0.2) * 0.5;
+      const light = Math.max(0.42, Math.min(1.42, s));
+      const aoAmt = (mat.ao ?? 0.2) * 0.48;
       const ao = 1 - (1 - smoothstep(0.35, 1.05, s)) * aoAmt;
 
       let cr = flr * light * ao;
       let cg = flg * light * ao;
       let cb = flb * light * ao;
 
-      // Mild sat recovery after multiply
+      // Recover saturation after lighting multiply
       const lum = 0.2126 * cr + 0.7152 * cg + 0.0722 * cb;
-      const satBoost = 1.12;
+      const satBoost = 1.14;
       cr = lum + (cr - lum) * satBoost;
       cg = lum + (cg - lum) * satBoost;
       cb = lum + (cb - lum) * satBoost;
