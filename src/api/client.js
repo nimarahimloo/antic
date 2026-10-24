@@ -126,6 +126,7 @@ const ENTITY_NAMES = [
   "ConsultationRequest",
   "CurtainCategory",
   "CurtainModel",
+  "PortfolioCategory",
   "InstallReference",
   "Project",
   "RenderTemplate",
@@ -289,7 +290,6 @@ export const api = {
     },
   },
 
-  /** Install render + category templates (admin) */
   render: {
     categoriesCoverage() {
       return request("/render/categories-coverage");
