@@ -111,19 +111,28 @@ export function guessMaterial(model: {
   return "cotton";
 }
 
+/** Flat surface styles — almost no warp / stretch on UV */
+export function isFlatStyle(style?: string): boolean {
+  const s = (style || "").toLowerCase();
+  return (
+    s === "shade" ||
+    s === "double" ||
+    s === "roller" ||
+    s === "roman" ||
+    s.includes("shade") ||
+    s.includes("roller") ||
+    s.includes("roman")
+  );
+}
+
 /**
  * ~1 = یک تصویر پارچه عرض ناحیه سبز را می‌پوشاند (بدون تکرار ریز).
+ * برای استایل‌های صاف کمی بالاتر تا طرح کش نیاید.
  */
 export function styleTileFactor(style?: string) {
+  if (isFlatStyle(style)) return 1.05;
   switch (style) {
     case "zebra":
-      return 1.0;
-    case "roman":
-      return 1.0;
-    case "shade":
-    case "double":
-      return 1.0;
-    case "roller":
       return 1.0;
     case "panel":
       return 0.98;
@@ -137,6 +146,27 @@ export function styleTileFactor(style?: string) {
       return 0.9;
     default:
       return 1.0;
+  }
+}
+
+/** Warp strength — near zero for flat styles to avoid geometric stretch */
+export function styleWarpFactor(style?: string): number {
+  if (isFlatStyle(style)) return 0.006;
+  switch (style) {
+    case "zebra":
+      return 0.018;
+    case "panel":
+      return 0.012;
+    case "pleated-manual":
+    case "pleated-chain":
+    case "pleated-sheer":
+      return 0.022;
+    case "wave":
+      return 0.028;
+    case "drape":
+      return 0.032;
+    default:
+      return 0.025;
   }
 }
 
