@@ -7,7 +7,7 @@ function InternalLink({ href, children }) {
     return (
       <button
         type="button"
-        className="text-primary underline cursor-pointer"
+        className="font-bold text-primary underline decoration-primary/40 underline-offset-2"
         onClick={() => navigate(href)}
       >
         {children}
@@ -15,7 +15,12 @@ function InternalLink({ href, children }) {
     );
   }
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-bold text-primary underline"
+    >
       {children}
     </a>
   );
@@ -24,29 +29,36 @@ function InternalLink({ href, children }) {
 function ModelCards({ items }) {
   if (!items?.length) return null;
   return (
-    <div className="mt-3 grid grid-cols-2 gap-2">
+    <div className="mt-3 grid grid-cols-2 gap-2.5">
       {items.map((item) => (
         <Link
           key={item.id || item.href}
           to={item.href}
-          className="group overflow-hidden rounded-xl border border-secondary/60 bg-background/80 transition hover:border-primary"
+          className="group overflow-hidden rounded-2xl border border-secondary/50 bg-background shadow-sm transition hover:border-primary hover:shadow-md"
         >
-          <div className="relative aspect-[4/3] bg-secondary/30">
+          <div className="relative aspect-[3/4] bg-secondary/30">
             {item.image ? (
-              <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
+              <img
+                src={item.image}
+                alt={item.title}
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+              />
             ) : (
-              <div className="flex h-full items-center justify-center px-2 text-center font-display text-[11px] text-muted-foreground">
+              <div className="flex h-full items-center justify-center px-2 text-center font-display text-xs text-muted-foreground">
                 {item.title}
               </div>
             )}
           </div>
-          <div className="p-2 text-right">
-            <p className="font-display text-xs font-bold text-foreground line-clamp-1">{item.title}</p>
+          <div className="space-y-0.5 p-2.5 text-right">
+            <p className="font-display text-xs font-black text-foreground line-clamp-2">{item.title}</p>
             {item.subtitle && (
-              <p className="mt-0.5 font-body text-[10px] text-muted-foreground line-clamp-1">
+              <p className="font-body text-[10px] leading-4 text-muted-foreground line-clamp-2">
                 {item.subtitle}
               </p>
             )}
+            <span className="inline-block pt-1 font-body text-[10px] font-bold text-primary">
+              مشاهده مدل ←
+            </span>
           </div>
         </Link>
       ))}
@@ -62,7 +74,7 @@ function LinkButtons({ items }) {
         <Link
           key={item.href + item.label}
           to={item.href}
-          className="rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-body text-[11px] font-bold text-primary transition hover:bg-primary hover:text-primary-foreground"
+          className="rounded-full border border-primary/40 bg-primary/10 px-3.5 py-1.5 font-body text-[11px] font-bold text-primary transition hover:bg-primary hover:text-primary-foreground"
         >
           {item.label}
         </Link>
@@ -80,7 +92,7 @@ function QuickReplies({ items, onPick }) {
           key={item.message}
           type="button"
           onClick={() => onPick(item.message)}
-          className="rounded-full border border-secondary/70 px-3 py-1.5 font-body text-[11px] text-muted-foreground transition hover:border-primary hover:text-primary"
+          className="rounded-full border border-secondary/60 bg-background/80 px-3 py-1.5 font-body text-[11px] text-foreground/80 transition hover:border-primary hover:text-primary"
         >
           {item.label}
         </button>
@@ -92,18 +104,12 @@ function QuickReplies({ items, onPick }) {
 function Blocks({ blocks, onQuickReply }) {
   if (!blocks?.length) return null;
   return (
-    <div className="mt-1">
+    <div>
       {blocks.map((b, i) => {
         if (b.type === "model_cards") return <ModelCards key={i} items={b.items} />;
         if (b.type === "link_buttons") return <LinkButtons key={i} items={b.items} />;
         if (b.type === "quick_replies")
           return <QuickReplies key={i} items={b.items} onPick={onQuickReply} />;
-        if (b.type === "text" && b.markdown)
-          return (
-            <div key={i} className="mt-2">
-              <MarkdownBody content={b.markdown} />
-            </div>
-          );
         return null;
       })}
     </div>
@@ -113,7 +119,7 @@ function Blocks({ blocks, onQuickReply }) {
 function MarkdownBody({ content }) {
   return (
     <ReactMarkdown
-      className="max-w-none font-body text-sm leading-7 text-foreground/90 [&_a]:text-primary [&_a]:underline [&_h1]:mb-2 [&_h1]:font-display [&_h1]:text-base [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:font-display [&_h2]:text-sm [&_h2]:font-bold [&_h3]:mb-1.5 [&_h3]:font-display [&_h3]:text-sm [&_h3]:font-bold [&_li]:mb-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_strong]:text-foreground [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pr-5"
+      className="max-w-none whitespace-pre-wrap font-body text-[13px] leading-7 text-foreground/90 [&_a]:text-primary [&_li]:mb-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_strong]:text-foreground [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pr-5"
       components={{
         a: ({ href, children }) => <InternalLink href={href}>{children}</InternalLink>,
       }}
@@ -127,32 +133,32 @@ export default function MessageBubble({ message, onQuickReply }) {
   const isUser = message.role === "user";
 
   return (
-    <div className={isUser ? "flex justify-end" : "flex justify-start"}>
-      <div className={`max-w-[92%] ${isUser ? "" : "w-full"}`}>
+    <div className={isUser ? "flex justify-start" : "flex justify-end"}>
+      <div className={`max-w-[90%] ${isUser ? "" : "w-full max-w-[90%]"}`}>
         {isUser ? (
           <div className="space-y-2">
             {message.attachments?.length > 0 && (
-              <div className="flex flex-wrap justify-end gap-2">
+              <div className="flex flex-wrap gap-2">
                 {message.attachments.map((a, i) =>
                   a.type === "image" ? (
                     <img
                       key={i}
                       src={a.url}
                       alt=""
-                      className="max-h-36 rounded-xl border border-primary/30 object-cover"
+                      className="max-h-40 rounded-2xl border border-primary/20 object-cover"
                     />
                   ) : null
                 )}
               </div>
             )}
             {message.content && (
-              <div className="rounded-2xl rounded-tr-sm bg-primary px-4 py-3 font-body text-sm leading-7 text-primary-foreground shadow-lg shadow-primary/10">
+              <div className="rounded-[18px] rounded-br-md bg-primary px-3.5 py-2.5 font-body text-[13px] leading-7 text-primary-foreground shadow-md shadow-primary/15">
                 {message.content}
               </div>
             )}
           </div>
         ) : (
-          <div className="rounded-2xl rounded-tl-sm border border-secondary/60 bg-card/60 px-4 py-3.5">
+          <div className="rounded-[18px] rounded-bl-md border border-secondary/50 bg-card px-3.5 py-3 shadow-sm">
             {message.content && <MarkdownBody content={message.content} />}
             <Blocks blocks={message.blocks} onQuickReply={onQuickReply} />
           </div>
