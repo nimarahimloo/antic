@@ -1,5 +1,10 @@
 /**
  * ماتریس سبک‌های نصب — هم‌تراز فرانت curtainStyleResolve.js
+ *
+ * Tile policy (20k SKU safe):
+ *  - Flat styles (shade/roman/roller/double): NO tiling — single panel, clamp UV.
+ *    Close-up fabric photos look slightly large; never show mirror/seam artifacts.
+ *  - Draped / pleated / wave: mild scale + optional warp; tiling only if needed later.
  */
 
 export type CurtainStyleKey =
@@ -111,7 +116,7 @@ export function guessMaterial(model: {
   return "cotton";
 }
 
-/** Flat surface styles — almost no warp / stretch on UV */
+/** Flat surface styles — orthographic UV, no warp, no tile */
 export function isFlatStyle(style?: string): boolean {
   const s = (style || "").toLowerCase();
   return (
@@ -126,48 +131,48 @@ export function isFlatStyle(style?: string): boolean {
 }
 
 /**
- * Scale factor: how many times the fabric photo spans the green width.
- * Close-up fabric photos need < 1 so pattern looks natural on full curtain.
- * Higher = fewer repeats (less visible seams). 0.68 ≈ 1.5 panels across.
+ * How much of the green width one fabric image covers.
+ * Flat: ~0.92 = almost full width, single panel, clamp edges (no repeat).
+ * Draped: slightly lower for natural fold coverage.
  */
 export function styleTileFactor(style?: string) {
-  if (isFlatStyle(style)) return 0.68;
+  if (isFlatStyle(style)) return 0.92;
   switch (style) {
     case "zebra":
-      return 0.75;
+      return 0.88;
     case "panel":
-      return 0.78;
+      return 0.9;
     case "pleated-manual":
     case "pleated-chain":
     case "pleated-sheer":
-      return 0.72;
+      return 0.85;
     case "wave":
-      return 0.88;
+      return 0.9;
     case "drape":
       return 0.92;
     default:
-      return 0.78;
+      return 0.9;
   }
 }
 
-/** Warp strength — near zero for flat styles to avoid geometric stretch */
+/** Warp — zero for flat; mild for draped */
 export function styleWarpFactor(style?: string): number {
-  if (isFlatStyle(style)) return 0.004;
+  if (isFlatStyle(style)) return 0;
   switch (style) {
     case "zebra":
-      return 0.015;
-    case "panel":
       return 0.012;
+    case "panel":
+      return 0.01;
     case "pleated-manual":
     case "pleated-chain":
     case "pleated-sheer":
-      return 0.02;
+      return 0.018;
     case "wave":
-      return 0.028;
+      return 0.024;
     case "drape":
-      return 0.032;
+      return 0.028;
     default:
-      return 0.022;
+      return 0.018;
   }
 }
 
