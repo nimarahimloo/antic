@@ -3,18 +3,12 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import CategoryCoverCard from "@/components/CategoryCoverCard";
 import ProjectCard from "@/components/ProjectCard";
-import { usePortfolioCategories } from "@/hooks/usePortfolioCategories";
+import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { base44 } from "@/api/base44Client";
 
-/**
- * صفحه دسته نمونه اجرا:
- * 1) محتوای دسته مادر (عنوان، توضیح، کاور)
- * 2) بخش جدا: کارت زیردسته‌ها
- * 3) نمونه‌های مستقیم همان دسته (بدون زیردسته)
- */
 export default function PortfolioCategoryPage() {
   const { slug } = useParams();
-  const { categories, loading: catsLoading } = usePortfolioCategories();
+  const { categories, loading: catsLoading } = useCurtainCategories();
   const category = useMemo(
     () => categories.find((c) => c.slug === slug) || null,
     [categories, slug]
@@ -72,7 +66,6 @@ export default function PortfolioCategoryPage() {
         </nav>
       </div>
 
-      {/* محتوای دسته مادر */}
       <section className="mx-auto max-w-7xl px-5 py-10 lg:px-10">
         <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
           <div className="relative aspect-[4/3] overflow-hidden rounded-3xl border border-secondary/60 bg-card">
@@ -91,7 +84,7 @@ export default function PortfolioCategoryPage() {
             )}
           </div>
           <div>
-            <span className="eyebrow mb-3 block">دسته نمونه اجرا</span>
+            <span className="eyebrow mb-3 block">دسته · کاتالوگ و نمونه اجرا</span>
             <h1 className="font-display text-3xl font-bold text-foreground lg:text-4xl">
               {category.name}
             </h1>
@@ -100,11 +93,16 @@ export default function PortfolioCategoryPage() {
                 {category.description}
               </p>
             )}
+            <Link
+              to={`/catalog?category=${category.slug}`}
+              className="btn-ghost-gold mt-6 inline-flex"
+            >
+              مشاهده در کاتالوگ
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* زیردسته‌ها — بخش جدا */}
       {category.subcategories?.length > 0 && (
         <section className="border-t border-secondary/40 bg-card/30 py-14">
           <div className="mx-auto max-w-7xl px-5 lg:px-10">
@@ -125,7 +123,6 @@ export default function PortfolioCategoryPage() {
         </section>
       )}
 
-      {/* نمونه‌های مستقیم دسته */}
       <section className="mx-auto max-w-7xl px-5 py-14 lg:px-10">
         <h2 className="mb-8 font-display text-xl font-black text-foreground lg:text-2xl">
           نمونه‌های این دسته
