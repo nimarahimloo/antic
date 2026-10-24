@@ -13,6 +13,8 @@ import Shop from '@/pages/Shop';
 import ProductDetail from '@/pages/ProductDetail';
 import Projects from '@/pages/Projects';
 import ProjectDetail from '@/pages/ProjectDetail';
+import PortfolioCategoryPage from '@/pages/PortfolioCategoryPage';
+import PortfolioSubcategoryPage from '@/pages/PortfolioSubcategoryPage';
 import Catalog from '@/pages/Catalog';
 import About from '@/pages/About';
 import Contact from '@/pages/Contact';
@@ -28,6 +30,7 @@ import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminModels from '@/pages/admin/AdminModels';
 import AdminProjects from '@/pages/admin/AdminProjects';
 import AdminCategories from '@/pages/admin/AdminCategories';
+import AdminPortfolioCategories from '@/pages/admin/AdminPortfolioCategories';
 import AdminRequests from '@/pages/admin/AdminRequests';
 import AdminWindowSettings from '@/pages/admin/AdminWindowSettings';
 import AdminSettings from '@/pages/admin/AdminSettings';
@@ -63,6 +66,8 @@ const AuthenticatedApp = () => {
           <Route path="/shop" element={<Shop />} />
           <Route path="/product/:slug" element={<ProductDetail />} />
           <Route path="/projects" element={<Projects />} />
+          <Route path="/projects/category/:slug" element={<PortfolioCategoryPage />} />
+          <Route path="/projects/category/:slug/:sub" element={<PortfolioSubcategoryPage />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/catalog" element={<Catalog />} />
           <Route path="/about" element={<About />} />
@@ -78,6 +83,7 @@ const AuthenticatedApp = () => {
           <Route path="requests" element={<AdminRequests />} />
           <Route path="models" element={<AdminModels />} />
           <Route path="projects" element={<AdminProjects />} />
+          <Route path="portfolio-categories" element={<AdminPortfolioCategories />} />
           <Route path="categories" element={<AdminCategories />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="orders" element={<AdminOrders />} />
