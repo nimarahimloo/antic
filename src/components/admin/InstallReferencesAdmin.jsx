@@ -4,8 +4,8 @@ import { base44 } from "@/api/base44Client";
 import { refreshRenderTemplates } from "@/hooks/useRenderTemplates";
 
 /**
- * Real product install photos, keyed by CurtainCategory.slug.
- * Engine retextures fabric onto these photos (no green required).
+ * یک عکس مرجع واقعی برای هر دسته کافی است.
+ * موتور خودش ناحیه پرده را پیدا می‌کند، chroma می‌سازد و پارچه مدل را می‌نشاند.
  */
 export default function InstallReferencesAdmin() {
   const [categories, setCategories] = useState([]);
@@ -68,11 +68,13 @@ export default function InstallReferencesAdmin() {
     <div className="mt-6 rounded-2xl border border-secondary/60 bg-card p-5">
       <span className="eyebrow mb-2 block">نمونه‌های اجرای واقعی (قالب اصلی)</span>
       <p className="mb-2 text-xs leading-6 text-muted-foreground">
-        همین عکس‌های محصول (مثل Roman80، PNF1210، PX2607) را برای هر دسته آپلود کنید. موتور پارچهٔ مدل را
-        روی <strong>همان عکس</strong> می‌نشاند — سبز لازم نیست. قاب، کاست و دیوار دست‌نخورده می‌مانند.
+        <strong>یک بار برای هر دسته کافی است.</strong> عکس محصول واقعی (مثل Roman80، PNF1210) را آپلود
+        کنید. سیستم خودش پرده را تشخیص می‌دهد، chroma می‌سازد و پارچهٔ هر مدل را روی همان عکس می‌نشاند.
+        نیازی به کار دستی برای تک‌تک مدل‌ها نیست.
       </p>
       <p className="mb-4 text-[11px] leading-5 text-muted-foreground">
-        لیست از دسته‌بندی کاتالوگ است. بعد از آپلود، در بخش بازبینی «ساخت دوباره» بزنید یا batch را اجرا کنید.
+        ترکیب: عکس مرجع + (اختیاری) قالب سبز پایین صفحه + پارچه مدل. بعد از آپلود «ساخت دوباره» یا batch
+        بزنید.
       </p>
 
       {!categories.length ? (

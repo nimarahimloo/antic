@@ -36,14 +36,14 @@ type ResolvedTemplate = {
   image: string;
   source: "install_reference" | "render_template";
   key: string;
-  mode: "product_photo" | "chroma";
+  mode: "hybrid" | "chroma";
+  chromaImage?: string | null;
 };
 
 /**
- * اولویت قالب‌ها (طبق درخواست کلاینت):
- *  1) InstallReference = عکس واقعی نصب محصول (PNF1210, Roman80, PX2607, …)
- *     → retexture پارچه روی همان عکس
- *  2) RenderTemplate chroma سبز (fallback)
+ * اولویت:
+ *  1) InstallReference (عکس واقعی) → hybrid: auto-chroma از عکس + پارچه
+ *  2) RenderTemplate سبز → chroma کلاسیک
  */
 async function resolveTemplateCandidates(opts: {
   categorySlug?: string | null;
@@ -56,7 +56,6 @@ async function resolveTemplateCandidates(opts: {
   const out: ResolvedTemplate[] = [];
   const seen = new Set<string>();
 
-  // 1) REAL product photos first
   for (const k of unique) {
     const ref = await prisma.installReference.findFirst({
       where: { style: k },
@@ -66,17 +65,21 @@ async function resolveTemplateCandidates(opts: {
       const id = `ref:${k}:${ref.image}`;
       if (!seen.has(id)) {
         seen.add(id);
+        const chroma = await prisma.renderTemplate.findFirst({
+          where: { style: k },
+          orderBy: { updatedAt: "desc" },
+        });
         out.push({
           image: ref.image,
           source: "install_reference",
           key: k,
-          mode: "product_photo",
+          mode: "hybrid",
+          chromaImage: chroma?.image || null,
         });
       }
     }
   }
 
-  // 2) chroma templates fallback
   for (const k of unique) {
     const tpl = await prisma.renderTemplate.findFirst({
       where: { style: k },
@@ -149,8 +152,8 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
   const candidates = await resolveTemplateCandidates({ categorySlug, style });
   if (!candidates.length) {
     throw new Error(
-      `برای دسته «${categorySlug || "—"}» / سبک «${style}» قالب نصب نیست. ` +
-        `عکس واقعی محصول (مثل Roman80 / PNF1210) را در «نمونه‌های اجرای واقعی» با style=slug دسته آپلود کنید.`
+      `برای دسته «${categorySlug || "—"}» قالب نیست. ` +
+        `عکس واقعی محصول را در «نمونه‌های اجرای واقعی» آپلود کنید (یک بار برای هر دسته کافی است).`
     );
   }
 
@@ -163,12 +166,14 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
   for (const resolved of candidates) {
     try {
       const result =
-        resolved.mode === "product_photo"
+        resolved.mode === "hybrid"
           ? await renderFromProductPhoto({
               photoPathOrUrl: resolved.image,
               fabricPathOrUrl: model.image,
               outDir: path.resolve(uploadDir),
               style,
+              material,
+              chromaPathOrUrl: resolved.chromaImage,
             })
           : await renderInstallImage({
               templatePathOrUrl: resolved.image,
@@ -181,9 +186,10 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
       const threshold = autoApproveThreshold();
       const autoOk = result.qualityScore >= threshold;
       const status = autoOk ? "approved" : "pending";
+      const label = resolved.mode === "hybrid" ? "ترکیب مرجع+chroma" : "chroma";
       const review = autoOk
-        ? `${resolved.mode === "product_photo" ? "عکس واقعی" : "chroma"} · امتیاز ${result.qualityScore}/10 · تأیید خودکار · ${resolved.source}`
-        : `${resolved.mode} · امتیاز ${result.qualityScore}/10 · پوشش ${Math.round(result.coverage * 100)}٪ · ${resolved.source}`;
+        ? `${label} · امتیاز ${result.qualityScore}/10 · تأیید خودکار · ${resolved.source}`
+        : `${label} · امتیاز ${result.qualityScore}/10 · پوشش ${Math.round(result.coverage * 100)}٪ · ${resolved.source}`;
 
       await prisma.curtainModel.update({
         where: { id: modelId },

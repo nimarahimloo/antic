@@ -1,12 +1,19 @@
 /**
- * Retexture a REAL product photograph.
- * Only curtain fabric body is replaced; wall, frame, glass, cassette, sill stay.
+ * Hybrid install pipeline (3 parts):
+ *  1) InstallReference  = real product photo (Roman80, PNF1210, …) → scene + folds
+ *  2) Optional green RenderTemplate = shape prior when available
+ *  3) Fabric from CurtainModel
+ *
+ * Flow: detect curtain on reference → paint chroma (green×luminance) →
+ * same fabric engine as installEngine → photoreal output.
+ * No per-model manual work; one reference photo per category is enough.
  */
 
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { applyBrandWatermark } from "./brandWatermark.js";
+import { styleTileFactor } from "../lib/curtainStyles.js";
 
 export type ProductRetextureInput = {
   photoPathOrUrl: string;
@@ -14,6 +21,9 @@ export type ProductRetextureInput = {
   outDir: string;
   maxWidth?: number;
   style?: string;
+  /** optional green template path — used as shape prior when layouts are similar */
+  chromaPathOrUrl?: string | null;
+  material?: string;
 };
 
 export type ProductRetextureResult = {
@@ -63,9 +73,247 @@ async function loadBuffer(src: string): Promise<Buffer> {
   throw new Error(`Image not found: ${src}`);
 }
 
+function pixelLum(data: Buffer, i: number) {
+  return (data[i] + data[i + 1] + data[i + 2]) / (3 * 255);
+}
+
+function localVar(data: Buffer, w: number, h: number, x: number, y: number, rad = 2): number {
+  let sum = 0,
+    sum2 = 0,
+    n = 0;
+  for (let dy = -rad; dy <= rad; dy++) {
+    for (let dx = -rad; dx <= rad; dx++) {
+      const xx = Math.min(w - 1, Math.max(0, x + dx));
+      const yy = Math.min(h - 1, Math.max(0, y + dy));
+      const L = pixelLum(data, (yy * w + xx) * 4);
+      sum += L;
+      sum2 += L * L;
+      n++;
+    }
+  }
+  const mean = sum / n;
+  return Math.max(0, sum2 / n - mean * mean);
+}
+
+function sampleWall(data: Buffer, w: number, h: number) {
+  const pts: [number, number][] = [
+    [6, 6],
+    [w - 7, 6],
+    [6, Math.floor(h * 0.12)],
+    [w - 7, Math.floor(h * 0.12)],
+    [Math.floor(w * 0.07), Math.floor(h * 0.4)],
+    [Math.floor(w * 0.93), Math.floor(h * 0.4)],
+  ];
+  let r = 0,
+    g = 0,
+    b = 0,
+    n = 0;
+  for (const [x, y] of pts) {
+    const i = (y * w + x) * 4;
+    r += data[i] / 255;
+    g += data[i + 1] / 255;
+    b += data[i + 2] / 255;
+    n++;
+  }
+  return { r: r / n, g: g / n, b: b / n };
+}
+
+function dist3(r: number, g: number, b: number, wr: number, wg: number, wb: number) {
+  return Math.hypot(r - wr, g - wg, b - wb);
+}
+
+/** Style-aware vertical band where curtain fabric lives on product shots */
+function styleBand(style?: string): { y0: number; y1: number; x0: number; x1: number } {
+  const s = (style || "").toLowerCase();
+  if (s.includes("roman")) return { y0: 0.06, y1: 0.62, x0: 0.16, x1: 0.84 };
+  if (s.includes("zebra") || s.includes("day")) return { y0: 0.08, y1: 0.78, x0: 0.12, x1: 0.88 };
+  if (s.includes("panel") || s.includes("track") || s.includes("turk"))
+    return { y0: 0.08, y1: 0.88, x0: 0.1, x1: 0.9 };
+  if (s.includes("pleat") || s.includes("honey") || s.includes("cellular"))
+    return { y0: 0.08, y1: 0.82, x0: 0.12, x1: 0.88 };
+  if (s.includes("roller") || s.includes("shade") || s.includes("blind"))
+    return { y0: 0.08, y1: 0.7, x0: 0.14, x1: 0.86 };
+  if (s.includes("double")) return { y0: 0.08, y1: 0.72, x0: 0.14, x1: 0.86 };
+  return { y0: 0.07, y1: 0.72, x0: 0.14, x1: 0.86 };
+}
+
+/**
+ * Build soft fabric mask on a real product photo.
+ * Strictly excludes white glass/frame and flat wall.
+ */
+function buildMask(
+  data: Buffer,
+  w: number,
+  h: number,
+  style?: string
+): { mask: Float32Array; coverage: number; meanLum: number } {
+  const wall = sampleWall(data, w, h);
+  const band = styleBand(style);
+  const mask = new Float32Array(w * h);
+  const variance = new Float32Array(w * h);
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      variance[y * w + x] = localVar(data, w, h, x, y, 2);
+    }
+  }
+
+  let vSum = 0;
+  for (let i = 0; i < variance.length; i++) vSum += variance[i];
+  const vMean = vSum / variance.length;
+  const vThresh = Math.max(0.00055, vMean * 0.45);
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const r = data[i] / 255;
+      const g = data[i + 1] / 255;
+      const b = data[i + 2] / 255;
+      const lum = (r + g + b) / 3;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const sat = max < 1e-3 ? 0 : (max - min) / max;
+      const yNorm = y / h;
+      const xNorm = x / w;
+      const edgeX = Math.min(xNorm, 1 - xNorm);
+      const edgeY = Math.min(yNorm, 1 - yNorm);
+      const v = variance[y * w + x];
+      const dWall = dist3(r, g, b, wall.r, wall.g, wall.b);
+
+      // Hard exclude glass / frame / cassette / pure white
+      if (lum > 0.84 && sat < 0.11) {
+        mask[y * w + x] = 0;
+        continue;
+      }
+      if (lum > 0.91) {
+        mask[y * w + x] = 0;
+        continue;
+      }
+      if (yNorm > 0.9 || edgeX < 0.07 || edgeY < 0.04) {
+        mask[y * w + x] = 0;
+        continue;
+      }
+      // Flat wall
+      if (dWall < 0.065 && v < vThresh * 0.9 && sat < 0.14) {
+        mask[y * w + x] = 0;
+        continue;
+      }
+
+      const inBand =
+        xNorm >= band.x0 && xNorm <= band.x1 && yNorm >= band.y0 && yNorm <= band.y1;
+
+      let k = 0;
+
+      if (v > vThresh) k = Math.max(k, clamp01((v - vThresh) / (vThresh * 2.2)) * 0.9);
+      if (dWall > 0.07) k = Math.max(k, clamp01((dWall - 0.04) / 0.16) * 0.75);
+      if (sat > 0.09) k = Math.max(k, clamp01((sat - 0.05) / 0.2) * 0.65);
+
+      if (inBand && lum > 0.18 && lum < 0.82) {
+        if (v > vThresh * 0.35 || dWall > 0.025) k = Math.max(k, 0.52);
+        // Uniform fabric face (roman body)
+        if (lum < 0.78 && dWall > 0.012 && v > vThresh * 0.2) k = Math.max(k, 0.58);
+      } else if (!inBand) {
+        // Outside band: only strong signals
+        if (k < 0.55) k = 0;
+      }
+
+      if (lum > 0.8 && sat < 0.1) k *= 0.12;
+      k *= smoothstep(0.06, 0.13, edgeX) * smoothstep(0.03, 0.09, edgeY);
+      if (yNorm > band.y1 - 0.04) k *= smoothstep(band.y1 + 0.02, band.y1 - 0.04, yNorm);
+
+      mask[y * w + x] = clamp01(k);
+    }
+  }
+
+  // Light pinhole fill inside fabric only
+  const dens = new Float32Array(mask);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const idx = y * w + x;
+      if (mask[idx] >= 0.4) continue;
+      let nH = 0,
+        sum = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const kk = mask[(y + dy) * w + (x + dx)];
+          if (kk > 0.45) {
+            nH++;
+            sum += kk;
+          }
+        }
+      }
+      if (nH >= 5 && pixelLum(data, (y * w + x) * 4) < 0.82) {
+        dens[idx] = Math.max(mask[idx], (sum / nH) * 0.72);
+      }
+    }
+  }
+
+  let maskN = 0,
+    meanLum = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const k = dens[y * w + x];
+      mask[y * w + x] = k;
+      if (k > 0.28) {
+        maskN++;
+        meanLum += pixelLum(data, (y * w + x) * 4);
+      }
+    }
+  }
+  return {
+    mask,
+    coverage: maskN / (w * h),
+    meanLum: maskN ? meanLum / maskN : 0.5,
+  };
+}
+
+/** Paint fabric region as green chroma while keeping scene elsewhere */
+function paintChroma(
+  data: Buffer,
+  w: number,
+  h: number,
+  mask: Float32Array,
+  meanLum: number
+): Buffer {
+  const out = Buffer.alloc(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const k = mask[y * w + x];
+      const pr = data[i],
+        pg = data[i + 1],
+        pb = data[i + 2],
+        pa = data[i + 3];
+
+      if (k < 0.22) {
+        out[i] = pr;
+        out[i + 1] = pg;
+        out[i + 2] = pb;
+        out[i + 3] = pa;
+        continue;
+      }
+
+      // Green keyed by original luminance (folds become shading on green)
+      const lum = pixelLum(data, i);
+      const shade = clamp01(lum / Math.max(meanLum, 0.05));
+      // Mid-green range that installEngine keys well (g-dominant)
+      const gVal = clamp(40 + shade * 180);
+      const rVal = clamp(8 + shade * 25);
+      const bVal = clamp(8 + shade * 25);
+      const kSoft = smoothstep(0.22, 0.55, k);
+      out[i] = clamp(pr * (1 - kSoft) + rVal * kSoft);
+      out[i + 1] = clamp(pg * (1 - kSoft) + gVal * kSoft);
+      out[i + 2] = clamp(pb * (1 - kSoft) + bVal * kSoft);
+      out[i + 3] = pa;
+    }
+  }
+  return out;
+}
+
 function sampleFab(fd: Buffer, fw: number, fh: number, u: number, v: number): [number, number, number] {
-  const x = Math.min(fw - 1.001, Math.max(0, ((u % 1) + 1) % 1) * (fw - 1));
-  const y = Math.min(fh - 1.001, Math.max(0, ((v % 1) + 1) % 1) * (fh - 1));
+  const x = Math.min(fw - 1.001, Math.max(0, u));
+  const y = Math.min(fh - 1.001, Math.max(0, v));
   const x0 = x | 0;
   const y0 = y | 0;
   const x1 = Math.min(fw - 1, x0 + 1);
@@ -94,224 +342,156 @@ function sampleFab(fd: Buffer, fw: number, fh: number, u: number, v: number): [n
   return [r, g, b];
 }
 
-function pixelLum(data: Buffer, i: number) {
-  return (data[i] + data[i + 1] + data[i + 2]) / (3 * 255);
-}
-
-function localVar(data: Buffer, w: number, h: number, x: number, y: number, rad = 2): number {
-  let sum = 0;
-  let sum2 = 0;
-  let n = 0;
-  for (let dy = -rad; dy <= rad; dy++) {
-    for (let dx = -rad; dx <= rad; dx++) {
-      const xx = Math.min(w - 1, Math.max(0, x + dx));
-      const yy = Math.min(h - 1, Math.max(0, y + dy));
-      const L = pixelLum(data, (yy * w + xx) * 4);
-      sum += L;
-      sum2 += L * L;
-      n++;
-    }
-  }
-  const mean = sum / n;
-  return Math.max(0, sum2 / n - mean * mean);
-}
-
-function sampleWallColor(data: Buffer, w: number, h: number) {
-  const pts: [number, number][] = [
-    [6, 6],
-    [w - 7, 6],
-    [6, Math.floor(h * 0.12)],
-    [w - 7, Math.floor(h * 0.12)],
-    [Math.floor(w * 0.08), Math.floor(h * 0.45)],
-    [Math.floor(w * 0.92), Math.floor(h * 0.45)],
-  ];
-  let r = 0,
-    g = 0,
-    b = 0,
-    n = 0;
-  for (const [x, y] of pts) {
-    const i = (y * w + x) * 4;
-    r += data[i] / 255;
-    g += data[i + 1] / 255;
-    b += data[i + 2] / 255;
-    n++;
-  }
-  return { r: r / n, g: g / n, b: b / n };
-}
-
-function colorDist(r: number, g: number, b: number, wr: number, wg: number, wb: number) {
-  return Math.hypot(r - wr, g - wg, b - wb);
-}
-
-/**
- * Conservative mask:
- * 1) Hard-exclude white glass/frame/cassette
- * 2) Exclude flat wall (low variance + wall color)
- * 3) Include only textured / non-wall pixels in the upper-central curtain band
- * 4) No aggressive dilate that paints over sill/glass
- */
-function buildMask(
-  data: Buffer,
+/** Map fabric onto in-memory chroma buffer (same algorithm as installEngine) */
+async function mapFabricOntoChroma(
+  chroma: Buffer,
   w: number,
-  h: number
-): { mask: Float32Array; coverage: number; meanLum: number } {
-  const wall = sampleWallColor(data, w, h);
-  const mask = new Float32Array(w * h);
-  const variance = new Float32Array(w * h);
+  h: number,
+  fabricPath: string,
+  style?: string,
+  material?: string
+): Promise<{ out: Buffer; coverage: number; meanLin: number; logStd: number }> {
+  const sharp = await getSharp();
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      variance[y * w + x] = localVar(data, w, h, x, y, 2);
+  // Analyze green key
+  let sumLin = 0,
+    nKey = 0,
+    top = h;
+  const logs: number[] = [];
+  for (let i = 0; i < chroma.length; i += 4) {
+    const r = chroma[i] / 255,
+      g = chroma[i + 1] / 255,
+      b = chroma[i + 2] / 255;
+    if (g - Math.max(r, b) > 0.12) {
+      const linG = Math.pow(g, 2.2);
+      sumLin += linG;
+      nKey++;
+      logs.push(Math.log(linG + 1e-3));
+      const y = Math.floor(i / 4 / w);
+      if (y < top) top = y;
     }
   }
+  const meanLin = nKey ? sumLin / nKey : 1;
+  const coverage = nKey / (w * h);
+  const avgLog = logs.length ? logs.reduce((a, v) => a + v, 0) / logs.length : 0;
+  const logStd = logs.length
+    ? Math.sqrt(logs.reduce((a, v) => a + (v - avgLog) ** 2, 0) / logs.length)
+    : 0.12;
+  const topFrac = 1 - top / h;
 
-  let vSum = 0;
-  for (let i = 0; i < variance.length; i++) vSum += variance[i];
-  const vMean = vSum / variance.length;
-  const vThresh = Math.max(0.0006, vMean * 0.5);
+  if (coverage < 0.03) {
+    throw new Error("chroma ساخته‌شده از عکس مرجع پوشش سبز کافی ندارد");
+  }
+
+  const target =
+    material === "velvet"
+      ? 0.4
+      : material === "silk"
+        ? 0.34
+        : material === "sheer"
+          ? 0.16
+          : 0.26;
+  const contrast = Math.min(1.8, Math.max(0.6, target / Math.max(logStd, 0.05)));
+  const mat = {
+    contrast,
+    detail: material === "sheer" ? 0.14 : 0.26,
+    tile: 1.0 * styleTileFactor(style),
+    warp: 0.03,
+    ao: material === "sheer" ? 0.18 : 0.38,
+  };
+  const fabricScale = Math.min(1.25, Math.max(0.75, mat.tile));
+
+  const fabricBuf = await loadBuffer(fabricPath);
+  const fabMeta = await sharp(fabricBuf).metadata();
+  const aspect = (fabMeta.width || 1) / (fabMeta.height || 1);
+  const fabW = Math.max(512, Math.min(1600, Math.round(w * 1.1)));
+  const fabH = Math.max(256, Math.min(1600, Math.round(fabW / aspect)));
+  const { data: fd, info: fi } = await sharp(fabricBuf)
+    .resize(fabW, fabH, { fit: "cover", kernel: sharp.kernel.lanczos3 })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  let meanR = 0,
+    meanG = 0,
+    meanB = 0,
+    nF = 0;
+  for (let i = 0; i < fd.length; i += 4) {
+    if (fd[i + 3] < 16) continue;
+    meanR += toLin(fd[i]);
+    meanG += toLin(fd[i + 1]);
+    meanB += toLin(fd[i + 2]);
+    nF++;
+  }
+  meanR = nF ? meanR / nF : 0.4;
+  meanG = nF ? meanG / nF : 0.4;
+  meanB = nF ? meanB / nF : 0.4;
+
+  const tileX = w * fabricScale;
+  const tileY = tileX / aspect;
+  const out = Buffer.alloc(w * h * 4);
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
-      const r = data[i] / 255;
-      const g = data[i + 1] / 255;
-      const b = data[i + 2] / 255;
-      const lum = (r + g + b) / 3;
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      const sat = max < 1e-3 ? 0 : (max - min) / max;
-      const yNorm = y / h;
-      const xNorm = x / w;
-      const edgeX = Math.min(xNorm, 1 - xNorm);
-      const edgeY = Math.min(yNorm, 1 - yNorm);
-      const v = variance[y * w + x];
-      const distWall = colorDist(r, g, b, wall.r, wall.g, wall.b);
+      const pr = chroma[i],
+        pg = chroma[i + 1],
+        pb = chroma[i + 2],
+        pa = chroma[i + 3];
+      const rn = pr / 255,
+        gn = pg / 255,
+        bn = pb / 255;
+      const gdom = gn - Math.max(rn, bn);
+      const sat = gn / Math.max(rn + gn + bn, 1e-3);
+      const key = smoothstep(0.035, 0.14, gdom) * smoothstep(0.26, 0.4, sat);
 
-      // --- hard excludes ---
-      // White / near-white: glass, frame, cassette, sill top
-      if (lum > 0.85 && sat < 0.12) {
-        mask[y * w + x] = 0;
-        continue;
-      }
-      if (lum > 0.92) {
-        mask[y * w + x] = 0;
-        continue;
-      }
-      // Floor / bottom board
-      if (yNorm > 0.88) {
-        mask[y * w + x] = 0;
-        continue;
-      }
-      // Outer margins (logo, wall edges)
-      if (edgeX < 0.08 || edgeY < 0.05) {
-        mask[y * w + x] = 0;
-        continue;
-      }
-      // Flat wall: similar color + low structure
-      if (distWall < 0.07 && v < vThresh * 0.85 && sat < 0.15) {
-        mask[y * w + x] = 0;
+      if (key < 0.008) {
+        out[i] = pr;
+        out[i + 1] = pg;
+        out[i + 2] = pb;
+        out[i + 3] = pa;
         continue;
       }
 
-      // Curtain band: product shots place fabric roughly center-top to mid
-      // Avoid lower glass region under half-raised roman/blinds
-      const inBand =
-        xNorm > 0.15 && xNorm < 0.85 && yNorm > 0.07 && yNorm < 0.72;
+      let s = toLin(pg) / meanLin;
+      const iL = (y * w + Math.max(0, x - 1)) * 4;
+      const iR = (y * w + Math.min(w - 1, x + 1)) * 4;
+      const iU = (Math.max(0, y - 1) * w + x) * 4;
+      const iD = (Math.min(h - 1, y + 1) * w + x) * 4;
+      const sh = (idx: number) => toLin(chroma[idx + 1]) / meanLin;
+      const gx = sh(iR) - sh(iL);
+      const gy = sh(iD) - sh(iU);
+      const blurS = (sh(iL) + sh(iR) + sh(iU) + sh(iD) + s) / 5;
+      const micro = clamp01(s / Math.max(blurS, 0.02));
+      s *= Math.pow(Math.min(2, Math.max(0.5, micro)), mat.detail);
+      s = Math.pow(Math.max(s, 0), Math.min(mat.contrast, 1.05));
 
-      if (!inBand) {
-        // Outside band: only allow strongly colored / highly textured (rare)
-        if (sat < 0.12 && distWall < 0.12) {
-          mask[y * w + x] = 0;
-          continue;
-        }
-      }
+      const py = (topFrac - y / h) * h;
+      const compress = 1 - 0.08 * smoothstep(0.75, 0.3, s);
+      const u = (x / tileX) * fi.width + gx * mat.warp * fi.width * 0.15;
+      const v = (py / (tileY * compress)) * fi.height + gy * mat.warp * fi.height * 0.08;
+      const [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u, v);
 
-      let k = 0;
+      const flr = toLin(fr),
+        flg = toLin(fg),
+        flb = toLin(fb);
+      const flatR = flr * 0.9 + meanR * 0.1;
+      const flatG = flg * 0.9 + meanG * 0.1;
+      const flatB = flb * 0.9 + meanB * 0.1;
+      const ao = 1 - (1 - smoothstep(0.25, 1.15, s)) * mat.ao * 0.7;
+      const cr = flatR * s * ao;
+      const cg = flatG * s * ao;
+      const cb = flatB * s * ao;
 
-      // Texture (folds, weave) — key for beige-on-beige
-      if (v > vThresh) {
-        k = clamp01((v - vThresh) / (vThresh * 2.5)) * 0.9;
-      }
-
-      // Color distance from wall
-      if (distWall > 0.08) {
-        k = Math.max(k, clamp01((distWall - 0.05) / 0.18) * 0.75);
-      }
-
-      // Saturation for dyed fabrics
-      if (sat > 0.1) {
-        k = Math.max(k, clamp01((sat - 0.06) / 0.22) * 0.65);
-      }
-
-      // Inside curtain band: mid-luminance with some structure = fabric face
-      if (inBand && lum > 0.2 && lum < 0.82) {
-        if (v > vThresh * 0.4 || distWall > 0.03) {
-          k = Math.max(k, 0.5);
-        }
-        // Solid roman face can be fairly uniform — still include if not wall-white
-        if (lum < 0.78 && sat < 0.2 && distWall > 0.015 && v > vThresh * 0.25) {
-          k = Math.max(k, 0.55);
-        }
-      }
-
-      // Kill residual near-white even if somehow scored
-      if (lum > 0.8 && sat < 0.1) k *= 0.15;
-
-      k *= smoothstep(0.07, 0.14, edgeX) * smoothstep(0.04, 0.1, edgeY);
-
-      // Fade near sill zone
-      if (yNorm > 0.68) k *= smoothstep(0.78, 0.68, yNorm);
-
-      mask[y * w + x] = clamp01(k);
+      const kSoft = smoothstep(0, 0.3, key) * key;
+      out[i] = toSrgb(toLin(pr) * (1 - kSoft) + cr * kSoft);
+      out[i + 1] = toSrgb(toLin(Math.min(pg, Math.max(pr, pb))) * (1 - kSoft) + cg * kSoft);
+      out[i + 2] = toSrgb(toLin(pb) * (1 - kSoft) + cb * kSoft);
+      out[i + 3] = pa;
     }
   }
 
-  // Light hole-fill ONLY inside strong fabric regions (no expansion into glass)
-  const densified = new Float32Array(mask);
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const idx = y * w + x;
-      if (mask[idx] >= 0.4) continue;
-      let nHigh = 0;
-      let sumK = 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (!dx && !dy) continue;
-          const kk = mask[(y + dy) * w + (x + dx)];
-          if (kk > 0.45) {
-            nHigh++;
-            sumK += kk;
-          }
-        }
-      }
-      // Require majority neighbors — fills pinholes, doesn't spill
-      if (nHigh >= 5) {
-        const i = (y * w + x) * 4;
-        const lum = pixelLum(data, i);
-        // Never fill into white glass/frame
-        if (lum < 0.82) {
-          densified[idx] = Math.max(mask[idx], (sumK / nHigh) * 0.75);
-        }
-      }
-    }
-  }
-
-  let maskN = 0;
-  let meanLum = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const k = densified[y * w + x];
-      mask[y * w + x] = k;
-      if (k > 0.25) {
-        maskN++;
-        meanLum += pixelLum(data, (y * w + x) * 4);
-      }
-    }
-  }
-
-  const coverage = maskN / (w * h);
-  meanLum = maskN ? meanLum / maskN : 0.5;
-  return { mask, coverage, meanLum };
+  return { out, coverage, meanLin, logStd };
 }
 
 export async function renderFromProductPhoto(
@@ -338,95 +518,34 @@ export async function renderFromProductPhoto(
   const w = info.width;
   const h = info.height;
 
-  const { mask, coverage, meanLum } = buildMask(pd, w, h);
-
-  if (coverage < 0.04) {
+  const { mask, coverage: maskCov, meanLum } = buildMask(pd, w, h, input.style);
+  if (maskCov < 0.04) {
     throw new Error(
-      "در این عکس ناحیهٔ پرده به‌اندازهٔ کافی تشخیص داده نشد. عکس نصب واقعی با پرده روی پنجره آپلود کنید."
+      "ناحیه پرده در عکس مرجع تشخیص داده نشد. عکس نصب واقعی واضح‌تری آپلود کنید."
     );
   }
 
-  let minX = w,
-    maxX = 0,
-    minY = h,
-    maxY = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (mask[y * w + x] > 0.3) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-  }
-  const bw = Math.max(1, maxX - minX);
-  const bh = Math.max(1, maxY - minY);
+  // Auto-chroma from reference (template + reference fused)
+  const chroma = paintChroma(pd, w, h, mask, meanLum);
 
-  const fabricBuf = await loadBuffer(input.fabricPathOrUrl);
-  const fabMeta = await sharp(fabricBuf).metadata();
-  const aspect = (fabMeta.width || 1) / (fabMeta.height || 1);
-  const fabW = Math.max(512, Math.min(1600, Math.round(bw * 1.2)));
-  const fabH = Math.max(256, Math.min(1600, Math.round(fabW / aspect)));
-  const { data: fd, info: fi } = await sharp(fabricBuf)
-    .resize(fabW, fabH, { fit: "cover", kernel: sharp.kernel.lanczos3 })
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+  const mapped = await mapFabricOntoChroma(
+    chroma,
+    w,
+    h,
+    input.fabricPathOrUrl,
+    input.style,
+    input.material
+  );
 
-  const out = Buffer.alloc(w * h * 4);
-
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      const k = mask[y * w + x];
-      const pr = pd[i],
-        pg = pd[i + 1],
-        pb = pd[i + 2],
-        pa = pd[i + 3];
-
-      // Hard keep original for low mask — prevents blue streaks on wall
-      if (k < 0.2) {
-        out[i] = pr;
-        out[i + 1] = pg;
-        out[i + 2] = pb;
-        out[i + 3] = pa;
-        continue;
-      }
-
-      const origLum = toLin((pr + pg + pb) / 3);
-      const shade = clamp01(origLum / Math.max(meanLum, 0.05));
-      const s = Math.pow(Math.max(shade, 0.05), 0.9);
-
-      const u = (x - minX) / bw;
-      const v = (y - minY) / bh;
-      const [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u * 0.98, v * 0.98);
-
-      const flr = toLin(fr),
-        flg = toLin(fg),
-        flb = toLin(fb);
-
-      const cr = flr * s;
-      const cg = flg * s;
-      const cb = flb * s;
-
-      // Steeper blend: only high-confidence mask gets full fabric
-      const kSoft = smoothstep(0.22, 0.65, k);
-      out[i] = toSrgb(toLin(pr) * (1 - kSoft) + cr * kSoft);
-      out[i + 1] = toSrgb(toLin(pg) * (1 - kSoft) + cg * kSoft);
-      out[i + 2] = toSrgb(toLin(pb) * (1 - kSoft) + cb * kSoft);
-      out[i + 3] = pa;
-    }
-  }
-
-  const coverageScore = Math.min(1, coverage / 0.16) * 5;
-  const qualityScore = Math.round(Math.min(10, coverageScore + 4.5) * 10) / 10;
+  const coverageScore = Math.min(1, mapped.coverage / 0.18) * 5;
+  const foldScore = Math.min(1, mapped.logStd / 0.18) * 3;
+  const qualityScore = Math.round(Math.min(10, coverageScore + foldScore + 1.5) * 10) / 10;
 
   const fileName = `install-${Date.now()}-${randomUUID().slice(0, 8)}.jpg`;
   const filePath = path.join(input.outDir, fileName);
   fs.mkdirSync(input.outDir, { recursive: true });
 
-  let pipeline = sharp(out, { raw: { width: w, height: h, channels: 4 } });
+  let pipeline = sharp(mapped.out, { raw: { width: w, height: h, channels: 4 } });
   pipeline = await applyBrandWatermark(sharp, pipeline, w, h);
   await pipeline.jpeg({ quality: 95, mozjpeg: true, chromaSubsampling: "4:4:4" }).toFile(filePath);
 
@@ -436,6 +555,6 @@ export async function renderFromProductPhoto(
     width: w,
     height: h,
     qualityScore,
-    coverage: Math.round(coverage * 1000) / 1000,
+    coverage: Math.round(mapped.coverage * 1000) / 1000,
   };
 }
