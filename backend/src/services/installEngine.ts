@@ -1,12 +1,9 @@
 /**
- * Install engine — production path for 20k+ SKUs.
- *
- * Flat styles (shade / roman / roller / double):
- *   - Single fabric panel mapped to green region (cover), clamp UV — never tile
- *   - Orthographic, zero warp
- *   - Color-preserving lighting
- *
- * Draped styles: mild warp + same color path
+ * Install engine
+ * - Smaller fabric scale for close-up photos (finer pattern)
+ * - Mirror tile (hides hard seams better than wrap on non-seamless photos)
+ * - Edge UV clamped (no left-side break)
+ * - Color-preserving shade
  */
 
 import fs from "fs";
@@ -243,16 +240,29 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
   return entry;
 }
 
-/** Clamp-to-edge — never tiles, safe for every fabric photo */
-function sampleFab(
+/** Mirror tile — reflects at edges so non-seamless close-ups don't hard-seam */
+function mirrorCoord(t: number, size: number): number {
+  if (size <= 1) return 0;
+  // Inset 1.5% so photo border pixels (often dirty) rarely hit
+  const inset = size * 0.015;
+  const usable = size - 2 * inset;
+  if (usable <= 1) return size / 2;
+  const period = usable * 2;
+  let m = t % period;
+  if (m < 0) m += period;
+  if (m > usable) m = period - m;
+  return Math.min(size - 1.001, Math.max(0, inset + m));
+}
+
+function sampleFabMirror(
   fd: Buffer,
   fw: number,
   fh: number,
   u: number,
   v: number
 ): [number, number, number] {
-  const x = Math.min(fw - 1.001, Math.max(0, u));
-  const y = Math.min(fh - 1.001, Math.max(0, v));
+  const x = mirrorCoord(u, fw);
+  const y = mirrorCoord(v, fh);
   const x0 = x | 0;
   const y0 = y | 0;
   const x1 = Math.min(fw - 1, x0 + 1);
@@ -279,14 +289,14 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
 
   const fabricScale = Math.min(
     1.05,
-    Math.max(0.75, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
+    Math.max(0.4, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
   );
 
   const fabricBuf = await loadBuffer(input.fabricPathOrUrl);
   const fabMeta = await sharp(fabricBuf).metadata();
   const aspect = (fabMeta.width || 1) / (fabMeta.height || 1);
 
-  const fabW = Math.max(768, Math.min(1800, Math.round(tpl.w * 1.25)));
+  const fabW = Math.max(768, Math.min(1800, Math.round(tpl.w * 1.2)));
   const fabH = Math.max(384, Math.min(1800, Math.round(fabW / aspect)));
 
   const { data: fd, info: fi } = await sharp(fabricBuf)
@@ -300,18 +310,16 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const td = tpl.data;
   const out = Buffer.alloc(w * h * 4);
 
-  // Green region in template pixels
+  // Full green bbox — continuous UV, no left-edge break
   const gMinX = tpl.minX;
   const gMinY = tpl.minY;
   const gW = Math.max(1, tpl.maxX - tpl.minX);
   const gH = Math.max(1, tpl.maxY - tpl.minY);
 
-  // How many fabric pixels map across the green width (single panel)
-  const spanU = fi.width * fabricScale;
-  const spanV = spanU / aspect;
-  // Center panel on green region
-  const u0 = (fi.width - spanU) / 2;
-  const v0 = (fi.height - spanV) / 2;
+  // Tile size from core width (stable pattern scale)
+  const coreW = Math.max(1, tpl.coreMaxX - tpl.coreMinX);
+  const tileX = coreW * fabricScale;
+  const tileY = tileX / aspect;
 
   let keySum = 0;
   let keyN = 0;
@@ -356,21 +364,16 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       s *= Math.pow(Math.min(1.7, Math.max(0.6, micro)), mat.detail * 0.8);
       s = 1 + (s - 1) * Math.min(mat.contrast, 0.9);
 
-      // Normalized position inside green region [0,1]
-      const nx = (x - gMinX) / gW;
-      const ny = (y - gMinY) / gH;
-      const nxC = Math.max(0, Math.min(1, nx));
-      const nyC = Math.max(0, Math.min(1, ny));
+      // Clamp local to green region — soft edges outside core stay continuous
+      let localX = x - gMinX;
+      let localY = y - gMinY;
+      localX = Math.max(0, Math.min(gW, localX));
+      localY = Math.max(0, Math.min(gH, localY));
 
-      // Single panel UV — clamp only, no tile/mirror
-      let u = u0 + nxC * spanU;
-      let v = v0 + nyC * spanV;
-      if (!flat && mat.warp > 0) {
-        u += gx * mat.warp * fi.width * 0.06;
-        v += gy * mat.warp * fi.height * 0.04;
-      }
+      const u = (localX / tileX) * fi.width + (flat ? 0 : gx * mat.warp * fi.width * 0.06);
+      const v = (localY / Math.max(tileY, 1)) * fi.height + (flat ? 0 : gy * mat.warp * fi.height * 0.04);
 
-      const [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u, v);
+      const [fr, fg, fb] = sampleFabMirror(fd, fi.width, fi.height, u, v);
 
       const flr = toLin(fr);
       const flg = toLin(fg);
@@ -384,9 +387,8 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       let cg = flg * light * ao;
       let cb = flb * light * ao;
 
-      // Recover saturation after lighting multiply
       const lum = 0.2126 * cr + 0.7152 * cg + 0.0722 * cb;
-      const satBoost = 1.14;
+      const satBoost = 1.12;
       cr = lum + (cr - lum) * satBoost;
       cg = lum + (cg - lum) * satBoost;
       cb = lum + (cb - lum) * satBoost;

@@ -1,10 +1,5 @@
 /**
  * ماتریس سبک‌های نصب — هم‌تراز فرانت curtainStyleResolve.js
- *
- * Tile policy (20k SKU safe):
- *  - Flat styles (shade/roman/roller/double): NO tiling — single panel, clamp UV.
- *    Close-up fabric photos look slightly large; never show mirror/seam artifacts.
- *  - Draped / pleated / wave: mild scale + optional warp; tiling only if needed later.
  */
 
 export type CurtainStyleKey =
@@ -116,7 +111,6 @@ export function guessMaterial(model: {
   return "cotton";
 }
 
-/** Flat surface styles — orthographic UV, no warp, no tile */
 export function isFlatStyle(style?: string): boolean {
   const s = (style || "").toLowerCase();
   return (
@@ -131,36 +125,34 @@ export function isFlatStyle(style?: string): boolean {
 }
 
 /**
- * How much of the green width one fabric image covers.
- * Flat: ~0.92 = almost full width, single panel, clamp edges (no repeat).
- * Draped: slightly lower for natural fold coverage.
+ * Close-up fabric photos → smaller factor = finer pattern on curtain.
+ * ~0.55 ≈ almost 2 repeats across width.
  */
 export function styleTileFactor(style?: string) {
-  if (isFlatStyle(style)) return 0.92;
+  if (isFlatStyle(style)) return 0.55;
   switch (style) {
     case "zebra":
-      return 0.88;
+      return 0.65;
     case "panel":
-      return 0.9;
+      return 0.7;
     case "pleated-manual":
     case "pleated-chain":
     case "pleated-sheer":
-      return 0.85;
+      return 0.65;
     case "wave":
-      return 0.9;
+      return 0.85;
     case "drape":
-      return 0.92;
-    default:
       return 0.9;
+    default:
+      return 0.7;
   }
 }
 
-/** Warp — zero for flat; mild for draped */
 export function styleWarpFactor(style?: string): number {
-  if (isFlatStyle(style)) return 0;
+  if (isFlatStyle(style)) return 0.003;
   switch (style) {
     case "zebra":
-      return 0.012;
+      return 0.014;
     case "panel":
       return 0.01;
     case "pleated-manual":
