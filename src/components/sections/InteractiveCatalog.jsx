@@ -7,6 +7,11 @@ import CatalogCard from "@/components/catalog/CatalogCard";
 import { ALL_CATEGORIES as FALLBACK_CATEGORIES } from "@/lib/catalogData";
 import { base44 } from "@/api/base44Client";
 
+/**
+ * کاتالوگ تعاملی:
+ * سمت چپ = قاب پنجره (همان install_image ادمین)
+ * سمت راست = انتخاب مدل از همان دیتابیس ادمین
+ */
 export default function InteractiveCatalog({ initialCategory }) {
   const [dbCategories, setDbCategories] = useState(null);
 
@@ -87,10 +92,11 @@ export default function InteractiveCatalog({ initialCategory }) {
           <div>
             <span className="eyebrow mb-2 block">انتخاب مدل</span>
             <h2 className="font-display text-xl font-black text-foreground lg:text-3xl">
-              پارچه واقعی · <span className="text-gold-gradient">فرم نصب دسته</span>
+              قاب پنجره · <span className="text-gold-gradient">نمونه نصب واقعی</span>
             </h2>
             <p className="mt-2 max-w-lg font-body text-sm leading-7 text-muted-foreground">
-              تصویر بزرگ = نمونه نصب همین مدل. کارت‌ها عکس پارچه یا نمونه تأییدشده را نشان می‌دهند.
+              مدل را از راست انتخاب کنید. تصویر بزرگ همان نمونه‌ای است که در پنل ادمین برای این مدل ساخته
+              شده — یک منبع، یک تصویر.
             </p>
           </div>
           <Link to="/#contact" className="btn-ghost-gold shrink-0">
@@ -151,6 +157,7 @@ export default function InteractiveCatalog({ initialCategory }) {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-5">
+          {/* قاب پنجره اصلی — همیشه سر جایش */}
           <div className="lg:col-span-3">
             <CurtainPreview fabric={selectedModel} publicMode />
 

@@ -14,10 +14,7 @@ const load = (src) =>
     img.src = src;
   });
 
-/**
- * Maps the model's fabric image onto a real window-install template (chroma).
- * scale / styleKey control pattern size so roman vs pleated vs shade read correctly.
- */
+/** فقط برای پیش‌نمایش ادمین — سایت عمومی از install_image استفاده می‌کند */
 export default function PhotoCurtain({ template, fabric, scale, styleKey }) {
   const canvas = useRef(null);
   const [state, setState] = useState("loading");
@@ -42,12 +39,8 @@ export default function PhotoCurtain({ template, fabric, scale, styleKey }) {
         const info = analyzeTemplate(photo);
         if (info.coverage < 0.02) return setState("invalid");
 
-        // patternScale from analyzer: larger number ≈ coarser pattern → slightly larger tile
-        const patternAdj = analysis?.patternScale
-          ? Math.min(1.2, Math.max(0.75, analysis.patternScale / 16))
-          : 1;
-        const tileScale = Math.min(1.05, Math.max(0.32, baseScale * patternAdj));
-
+        // scale≈1 = یک‌بار پارچه روی ناحیه سبز؛ بدون تکرار کارتونی
+        const tileScale = Math.min(1.35, Math.max(0.75, baseScale));
         const material = materialOf(fabric, analysis);
         renderPhoto(canvas.current, photo, swatch, info, material, tileScale);
         setState("ready");
@@ -60,7 +53,7 @@ export default function PhotoCurtain({ template, fabric, scale, styleKey }) {
   }, [template, fabric?.image, fabric?.fabric, fabric?.material, scale, styleKey]);
 
   return (
-    <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-card">
+    <div className="relative h-full w-full">
       <canvas
         ref={canvas}
         className="h-full w-full object-cover"
@@ -73,13 +66,12 @@ export default function PhotoCurtain({ template, fabric, scale, styleKey }) {
       )}
       {state === "invalid" && (
         <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-xs text-muted-foreground">
-          قالب نصب ناحیهٔ سبز (chroma) قابل‌تشخیص ندارد. در ادمین برای این سبک یک عکس نصب واقعی با پارچه
-          سبز آپلود کنید — مثل عکس‌های محصول (رومن / پلیسه / شید) با فرم درست همان سازوکار.
+          قالب chroma ناحیه سبز ندارد. در ادمین قالب دسته را بسازید.
         </p>
       )}
       {state === "error" && (
         <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-xs text-muted-foreground">
-          بارگذاری تصویر پارچه یا قالب ناموفق بود.
+          بارگذاری تصویر ناموفق بود.
         </p>
       )}
     </div>

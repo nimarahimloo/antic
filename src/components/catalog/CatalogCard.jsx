@@ -1,12 +1,12 @@
 import { Check } from "lucide-react";
 import FabricSwatch from "@/components/catalog/FabricSwatch";
 
+/**
+ * کارت مدل — همان منطق سایت بزرگ:
+ * اگر install_image باشد همان را نشان بده (سینک با ادمین)، وگرنه عکس پارچه.
+ */
 export default function CatalogCard({ model, active, onClick }) {
-  // Prefer approved install sample, else fabric photo, else synthetic swatch
-  const thumb =
-    model.install_status === "approved" && model.install_image
-      ? model.install_image
-      : model.image || null;
+  const thumb = model.install_image || model.image || null;
 
   return (
     <button
@@ -35,7 +35,7 @@ export default function CatalogCard({ model, active, onClick }) {
             <Check className="h-3 w-3" />
           </span>
         )}
-        {model.install_status === "approved" && model.install_image && (
+        {model.install_image && (
           <span className="absolute bottom-1 left-1 rounded bg-background/85 px-1.5 py-0.5 font-body text-[8px] text-primary">
             نمونه نصب
           </span>
