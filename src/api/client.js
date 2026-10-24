@@ -144,18 +144,18 @@ const agents = {
     return request("/agents/conversations", {
       method: "POST",
       body: { agent_name: agent_name, metadata: metadata },
-      auth: false,
+      auth: true,
     });
   },
   async getConversation(id) {
-    return request("/agents/conversations/" + id, { auth: false });
+    return request("/agents/conversations/" + id, { auth: true });
   },
   async addMessage(conversation, message) {
     const id = typeof conversation === "string" ? conversation : conversation.id;
     return request("/agents/conversations/" + id + "/messages", {
       method: "POST",
       body: message,
-      auth: false,
+      auth: true,
     });
   },
   subscribeToConversation(id, onUpdate) {
