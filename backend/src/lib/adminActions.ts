@@ -1,8 +1,12 @@
 /**
- * اجرای دستورات CRUD ادمین از متن فارسی/انگلیسی.
- * فقط از مسیر admin_assistant و بعد از requireAdmin فراخوانی شود.
+ * اجرای CRUD ادمین با تشخیص آزاد جمله (adminNlu).
  */
 import { prisma } from "./prisma.js";
+import {
+  parseAdminCommand,
+  type Action,
+  type EntityKind,
+} from "./adminNlu.js";
 
 export type AdminBlock =
   | { type: "text"; markdown: string }
@@ -29,102 +33,6 @@ function pack(text: string, blocks?: AdminBlock[], meta?: Record<string, unknown
   return { text, blocks, meta };
 }
 
-function normalize(s: string) {
-  return s
-    .toLowerCase()
-    .replace(/[یي]/g, "ی")
-    .replace(/[کك]/g, "ک")
-    .trim();
-}
-
-function parseFields(text: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  const re =
-    /(?:^|[\s,،\n])([\u0600-\u06FFa-zA-Z_][\u0600-\u06FFa-zA-Z0-9_]*)\s*[:：=]\s*([^\n,،]+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    const key = normalize(m[1]);
-    const val = m[2].trim();
-    if (key && val) out[key] = val;
-  }
-  const map: Record<string, string> = {
-    نام: "name",
-    عنوان: "title",
-    کد: "code",
-    شناسه: "slug",
-    اسلاگ: "slug",
-    دسته: "category",
-    دسته‌بندی: "category",
-    زیردسته: "subcategory",
-    رنگ: "color",
-    پارچه: "fabric",
-    توضیح: "description",
-    توضیحات: "description",
-    قیمت: "price",
-    موجودی: "stock",
-    تصویر: "image",
-    کاور: "cover",
-    وضعیت: "status",
-    ترتیب: "order",
-    مکانیزم: "mechanism",
-  };
-  const normalized: Record<string, string> = {};
-  for (const [k, v] of Object.entries(out)) {
-    normalized[map[k] || k] = v;
-  }
-  return normalized;
-}
-
-function pickIdToken(text: string): string | null {
-  const m =
-    text.match(/\b(c[a-z0-9]{20,})\b/i) ||
-    text.match(/(?:id|شناسه)\s*[:：=]?\s*([a-z0-9_-]{6,})/i) ||
-    text.match(/\b([a-z]{2,}-?\d{2,}|[A-Z]{1,3}-?\d{2,})\b/);
-  return m ? m[1] : null;
-}
-
-type EntityKind =
-  | "model"
-  | "category"
-  | "portfolio_category"
-  | "project"
-  | "product"
-  | "shop_category"
-  | "order"
-  | "request"
-  | "template"
-  | "install_ref"
-  | "saved_design"
-  | "window";
-
-function detectEntity(t: string): EntityKind | null {
-  if (/نمونه\s*اجرا|پروژه|project/.test(t) && !/دسته/.test(t)) return "project";
-  if (/دسته\s*نمونه|portfolio\s*categor/.test(t)) return "portfolio_category";
-  if (/دسته\s*فروشگاه|shop\s*categor/.test(t)) return "shop_category";
-  if (/دسته\s*کاتالوگ|curtain\s*categor|دسته.?پرده/.test(t)) return "category";
-  if (/\bدسته\b|category/.test(t) && !/مدل|محصول|سفارش/.test(t)) return "category";
-  if (/مدل|curtain\s*model/.test(t)) return "model";
-  if (/محصول|product/.test(t)) return "product";
-  if (/سفارش|order/.test(t)) return "order";
-  if (/درخواست|مشاوره|request|consultation/.test(t)) return "request";
-  if (/قالب|template|chroma/.test(t)) return "template";
-  if (/مرجع\s*نصب|install\s*ref/.test(t)) return "install_ref";
-  if (/طراحی\s*ذخیره|saved\s*design/.test(t)) return "saved_design";
-  if (/پنجره\s*مجازی|window\s*setting/.test(t)) return "window";
-  return null;
-}
-
-type Action = "create" | "update" | "delete" | "list" | "count";
-
-function detectAction(t: string): Action | null {
-  if (/حذف|پاک\s*کن|delete|remove/.test(t)) return "delete";
-  if (/افزودن|اضافه|بساز|ثبت\s*کن|create|add\b|new\b/.test(t)) return "create";
-  if (/ویرایش|بروز|تغییر|عوض|update|edit|set\b|rename/.test(t)) return "update";
-  if (/تعداد|چندتا|count/.test(t)) return "count";
-  if (/لیست|نشان\s*بده|list|show|همه/.test(t)) return "list";
-  return null;
-}
-
 function slugify(s: string) {
   return (
     s
@@ -141,49 +49,61 @@ async function resolveByIdOrName(
   entity: EntityKind,
   token: string
 ): Promise<{ id: string; label: string } | null> {
+  const t = token.trim();
+  if (!t) return null;
+
   switch (entity) {
     case "model": {
       const r = await prisma.curtainModel.findFirst({
         where: {
-          OR: [{ id: { contains: token } }, { code: token }, { name: { contains: token } }],
+          OR: [
+            { id: { contains: t } },
+            { code: { contains: t } },
+            { name: { contains: t } },
+          ],
         },
       });
       return r ? { id: r.id, label: r.name || r.code } : null;
     }
     case "category": {
       const r = await prisma.curtainCategory.findFirst({
-        where: { OR: [{ id: { contains: token } }, { slug: token }, { name: { contains: token } }] },
-      });
-      return r ? { id: r.id, label: r.name } : null;
-    }
-    case "portfolio_category": {
-      const r = await prisma.portfolioCategory.findFirst({
-        where: { OR: [{ id: { contains: token } }, { slug: token }, { name: { contains: token } }] },
+        where: {
+          OR: [{ id: { contains: t } }, { slug: { contains: t } }, { name: { contains: t } }],
+        },
       });
       return r ? { id: r.id, label: r.name } : null;
     }
     case "project": {
       const r = await prisma.project.findFirst({
-        where: { OR: [{ id: { contains: token } }, { title: { contains: token } }] },
+        where: { OR: [{ id: { contains: t } }, { title: { contains: t } }] },
       });
       return r ? { id: r.id, label: r.title } : null;
     }
     case "product": {
       const r = await prisma.product.findFirst({
-        where: { OR: [{ id: { contains: token } }, { slug: token }, { name: { contains: token } }] },
+        where: {
+          OR: [{ id: { contains: t } }, { slug: { contains: t } }, { name: { contains: t } }],
+        },
       });
       return r ? { id: r.id, label: r.name } : null;
     }
     case "shop_category": {
       const r = await prisma.shopCategory.findFirst({
-        where: { OR: [{ id: { contains: token } }, { slug: token }, { name: { contains: token } }] },
+        where: {
+          OR: [{ id: { contains: t } }, { slug: { contains: t } }, { name: { contains: t } }],
+        },
       });
       return r ? { id: r.id, label: r.name } : null;
     }
     case "order": {
       const r = await prisma.order.findFirst({
         where: {
-          OR: [{ id: { contains: token } }, { customerPhone: { contains: token } }, { authority: token }],
+          OR: [
+            { id: { contains: t } },
+            { customerPhone: { contains: t } },
+            { customerName: { contains: t } },
+            { authority: t },
+          ],
         },
       });
       return r ? { id: r.id, label: r.customerName } : null;
@@ -191,28 +111,34 @@ async function resolveByIdOrName(
     case "request": {
       const r = await prisma.consultationRequest.findFirst({
         where: {
-          OR: [{ id: { contains: token } }, { phone: { contains: token } }, { name: { contains: token } }],
+          OR: [{ id: { contains: t } }, { phone: { contains: t } }, { name: { contains: t } }],
         },
       });
       return r ? { id: r.id, label: r.name } : null;
     }
     case "template": {
       const r = await prisma.renderTemplate.findFirst({
-        where: { OR: [{ id: { contains: token } }, { style: token }] },
+        where: { OR: [{ id: { contains: t } }, { style: { contains: t } }] },
       });
       return r ? { id: r.id, label: r.style } : null;
     }
     case "install_ref": {
       const r = await prisma.installReference.findFirst({
-        where: { OR: [{ id: { contains: token } }, { style: token }] },
+        where: { OR: [{ id: { contains: t } }, { style: { contains: t } }] },
       });
       return r ? { id: r.id, label: r.style } : null;
     }
     case "saved_design": {
       const r = await prisma.savedDesign.findFirst({
-        where: { OR: [{ id: { contains: token } }, { title: { contains: token } }] },
+        where: { OR: [{ id: { contains: t } }, { title: { contains: t } }] },
       });
       return r ? { id: r.id, label: r.title } : null;
+    }
+    case "window": {
+      const r = await prisma.virtualWindowSetting.findFirst({
+        where: { id: { contains: t } },
+      });
+      return r ? { id: r.id, label: "تنظیم پنجره" } : null;
     }
     default:
       return null;
@@ -221,33 +147,46 @@ async function resolveByIdOrName(
 
 export async function executeAdminCommand(
   userText: string,
-  options?: { imageUrl?: string }
+  options?: { imageUrl?: string; path?: string }
 ): Promise<AdminActionResult | null> {
-  const t = normalize(userText);
-  const action = detectAction(t);
-  const entity = detectEntity(t);
-  const fields = parseFields(userText);
-  if (options?.imageUrl) {
-    fields.image = fields.image || options.imageUrl;
-    fields.cover = fields.cover || options.imageUrl;
-  }
+  const parsed = parseAdminCommand(userText, {
+    imageUrl: options?.imageUrl,
+    path: options?.path,
+  });
 
+  let action = parsed.action;
+  let entity = parsed.entity;
+  const fields = { ...parsed.fields };
+  const target = parsed.target;
+
+  // بدون هیچ سرنخی
   if (!action && !entity) return null;
 
-  if (action === "count" || (/تعداد/.test(t) && entity)) {
-    const e = entity || "model";
+  if (action === "help") {
+    return pack(
+      `می‌توانی آزاد حرف بزنی — مثال‌ها:\n` +
+        `• «مدل ZB-001 رو پاک کن»\n` +
+        `• «یه مدل جدید با کد TEST و نام تست و دسته zebra بساز»\n` +
+        `• «قیمت محصول قلاب رو بکن 200000»\n` +
+        `• «وضعیت درخواست احمد را انجام کن»\n` +
+        `• «لیست سفارش‌ها رو بیار»\n` +
+        `• «چند تا مدل داریم؟»\n` +
+        `فیلدها را می‌توانی با «نام: …» یا «نامش … باشه» بگویی.`
+    );
+  }
+
+  if (action === "count") {
     const counts: Record<string, number> = {
       model: await prisma.curtainModel.count(),
       category: await prisma.curtainCategory.count(),
-      portfolio_category: await prisma.portfolioCategory.count(),
       project: await prisma.project.count(),
       product: await prisma.product.count(),
       shop_category: await prisma.shopCategory.count(),
       order: await prisma.order.count(),
       request: await prisma.consultationRequest.count(),
     };
-    if (e && counts[e] !== undefined) {
-      return pack(`تعداد **${labelEntity(e)}**: **${counts[e]}**`);
+    if (entity && counts[entity] !== undefined) {
+      return pack(`تعداد **${labelEntity(entity)}**: **${counts[entity]}**`);
     }
     return pack(
       Object.entries(counts)
@@ -256,33 +195,29 @@ export async function executeAdminCommand(
     );
   }
 
-  if (action === "list" || (entity && !action && /لیست|نشان|همه/.test(t))) {
-    return listEntity(entity || "model");
+  if (action === "list" || action === "search") {
+    if (!entity) {
+      return pack("بگو لیست **چی** را می‌خواهی: مدل، دسته، محصول، سفارش، درخواست، نمونه اجرا…");
+    }
+    return listEntity(entity, target);
   }
 
   if (!entity) {
     if (action) {
       return pack(
-        `نوع موجودیت را بگو. مثال‌ها:\n` +
-          `• حذف مدل ZB-001\n` +
-          `• افزودن مدل کد: ZB-10 نام: زبرا طوسی دسته: zebra\n` +
-          `• ویرایش مدل ZB-001 رنگ: کرم\n` +
-          `• افزودن دسته کاتالوگ نام: زبرا شناسه: zebra\n` +
-          `• حذف محصول hook-1\n` +
-          `• ویرایش سفارش abc123 وضعیت: paid\n` +
-          `• لیست درخواست‌ها`
+        `متوجه شدم می‌خواهی **${labelAction(action)}** کنی؛ بگو روی چه چیزی (مدل، دسته، محصول، سفارش، …).`
       );
     }
     return null;
   }
 
+  // اگر فقط entity گفته شد بدون action → list
+  if (!action) action = "list";
+
   if (action === "delete") {
-    const token = pickIdToken(userText) || fields.code || fields.slug || fields.name || fields.title;
-    if (!token) {
-      return pack(`برای حذف ${labelEntity(entity)} کد، نام یا id را بگو.`);
-    }
-    const found = await resolveByIdOrName(entity, token);
-    if (!found) return pack(`${labelEntity(entity)} با «${token}» پیدا نشد.`);
+    if (!target) return pack(`برای حذف ${labelEntity(entity)} نام، کد یا id را بگو.`);
+    const found = await resolveByIdOrName(entity, target);
+    if (!found) return pack(`${labelEntity(entity)} با «${target}» پیدا نشد.`);
     await deleteEntity(entity, found.id);
     return pack(`✅ **${found.label}** (${labelEntity(entity)}) حذف شد.`, [
       { type: "link_buttons", items: adminLink(entity) },
@@ -290,49 +225,33 @@ export async function executeAdminCommand(
   }
 
   if (action === "create") {
+    // اگر فیلد name/title خالی و target هست
+    if (!fields.name && !fields.title && target && !/^(مدل|دسته|محصول)$/.test(target)) {
+      if (entity === "project") fields.title = fields.title || target;
+      else fields.name = fields.name || target;
+    }
     try {
       const created = await createEntity(entity, fields);
       return pack(`✅ ${labelEntity(entity)} **${created.label}** ساخته شد.\n\`${created.id}\``, [
         { type: "link_buttons", items: adminLink(entity) },
       ]);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "خطا در ایجاد";
+      const msg = e instanceof Error ? e.message : "خطا";
       return pack(`❌ ایجاد ناموفق: ${msg}\n\n${createHelp(entity)}`);
     }
   }
 
   if (action === "update") {
-    const token =
-      pickIdToken(userText) || fields.code || fields.slug || fields.name || fields.title || "";
-    if (!token) {
-      return pack(`برای ویرایش ${labelEntity(entity)} شناسه/کد را بگو و فیلدها را با : بنویس.`);
+    if (!target) {
+      return pack(`برای ویرایش ${labelEntity(entity)} بگو کدام مورد (کد/نام/id) و چه چیزی عوض شود.`);
     }
-    const found = await resolveByIdOrName(entity, token);
-    if (!found) return pack(`${labelEntity(entity)} با «${token}» پیدا نشد.`);
-
-    if (entity === "order" || entity === "request") {
-      const st = t.match(
-        /(?:را|به|=)\s*(جدید|new|انجام|done|بسته|closed|درحال|processing|pending|paid|cancelled|shipped)/i
+    const found = await resolveByIdOrName(entity, target);
+    if (!found) return pack(`${labelEntity(entity)} با «${target}» پیدا نشد.`);
+    if (Object.keys(fields).length === 0) {
+      return pack(
+        `**${found.label}** پیدا شد. بگو چه فیلدی عوض شود — مثلاً «رنگش کرم باشه» یا «قیمت: 200000».`
       );
-      if (st && !fields.status) {
-        const map: Record<string, string> = {
-          جدید: "new",
-          new: "new",
-          انجام: "done",
-          done: "done",
-          بسته: "closed",
-          closed: "closed",
-          درحال: "processing",
-          processing: "processing",
-          pending: "pending",
-          paid: "paid",
-          cancelled: "cancelled",
-          shipped: "shipped",
-        };
-        fields.status = map[normalize(st[1])] || st[1];
-      }
     }
-
     try {
       const updated = await updateEntity(entity, found.id, fields);
       return pack(`✅ **${updated.label}** به‌روزرسانی شد.`, [
@@ -344,16 +263,30 @@ export async function executeAdminCommand(
     }
   }
 
+  if (action === "list") return listEntity(entity, target);
+
   return null;
+}
+
+function labelAction(a: Action) {
+  const m: Record<string, string> = {
+    create: "افزودن",
+    update: "ویرایش",
+    delete: "حذف",
+    list: "لیست",
+    count: "شمارش",
+    search: "جستجو",
+    help: "راهنما",
+  };
+  return m[a] || a;
 }
 
 function labelEntity(e: EntityKind | string) {
   const map: Record<string, string> = {
     model: "مدل پرده",
-    category: "دسته کاتالوگ",
-    portfolio_category: "دسته نمونه‌اجرا",
+    category: "دسته",
     project: "نمونه اجرا",
-    product: "محصول فروشگاه",
+    product: "محصول",
     shop_category: "دسته فروشگاه",
     order: "سفارش",
     request: "درخواست مشاوره",
@@ -368,8 +301,7 @@ function labelEntity(e: EntityKind | string) {
 function adminLink(e: EntityKind): Array<{ label: string; href: string }> {
   const map: Record<EntityKind, { label: string; href: string }> = {
     model: { label: "مدل‌ها", href: "/admin/models" },
-    category: { label: "دسته‌های کاتالوگ", href: "/admin/categories" },
-    portfolio_category: { label: "دسته نمونه‌ها", href: "/admin/portfolio-categories" },
+    category: { label: "دسته‌ها", href: "/admin/categories" },
     project: { label: "نمونه‌های اجرا", href: "/admin/projects" },
     product: { label: "محصولات", href: "/admin/products" },
     shop_category: { label: "دسته فروشگاه", href: "/admin/products" },
@@ -385,62 +317,82 @@ function adminLink(e: EntityKind): Array<{ label: string; href: string }> {
 
 function createHelp(e: EntityKind) {
   const helps: Record<EntityKind, string> = {
-    model: "افزودن مدل کد: ZB-10 نام: زبرا طوسی دسته: zebra رنگ: طوسی",
-    category: "افزودن دسته کاتالوگ نام: زبرا شناسه: zebra",
-    portfolio_category: "افزودن دسته نمونه نام: پذیرایی شناسه: living",
-    project: "افزودن نمونه اجرا عنوان: ویلا شمال دسته: living",
-    product: "افزودن محصول نام: قلاب فلزی شناسه: hook-1 قیمت: 120000",
-    shop_category: "افزودن دسته فروشگاه نام: اکسسوری شناسه: accessory",
-    order: "از چت فقط وضعیت سفارش را عوض کن",
-    request: "از چت فقط وضعیت درخواست را عوض کن",
-    template: "افزودن قالب style: roman تصویر: /uploads/...",
-    install_ref: "افزودن مرجع نصب style: zebra تصویر: /uploads/...",
-    saved_design: "افزودن طراحی عنوان: طرح۱ تصویر: /uploads/...",
-    window: "ویرایش پنجره مجازی wallColor: #fff",
+    model: "مثال: یه مدل با کد ZB-10 و نام زبرا و دسته zebra بساز",
+    category: "مثال: دسته جدید نام پذیرایی شناسه living-room اضافه کن",
+    project: "مثال: نمونه اجرا با عنوان ویلا شمال و دسته living-room ثبت کن",
+    product: "مثال: محصول قلاب با قیمت 150000 اضافه کن",
+    shop_category: "مثال: دسته فروشگاه اکسسوری با شناسه accessories بساز",
+    order: "سفارش را از چت فقط وضعیتش را عوض کن",
+    request: "درخواست را با نام یا id پیدا کن و وضعیتش را عوض کن",
+    template: "قالب نیاز به style و تصویر دارد",
+    install_ref: "مرجع نصب نیاز به style و تصویر دارد",
+    saved_design: "طراحی نیاز به عنوان و تصویر دارد",
+    window: "wallColor یا frameColor را بگو",
   };
   return helps[e];
 }
 
-async function listEntity(entity: EntityKind): Promise<AdminActionResult> {
+async function listEntity(entity: EntityKind, search?: string | null): Promise<AdminActionResult> {
+  const q = search?.trim();
   switch (entity) {
     case "model": {
-      const rows = await prisma.curtainModel.findMany({ orderBy: { updatedAt: "desc" }, take: 10 });
+      const rows = await prisma.curtainModel.findMany({
+        where: q
+          ? {
+              OR: [
+                { name: { contains: q } },
+                { code: { contains: q } },
+                { categorySlug: { contains: q } },
+              ],
+            }
+          : undefined,
+        orderBy: { updatedAt: "desc" },
+        take: 12,
+      });
       const n = await prisma.curtainModel.count();
       return pack(
-        `**${n}** مدل — آخرین‌ها:\n` +
-          rows
-            .map((r) => `• **${r.name}** (${r.code}) — ${r.categorySlug} — \`${r.id.slice(0, 8)}\``)
-            .join("\n"),
+        `**${n}** مدل${q ? ` (فیلتر: ${q})` : ""}:\n` +
+          (rows.map((r) => `• **${r.name}** (${r.code}) — ${r.categorySlug}`).join("\n") || "—"),
         [{ type: "link_buttons", items: adminLink("model") }]
       );
     }
     case "category": {
-      const rows = await prisma.curtainCategory.findMany({ orderBy: { order: "asc" }, take: 20 });
+      const rows = await prisma.curtainCategory.findMany({
+        where: q
+          ? { OR: [{ name: { contains: q } }, { slug: { contains: q } }] }
+          : undefined,
+        orderBy: { order: "asc" },
+        take: 30,
+      });
       return pack(
         rows.map((r) => `• **${r.name}** (\`${r.slug}\`)`).join("\n") || "خالی",
         [{ type: "link_buttons", items: adminLink("category") }]
       );
     }
-    case "portfolio_category": {
-      const rows = await prisma.portfolioCategory.findMany({ orderBy: { order: "asc" }, take: 20 });
-      return pack(
-        rows.map((r) => `• **${r.name}** (\`${r.slug}\`)`).join("\n") || "خالی",
-        [{ type: "link_buttons", items: adminLink("portfolio_category") }]
-      );
-    }
     case "project": {
-      const rows = await prisma.project.findMany({ orderBy: { updatedAt: "desc" }, take: 10 });
+      const rows = await prisma.project.findMany({
+        where: q
+          ? { OR: [{ title: { contains: q } }, { categorySlug: { contains: q } }] }
+          : undefined,
+        orderBy: { updatedAt: "desc" },
+        take: 12,
+      });
       return pack(
-        rows.map((r) => `• **${r.title}** — ${r.categorySlug || "—"} — \`${r.id.slice(0, 8)}\``).join("\n") ||
-          "خالی",
+        rows.map((r) => `• **${r.title}** — ${r.categorySlug || "—"}`).join("\n") || "خالی",
         [{ type: "link_buttons", items: adminLink("project") }]
       );
     }
     case "product": {
-      const rows = await prisma.product.findMany({ orderBy: { updatedAt: "desc" }, take: 10 });
+      const rows = await prisma.product.findMany({
+        where: q
+          ? { OR: [{ name: { contains: q } }, { slug: { contains: q } }] }
+          : undefined,
+        orderBy: { updatedAt: "desc" },
+        take: 12,
+      });
       return pack(
         rows
-          .map((r) => `• **${r.name}** — ${r.price.toLocaleString("fa-IR")} ت — \`${r.slug}\``)
+          .map((r) => `• **${r.name}** — ${r.price.toLocaleString("fa-IR")} ت`)
           .join("\n") || "خالی",
         [{ type: "link_buttons", items: adminLink("product") }]
       );
@@ -453,7 +405,15 @@ async function listEntity(entity: EntityKind): Promise<AdminActionResult> {
       );
     }
     case "order": {
-      const rows = await prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 10 });
+      const rows = await prisma.order.findMany({
+        where: q
+          ? {
+              OR: [{ customerName: { contains: q } }, { customerPhone: { contains: q } }],
+            }
+          : undefined,
+        orderBy: { createdAt: "desc" },
+        take: 12,
+      });
       return pack(
         rows
           .map(
@@ -466,8 +426,11 @@ async function listEntity(entity: EntityKind): Promise<AdminActionResult> {
     }
     case "request": {
       const rows = await prisma.consultationRequest.findMany({
+        where: q
+          ? { OR: [{ name: { contains: q } }, { phone: { contains: q } }] }
+          : undefined,
         orderBy: { createdAt: "desc" },
-        take: 10,
+        take: 12,
       });
       return pack(
         rows
@@ -489,8 +452,6 @@ async function deleteEntity(entity: EntityKind, id: string) {
       return prisma.curtainModel.delete({ where: { id } });
     case "category":
       return prisma.curtainCategory.delete({ where: { id } });
-    case "portfolio_category":
-      return prisma.portfolioCategory.delete({ where: { id } });
     case "project":
       return prisma.project.delete({ where: { id } });
     case "product":
@@ -507,8 +468,10 @@ async function deleteEntity(entity: EntityKind, id: string) {
       return prisma.installReference.delete({ where: { id } });
     case "saved_design":
       return prisma.savedDesign.delete({ where: { id } });
+    case "window":
+      return prisma.virtualWindowSetting.delete({ where: { id } });
     default:
-      throw new Error("حذف این نوع پشتیبانی نشده");
+      throw new Error("حذف پشتیبانی نشده");
   }
 }
 
@@ -520,7 +483,7 @@ async function createEntity(
     case "model": {
       const code = f.code || `M-${Date.now().toString(36).slice(-5)}`;
       const name = f.name || code;
-      const categorySlug = f.category || f.slug || "roman";
+      const categorySlug = f.category || "roman";
       const row = await prisma.curtainModel.create({
         data: {
           code,
@@ -547,21 +510,6 @@ async function createEntity(
           image: f.image || null,
           order: f.order ? Number(f.order) : 99,
           mechanism: f.mechanism || null,
-          subcategories: f.subcategories || null,
-        },
-      });
-      return { id: row.id, label: row.name };
-    }
-    case "portfolio_category": {
-      const name = f.name || "دسته نمونه";
-      const slug = f.slug || slugify(name);
-      const row = await prisma.portfolioCategory.create({
-        data: {
-          name,
-          slug,
-          description: f.description || null,
-          image: f.image || null,
-          order: f.order ? Number(f.order) : 99,
           subcategories: f.subcategories || null,
         },
       });
@@ -612,25 +560,22 @@ async function createEntity(
     }
     case "template": {
       const style = f.style || f.slug || "roman";
-      const image = f.image || "";
-      if (!image) throw new Error("برای قالب فیلد تصویر لازم است");
-      const row = await prisma.renderTemplate.create({ data: { style, image } });
+      if (!f.image) throw new Error("تصویر قالب لازم است");
+      const row = await prisma.renderTemplate.create({ data: { style, image: f.image } });
       return { id: row.id, label: row.style };
     }
     case "install_ref": {
-      const style = f.style || "roman";
-      const image = f.image || "";
-      if (!image) throw new Error("تصویر لازم است");
+      if (!f.image) throw new Error("تصویر لازم است");
       const row = await prisma.installReference.create({
-        data: { style, image, note: f.description || null },
+        data: { style: f.style || "roman", image: f.image, note: f.description || null },
       });
       return { id: row.id, label: row.style };
     }
     case "saved_design": {
-      const title = f.title || f.name || "طرح";
-      const image = f.image || "";
-      if (!image) throw new Error("تصویر لازم است");
-      const row = await prisma.savedDesign.create({ data: { title, image } });
+      if (!f.image) throw new Error("تصویر لازم است");
+      const row = await prisma.savedDesign.create({
+        data: { title: f.title || f.name || "طرح", image: f.image },
+      });
       return { id: row.id, label: row.title };
     }
     case "order":
@@ -669,7 +614,7 @@ async function updateEntity(
       if (f.description) data.description = f.description;
       if (f.image) data.image = f.image;
       if (f.material) data.material = f.material;
-      if (Object.keys(data).length === 0) throw new Error("هیچ فیلدی برای ویرایش نبود");
+      if (Object.keys(data).length === 0) throw new Error("فیلدی برای ویرایش نبود");
       const row = await prisma.curtainModel.update({ where: { id }, data });
       return { id: row.id, label: row.name };
     }
@@ -683,17 +628,6 @@ async function updateEntity(
       if (f.mechanism) data.mechanism = f.mechanism;
       if (f.subcategories) data.subcategories = f.subcategories;
       const row = await prisma.curtainCategory.update({ where: { id }, data });
-      return { id: row.id, label: row.name };
-    }
-    case "portfolio_category": {
-      const data: Record<string, unknown> = {};
-      if (f.name) data.name = f.name;
-      if (f.slug) data.slug = f.slug;
-      if (f.description) data.description = f.description;
-      if (f.image) data.image = f.image;
-      if (f.order) data.order = Number(f.order);
-      if (f.subcategories) data.subcategories = f.subcategories;
-      const row = await prisma.portfolioCategory.update({ where: { id }, data });
       return { id: row.id, label: row.name };
     }
     case "project": {
@@ -732,7 +666,7 @@ async function updateEntity(
       const data: Record<string, unknown> = {};
       if (f.status) data.status = f.status;
       if (f.note) data.note = f.note;
-      if (Object.keys(data).length === 0) throw new Error("وضعیت یا note بده");
+      if (Object.keys(data).length === 0) throw new Error("وضعیت یا یادداشت بده");
       const row = await prisma.order.update({ where: { id }, data });
       return { id: row.id, label: row.customerName };
     }
