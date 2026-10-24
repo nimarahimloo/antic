@@ -1,12 +1,19 @@
 /**
  * Install engine: chroma template + fabric map.
  * UV is mapped to the GREEN bounding box (not full image) so fabric scale is natural.
+ * Flat styles (shade/roman/roller) use near-zero warp to avoid geometric stretch.
  */
 
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
-import { resolveStyle, guessMaterial, styleTileFactor } from "../lib/curtainStyles.js";
+import {
+  resolveStyle,
+  guessMaterial,
+  styleTileFactor,
+  styleWarpFactor,
+  isFlatStyle,
+} from "../lib/curtainStyles.js";
 import { applyBrandWatermark } from "./brandWatermark.js";
 
 export type RenderInput = {
@@ -89,7 +96,7 @@ type TemplateCache = {
 
 const templateCache = new Map<string, TemplateCache>();
 
-function materialParams(material?: string, logStd?: number) {
+function materialParams(material?: string, logStd?: number, style?: string) {
   const target =
     material === "velvet"
       ? 0.4
@@ -99,17 +106,52 @@ function materialParams(material?: string, logStd?: number) {
           ? 0.16
           : 0.26;
   const contrast = Math.min(1.8, Math.max(0.6, target / Math.max(logStd ?? 0.12, 0.05)));
+  const warp = styleWarpFactor(style);
+  const flat = isFlatStyle(style);
+
   switch ((material || "cotton").toLowerCase()) {
     case "velvet":
-      return { id: 1, contrast, sheen: 0.45, detail: 0.22, tile: 1.0, warp: 0.03, ao: 0.42 };
+      return {
+        id: 1,
+        contrast,
+        sheen: 0.45,
+        detail: flat ? 0.16 : 0.22,
+        tile: 1.0,
+        warp,
+        ao: flat ? 0.28 : 0.42,
+      };
     case "silk":
     case "satin":
-      return { id: 2, contrast, sheen: 0.5, detail: 0.2, tile: 1.0, warp: 0.025, ao: 0.3 };
+      return {
+        id: 2,
+        contrast,
+        sheen: 0.5,
+        detail: flat ? 0.14 : 0.2,
+        tile: 1.0,
+        warp,
+        ao: flat ? 0.22 : 0.3,
+      };
     case "sheer":
     case "voile":
-      return { id: 3, contrast, sheen: 0.1, detail: 0.14, tile: 1.0, warp: 0.02, ao: 0.18 };
+      return {
+        id: 3,
+        contrast,
+        sheen: 0.1,
+        detail: 0.12,
+        tile: 1.0,
+        warp: Math.min(warp, 0.012),
+        ao: 0.16,
+      };
     default:
-      return { id: 0, contrast, sheen: 0.06, detail: 0.26, tile: 1.0, warp: 0.025, ao: 0.38 };
+      return {
+        id: 0,
+        contrast,
+        sheen: 0.06,
+        detail: flat ? 0.18 : 0.26,
+        tile: 1.0,
+        warp,
+        ao: flat ? 0.26 : 0.38,
+      };
   }
 }
 
@@ -239,12 +281,13 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const sharp = await getSharp();
   const maxWidth = input.maxWidth || Number(process.env.RENDER_MAX_WIDTH) || 1400;
   const tpl = await decodeTemplate(input.templatePathOrUrl, maxWidth);
-  const mat = materialParams(input.material, tpl.logStd);
+  const mat = materialParams(input.material, tpl.logStd, input.style);
+  const flat = isFlatStyle(input.style);
 
   // ~1 = one fabric image spans the green region width
   const fabricScale = Math.min(
-    1.2,
-    Math.max(0.85, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
+    1.18,
+    Math.max(0.88, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
   );
 
   const fabricBuf = await loadBuffer(input.fabricPathOrUrl);
@@ -284,7 +327,8 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const gW = Math.max(1, tpl.maxX - tpl.minX);
   const gH = Math.max(1, tpl.maxY - tpl.minY);
   const tileX = gW * fabricScale;
-  const tileY = tileX / aspect;
+  // For flat styles keep vertical scale closer to horizontal so pattern is not stretched
+  const tileY = flat ? tileX / aspect : (tileX / aspect) * 0.92;
 
   let keySum = 0;
   let keyN = 0;
@@ -332,8 +376,10 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       const localX = x - tpl.minX;
       const localY = y - tpl.minY;
       const warp = mat.warp ?? 0.025;
-      const u = (localX / tileX) * fi.width + gx * warp * fi.width * 0.1;
-      const v = (localY / Math.max(tileY * 0.92, 1)) * fi.height + gy * warp * fi.height * 0.06;
+
+      // Flat styles: pure planar UV, almost no gradient warp
+      const u = (localX / tileX) * fi.width + (flat ? 0 : gx * warp * fi.width * 0.1);
+      const v = (localY / Math.max(tileY, 1)) * fi.height + (flat ? 0 : gy * warp * fi.height * 0.06);
       const [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u, v);
 
       const flr = toLin(fr),
