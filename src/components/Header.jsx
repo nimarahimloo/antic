@@ -5,7 +5,7 @@ import { Menu, X } from "lucide-react";
 const NAV = [
   { label: "خانه", to: "/" },
   { label: "کاتالوگ", to: "/catalog" },
-  { label: "پروژه‌ها", to: "/projects" },
+  { label: "نمونه‌های اجرا", to: "/projects" },
   { label: "فروشگاه", to: "/shop" },
   { label: "درباره ما", to: "/about" },
   { label: "تماس", to: "/contact" },
