@@ -1,4 +1,4 @@
-/** Dual assistant: design_consultant + admin_assistant — rich blocks, local Prisma. */
+/** Dual assistant: warm design chat + admin DB tools. Never dump raw paths in text. */
 import { prisma } from "./prisma.js";
 
 export type RichBlock =
@@ -35,73 +35,62 @@ export type AssistantResult = {
   meta?: Record<string, unknown>;
 };
 
-type Intent =
-  | "greeting"
-  | "thanks"
-  | "help"
-  | "list_styles"
-  | "list_models"
-  | "search_models"
-  | "recommend"
-  | "about_install"
-  | "about_price"
-  | "about_contact"
-  | "taste"
-  | "unknown";
-
 const GREETING_RE =
   /^(سلام|درود|hi|hello|hey|سلام علیکم|صبح بخیر|عصر بخیر|شب بخیر|خوبی|چطوری)[\s!.؟?]*$/i;
 const THANKS_RE = /^(ممنون|مرسی|تشکر|thanks|thank you|خداحافظ|bye)[\s!.؟?]*$/i;
 
-const STYLE_HINTS: { keys: string[]; styles: string[]; note: string }[] = [
+/** هر کلید → اسلاگ واقعی دسته در DB */
+const STYLE_HINTS: { keys: string[]; slugs: string[]; tip: string }[] = [
   {
     keys: ["بلک", "blackout", "تاریک", "خواب", "نور نده", "اتاق خواب"],
-    styles: ["shade", "zebra", "roman"],
-    note: "برای کنترل نور و اتاق خواب، شید بلک‌اوت، زبرا یا رومن مناسب‌اند.",
+    slugs: ["shade", "zebra", "roman"],
+    tip: "برای اتاق خواب معمولاً شید بلک‌اوت یا زبرا انتخاب می‌شود تا صبح راحت بخوابی.",
   },
   {
     keys: ["شفاف", "تور", "نورگیر", "روشن", "sheer"],
-    styles: ["drape", "wave", "pleated-sheer"],
-    note: "برای فضای پرنور، پرده شفاف/تور حس سبکی می‌دهد.",
+    slugs: ["sheer", "silk"],
+    tip: "تور و حریر نور را نرم رد می‌کنند و فضا را دلباز نشان می‌دهند.",
   },
   {
-    keys: ["کلاسیک", "لوکس", "مجلل", "مجلسی"],
-    styles: ["drape", "roman", "velvet"],
-    note: "برای کلاسیک، چین‌دار یا رومن شیک‌تر می‌نشیند.",
+    keys: ["کلاسیک", "لوکس", "مجلل", "مجلسی", "سلیقه"],
+    slugs: ["velvet", "roman", "silk", "sheer"],
+    tip: "برای حس کلاسیک، مخمل و رومن با تور روی هم خیلی شیک می‌نشینند.",
   },
   {
     keys: ["مدرن", "ساده", "مینیمال"],
-    styles: ["panel", "turk-panel", "shade", "zebra", "roller"],
-    note: "برای مدرن، ترک‌پنل، شید یا زبرا خطوط تمیزتری دارند.",
+    slugs: ["turk-panel", "shade", "zebra", "roller", "cubism"],
+    tip: "خط‌های تمیز ترک‌پنل، شید یا زبرا با دکوراسیون مدرن جورتر است.",
   },
   {
     keys: ["اداری", "دفتر", "تجاری", "شرکت"],
-    styles: ["zebra", "shade", "roller", "double"],
-    note: "برای اداری زبرا یا شید کاربردی‌ترند.",
+    slugs: ["zebra", "shade", "roller", "office"],
+    tip: "در دفتر زبرا و شید هم حریم می‌دهند هم نور را کنترل می‌کنند.",
   },
   {
     keys: ["آشپزخانه", "kitchen"],
-    styles: ["roman", "shade", "roller"],
-    note: "برای آشپزخانه رومن یا شید جمع‌وجور است.",
+    slugs: ["kitchen", "roman", "shade", "roller"],
+    tip: "آشپزخانه بهتر است پرده‌اش جمع‌وجور باشد — رومن یا شید.",
   },
   {
     keys: ["نشیمن", "پذیرایی", "سالن", "living"],
-    styles: ["drape", "roman", "zebra"],
-    note: "برای نشیمن بسته به نور: چین‌دار، رومن یا زبرا.",
+    slugs: ["velvet", "sheer", "roman", "zebra", "silk"],
+    tip: "پذیرایی اغلب ترکیب تور + لایه سنگین‌تر (مخمل یا رومن) جواب می‌دهد.",
   },
-  { keys: ["زبرا", "zebra"], styles: ["zebra"], note: "زبرا نور و حریم را با هم می‌دهد." },
-  { keys: ["رومن", "roman"], styles: ["roman"], note: "رومن تاهای افقی مرتب دارد." },
-  { keys: ["شید", "shade"], styles: ["shade", "double"], note: "شید برای کنترل نور عالی است." },
+  { keys: ["زبرا", "zebra"], slugs: ["zebra"], tip: "زبرا نوار روشن و تیره دارد؛ هم نور می‌آید هم دید کم می‌شود." },
+  { keys: ["رومن", "roman"], slugs: ["roman"], tip: "رومن تاهای افقی مرتب دارد و برای پنجره متوسط عالی است." },
+  { keys: ["شید", "shade"], slugs: ["shade"], tip: "شید برای کنترل دقیق نور ساخته شده؛ بلک‌اوت یا اسکرین." },
   {
     keys: ["ترک", "پنل", "turk", "panel"],
-    styles: ["panel", "turk-panel"],
-    note: "ترک‌پنل ظاهر مدرن دارد.",
+    slugs: ["turk-panel"],
+    tip: "ترک‌پنل ظاهر مدرن و تخت دارد.",
   },
   {
     keys: ["پلیسه", "pleated"],
-    styles: ["pleated", "pleated-manual"],
-    note: "پلیسه برای پنجره متوسط مناسب است.",
+    slugs: ["pleated"],
+    tip: "پلیسه مثل آکاردئون جمع می‌شود و برای پنجره‌های معمولی مناسب است.",
   },
+  { keys: ["مخمل", "velvet"], slugs: ["velvet"], tip: "مخمل حس لوکس و سنگینی به فضا می‌دهد." },
+  { keys: ["کرکره", "roller", "رول"], slugs: ["roller"], tip: "کرکره‌ای/رولر برای کنترل نور کاربردی است." },
 ];
 
 function normalize(s: string) {
@@ -112,34 +101,12 @@ function normalize(s: string) {
     .trim();
 }
 
-function detectIntent(text: string): Intent {
-  const t = normalize(text);
-  if (GREETING_RE.test(t) || t.length < 3) return "greeting";
-  if (THANKS_RE.test(t)) return "thanks";
-  if (/کمک|چطور|چگونه|راهنما|help/.test(t)) return "help";
-  if (/سلیقه|دوست دارم|ترجیح|رنگ مورد|طرح مورد|کلاسیک|مدرن/.test(t) && !/پیشنهاد|میخوام|اتاق/.test(t))
-    return "taste";
-  if (/قیمت|هزینه|مبلغ|price/.test(t)) return "about_price";
-  if (/نصب|اندازه|بازدید|اجرا/.test(t)) return "about_install";
-  if (/تماس|مشاوره|شماره|فرم|contact/.test(t)) return "about_contact";
-  if (/چه سبک|سبک‌ها|انواع پرده|دسته/.test(t)) return "list_styles";
-  if (/چه مدل|لیست مدل|کاتالوگ|همه مدل/.test(t)) return "list_models";
-  if (
-    STYLE_HINTS.some((h) => h.keys.some((k) => t.includes(normalize(k)))) ||
-    /پیشنهاد|میخوام|می‌خوام|نیاز|برای|فضا|اتاق|پنجره|دکور/.test(t)
-  ) {
-    return "recommend";
-  }
-  if (/جستجو|پیدا|دارید|موجود/.test(t)) return "search_models";
-  return "unknown";
-}
-
-function detectStyleHints(text: string) {
+function detectHints(text: string) {
   const t = normalize(text);
   return STYLE_HINTS.filter((h) => h.keys.some((k) => t.includes(normalize(k))));
 }
 
-function extractSearchTerms(text: string): string[] {
+function extractTerms(text: string): string[] {
   const stop = new Set([
     "سلام",
     "برای",
@@ -158,8 +125,11 @@ function extractSearchTerms(text: string): string[] {
     "کن",
     "مدل",
     "پرده",
-    "قالب",
-    "بساز",
+    "دارید",
+    "دارین",
+    "هست",
+    "چیست",
+    "چی",
   ]);
   return normalize(text)
     .split(/[\s,،.؟!]+/)
@@ -167,18 +137,8 @@ function extractSearchTerms(text: string): string[] {
     .filter((w) => w.length >= 2 && !stop.has(w));
 }
 
-async function loadCatalog() {
-  const [categories, models, projects, modelCount, orderCount, requestCount, products] =
-    await Promise.all([
-      prisma.curtainCategory.findMany({ orderBy: { order: "asc" }, take: 40 }),
-      prisma.curtainModel.findMany({ orderBy: { updatedAt: "desc" }, take: 120 }),
-      prisma.project.findMany({ orderBy: { updatedAt: "desc" }, take: 12 }).catch(() => []),
-      prisma.curtainModel.count(),
-      prisma.order.count().catch(() => 0),
-      prisma.consultationRequest.count().catch(() => 0),
-      prisma.product.findMany({ orderBy: { updatedAt: "desc" }, take: 20 }).catch(() => []),
-    ]);
-  return { categories, models, projects, modelCount, orderCount, requestCount, products };
+function pack(text: string, blocks?: RichBlock[], meta?: Record<string, unknown>): AssistantResult {
+  return { text, blocks, meta };
 }
 
 function modelCards(
@@ -189,14 +149,15 @@ function modelCards(
     color: string | null;
     image: string | null;
     categorySlug: string | null;
+    fabric?: string | null;
   }>
 ): RichBlock {
   return {
     type: "model_cards",
     items: list.map((m) => ({
       id: m.id,
-      title: m.name,
-      subtitle: [m.code, m.color, m.categorySlug].filter(Boolean).join(" · "),
+      title: m.name || m.code || "مدل",
+      subtitle: [m.code, m.color || m.fabric, m.categorySlug].filter(Boolean).join(" · "),
       image: m.image,
       href: `/curtain/${m.id}`,
     })),
@@ -214,7 +175,7 @@ function scoreModel(
     subcategory: string | null;
     material: string | null;
   },
-  preferred: string[],
+  preferredSlugs: string[],
   terms: string[]
 ) {
   const slug = (m.categorySlug || "").toLowerCase();
@@ -223,163 +184,131 @@ function scoreModel(
     `${m.name} ${m.code || ""} ${m.fabric || ""} ${m.color || ""} ${m.description || ""} ${m.material || ""} ${slug} ${sub}`
   );
   let score = 0;
-  for (const s of preferred) {
+  for (const s of preferredSlugs) {
     const ns = normalize(s);
-    if (slug.includes(ns) || sub.includes(ns) || blob.includes(ns)) score += 4;
+    if (slug === ns) score += 10;
+    else if (slug.includes(ns) || sub.includes(ns)) score += 6;
   }
-  for (const t of terms) if (blob.includes(t)) score += 2;
+  for (const t of terms) {
+    if (blob.includes(t)) score += 2;
+  }
   return score;
 }
 
-function pack(text: string, blocks?: RichBlock[], meta?: Record<string, unknown>): AssistantResult {
-  return { text, blocks, meta };
+async function loadCatalog() {
+  const [categories, models, modelCount, orderCount, requestCount] = await Promise.all([
+    prisma.curtainCategory.findMany({ orderBy: { order: "asc" }, take: 40 }),
+    prisma.curtainModel.findMany({ orderBy: { updatedAt: "desc" }, take: 150 }),
+    prisma.curtainModel.count(),
+    prisma.order.count().catch(() => 0),
+    prisma.consultationRequest.count().catch(() => 0),
+  ]);
+  return { categories, models, modelCount, orderCount, requestCount };
+}
+
+function historyBlob(history: ChatMessage[]) {
+  return history
+    .filter((m) => m.role === "user")
+    .slice(-6)
+    .map((m) => m.content)
+    .join(" ");
 }
 
 export async function buildConsultantReply(
   userText: string,
   history: ChatMessage[] = []
 ): Promise<AssistantResult> {
-  const intent = detectIntent(userText);
-  const { categories, models, projects, modelCount } = await loadCatalog();
-  const meta = { intent, agent: "design_consultant" };
+  const t = normalize(userText);
+  const { categories, models, modelCount } = await loadCatalog();
+  const fullContext = `${historyBlob(history)} ${userText}`;
+  const hints = detectHints(fullContext);
+  const preferred = [...new Set(hints.flatMap((h) => h.slugs))];
+  const terms = extractTerms(userText);
+  const tip = hints.map((h) => h.tip).filter(Boolean)[0];
 
-  if (intent === "greeting") {
+  // —— احوال‌پرسی ——
+  if (GREETING_RE.test(t) || t.length < 2) {
     return pack(
-      `سلام 👋 من دستیار طراحی **پرده آنتیک** هستم.\n\n` +
-        `برای پیشنهاد دقیق بگو:\n` +
-        `• فضا کجاست؟ (نشیمن، خواب، آشپزخانه، اداری)\n` +
-        `• نور را تاریک می‌خواهی یا روشن؟\n` +
-        `• حس دکوراسیون؟ (مدرن، کلاسیک، مینیمال)`,
+      "سلام، خوش اومدی 🌿\nمن اینجام که کمکت کنم پرده‌ای انتخاب کنی که هم با سلیقه‌ت جور دربیاد هم با نور اتاقت.\n\nراستش را بگو: **کدام اتاق** است و دوست داری فضا **تاریک** بماند یا **روشن و پرنور**؟",
       [
         {
           type: "quick_replies",
           items: [
-            { label: "نشیمن مدرن", message: "نشیمن مدرن می‌خوام" },
-            { label: "اتاق خواب تاریک", message: "اتاق خواب بلک‌اوت می‌خوام" },
-            { label: "کلاسیک لوکس", message: "سلیقه‌م کلاسیک و لوکسه" },
-            { label: "مشاهده کاتالوگ", message: "سبک‌های پرده را نشان بده" },
-          ],
-        },
-        {
-          type: "link_buttons",
-          items: [
-            { label: "کاتالوگ کامل", href: "/catalog" },
-            { label: "نمونه‌های اجرا", href: "/projects" },
-            { label: "تماس و مشاوره", href: "/contact" },
-          ],
-        },
-      ],
-      meta
-    );
-  }
-
-  if (intent === "thanks") {
-    return pack("قابل نداشت. هر وقت خواستی رنگ یا طرح را عوض کنیم همین‌جا بگو.", undefined, meta);
-  }
-
-  if (intent === "help" || intent === "taste") {
-    const top = models.slice(0, 4);
-    return pack(
-      intent === "taste"
-        ? `سلیقه‌ات را گرفتم. برای اینکه مدل واقعی پیشنهاد بدهم بگو **فضا** کجاست و **نور** را تاریک می‌خواهی یا روشن؟`
-        : `می‌توانم از کاتالوگ زنده مدل پیشنهاد بدهم. فضا و میزان نور را بگو تا دقیق‌تر انتخاب کنیم.`,
-      [
-        ...(top.length ? [modelCards(top)] : []),
-        {
-          type: "quick_replies",
-          items: [
-            { label: "نشیمن روشن", message: "نشیمن روشن و مدرن" },
+            { label: "نشیمن روشن", message: "نشیمن روشن و دلباز" },
             { label: "خواب تاریک", message: "اتاق خواب تاریک بلک‌اوت" },
-            { label: "اداری", message: "پرده اداری زبرا" },
+            { label: "کلاسیک لوکس", message: "پذیرایی کلاسیک و لوکس" },
+            { label: "دفتر کار", message: "پرده اداری برای دفتر" },
           ],
         },
-        {
-          type: "link_buttons",
-          items: [
-            { label: "باز کردن کاتالوگ", href: "/catalog" },
-            { label: "درخواست مشاوره", href: "/contact" },
-          ],
-        },
-      ],
-      meta
+      ]
     );
   }
 
-  if (intent === "about_price") {
-    return pack(
-      `قیمت بر اساس **ابعاد + پارچه + سبک نصب** حساب می‌شود و در سایت عدد ثابت ندارد.\nمدل را انتخاب کن، بعد از صفحه تماس درخواست بده تا اندازه و قیمت دقیق بگیری.`,
-      [{ type: "link_buttons", items: [{ label: "فرم مشاوره و قیمت", href: "/contact" }] }],
-      meta
-    );
+  if (THANKS_RE.test(t)) {
+    return pack("قابلی نداشت 💛 هر وقت خواستی دوباره تنظیمش می‌کنیم. موفق باشی.");
   }
 
-  if (intent === "about_install" || intent === "about_contact") {
+  if (/قیمت|هزینه|مبلغ/.test(t)) {
     return pack(
-      `مسیر استاندارد:\n۱) انتخاب مدل از کاتالوگ\n۲) درخواست در صفحه تماس\n۳) بازدید، اندازه‌گیری و نصب`,
+      "قیمت پرده مثل لباس آماده روی تگ نیست — به **عرض و ارتفاع پنجره**، نوع پارچه و سبک نصب بستگی دارد.\n\nبهترین کار: مدلی که دوست داری را انتخاب کن، بعد از صفحه تماس ابعاد تقریبی را بفرست تا برات برآورد دقیق بفرستیم.",
       [
         {
           type: "link_buttons",
           items: [
+            { label: "درخواست مشاوره و قیمت", href: "/contact" },
             { label: "کاتالوگ", href: "/catalog" },
-            { label: "تماس / مشاوره", href: "/contact" },
-            { label: "نمونه‌های اجرا", href: "/projects" },
           ],
         },
-      ],
-      meta
+      ]
     );
   }
 
-  if (intent === "list_styles") {
-    const lines = categories.map((c) => `• **${c.name}**`).join("\n");
+  if (/نصب|اندازه|بازدید|اجرا/.test(t)) {
     return pack(
-      lines ? `سبک‌های فعال کاتالوگ:\n${lines}\n\nکدام فضا را می‌خواهی دکور کنیم؟` : "هنوز دسته‌ای ثبت نشده.",
+      "نصب استاندارد ما این‌طور پیش می‌رود:\n۱) انتخاب مدل از کاتالوگ\n۲) هماهنگی بازدید و اندازه‌گیری\n۳) دوخت/آماده‌سازی و نصب در محل\n\nاگر مدل را انتخاب کردی، از تماس اقدام کن تا نوبت بازدید بگیری.",
       [
         {
           type: "link_buttons",
-          items: categories.slice(0, 8).map((c) => ({
+          items: [
+            { label: "تماس و نوبت", href: "/contact" },
+            { label: "نمونه‌های اجرا شده", href: "/projects" },
+          ],
+        },
+      ]
+    );
+  }
+
+  if (/تماس|مشاوره|شماره|فرم/.test(t)) {
+    return pack("حتماً — از صفحه تماس می‌تونی درخواستت را ثبت کنی. کارشناس ما سریع جواب می‌دهد.", [
+      { type: "link_buttons", items: [{ label: "رفتن به تماس", href: "/contact" }] },
+    ]);
+  }
+
+  if (/سبک|انواع|دسته|چی دارید|چه پرده/.test(t) && preferred.length === 0) {
+    return pack(
+      categories.length
+        ? `الان این سبک‌ها را در کاتالوگ داریم:\n${categories
+            .slice(0, 12)
+            .map((c) => `• **${c.name}**`)
+            .join("\n")}\n\nبگو سراغ کدام فضا می‌روی تا همان را برایت باز کنم.`
+        : "هنوز دسته‌ای ثبت نشده.",
+      [
+        {
+          type: "link_buttons",
+          items: categories.slice(0, 6).map((c) => ({
             label: c.name,
             href: `/catalog?category=${c.slug}`,
           })),
         },
-      ],
-      meta
+      ]
     );
   }
 
-  if (intent === "list_models") {
-    const sample = models.slice(0, 6);
-    return pack(
-      `**${modelCount} مدل** در کاتالوگ موجود است. چند مورد اخیر:`,
-      [
-        modelCards(sample),
-        {
-          type: "link_buttons",
-          items: [{ label: "مشاهده همه در کاتالوگ", href: "/catalog" }],
-        },
-      ],
-      meta
-    );
-  }
-
-  const hints = detectStyleHints(userText);
-  const preferred = [...new Set(hints.flatMap((h) => h.styles))];
-  const histText = history
-    .filter((m) => m.role === "user")
-    .slice(-5)
-    .map((m) => m.content)
-    .join(" ");
-  for (const s of detectStyleHints(histText).flatMap((h) => h.styles)) {
-    if (!preferred.includes(s)) preferred.push(s);
-  }
-  const terms = extractSearchTerms(userText);
-
+  // —— پیشنهاد مدل ——
   if (!models.length) {
-    return pack(
-      "کاتالوگ هنوز خالی است. از صفحه تماس می‌توانی مشاوره بگیری.",
-      [{ type: "link_buttons", items: [{ label: "تماس", href: "/contact" }] }],
-      meta
-    );
+    return pack("کاتالوگ هنوز خالی است. از تماس می‌تونی مشاوره بگیری.", [
+      { type: "link_buttons", items: [{ label: "تماس", href: "/contact" }] },
+    ]);
   }
 
   const scored = models
@@ -387,58 +316,85 @@ export async function buildConsultantReply(
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  const top = (scored.length ? scored : models.map((m) => ({ m, score: 0 })))
-    .slice(0, 6)
-    .map((x) => x.m);
-
-  if (intent === "recommend" || scored.length > 0) {
-    const note =
-      hints.map((h) => h.note).join(" ") ||
-      "با توجه به حرف‌هات، این مدل‌ها از کاتالوگ نزدیک‌ترند:";
-    const blocks: RichBlock[] = [
-      modelCards(top),
-      {
-        type: "quick_replies",
-        items: [
-          { label: "گزینه تاریک‌تر", message: "نسخه تاریک‌تر یا بلک‌اوت می‌خوام" },
-          { label: "گزینه روشن‌تر", message: "نسخه روشن‌تر و شفاف‌تر" },
-          { label: "مشاوره نصب", message: "برای نصب و قیمت راهنمایی کن" },
-        ],
-      },
-      {
-        type: "link_buttons",
-        items: [
-          { label: "کاتالوگ کامل", href: "/catalog" },
-          { label: "درخواست مشاوره", href: "/contact" },
-        ],
-      },
-    ];
-    if (projects.length) {
-      blocks.push({
-        type: "link_buttons",
-        items: [{ label: "نمونه‌های اجرا شده", href: "/projects" }],
-      });
-    }
-    return pack(`${note}\nروی هر کارت بزن تا جزئیات مدل را ببینی.`, blocks, meta);
+  // فقط مدل‌هایی که واقعاً امتیاز دارند؛ اگر سبک مشخص است و چیزی نیست، نگوییم «نزدیک‌ترین» تصادفی
+  if (preferred.length > 0 && scored.length === 0) {
+    return pack(
+      (tip ? tip + "\n\n" : "") +
+        `متأسفانه الان مدلی با این مشخصات در کاتالوگ ثبت نشده. می‌تونی از کاتالوگ کامل ببینی یا از تماس بپرسی — شاید مدل جدید اضافه شده باشد.`,
+      [
+        {
+          type: "link_buttons",
+          items: [
+            { label: "کاتالوگ", href: "/catalog" },
+            { label: "تماس", href: "/contact" },
+          ],
+        },
+        {
+          type: "quick_replies",
+          items: [
+            { label: "زبرا ببینم", message: "زبرا دارید؟" },
+            { label: "شید ببینم", message: "شید بلک‌اوت" },
+            { label: "رومن", message: "رومن کلاسیک" },
+          ],
+        },
+      ]
+    );
   }
 
-  return pack(
-    `برای پیشنهاد دقیق‌تر بگو فضا و نور چطور است — مثلاً «نشیمن مدرن روشن» یا «خواب بلک‌اوت».`,
-    [
-      {
-        type: "quick_replies",
-        items: [
-          { label: "نشیمن مدرن", message: "نشیمن مدرن" },
-          { label: "خواب بلک‌اوت", message: "اتاق خواب بلک‌اوت" },
-          { label: "زبرا اداری", message: "زبرا برای دفتر" },
-        ],
-      },
-    ],
-    meta
-  );
+  // بدون سرنخ کافی → سؤال راهنما، نه لیست تصادفی
+  if (scored.length === 0) {
+    return pack(
+      "دوست دارم دقیق‌تر کمکت کنم 😊\nفقط بگو:\n• اتاق کجاست؟\n• نور را بیشتر می‌خواهی یا کمتر؟\n• حس مدرن می‌خواهی یا کلاسیک؟",
+      [
+        {
+          type: "quick_replies",
+          items: [
+            { label: "نشیمن کلاسیک", message: "نشیمن کلاسیک لوکس" },
+            { label: "خواب تاریک", message: "اتاق خواب تاریک" },
+            { label: "شید می‌خوام", message: "شید برای کنترل نور" },
+            { label: "زبرا می‌خوام", message: "زبرا اداری یا خانگی" },
+          ],
+        },
+      ]
+    );
+  }
+
+  const top = scored.slice(0, 4).map((x) => x.m);
+  const intro =
+    tip ||
+    (preferred.length
+      ? "طبق چیزی که گفتی، این چند مدل از کاتالوگ واقعاً به کارت می‌آید:"
+      : "چند مدل مرتبط پیدا کردم:");
+
+  const teach =
+    preferred.includes("shade") || /شید/.test(t)
+      ? "\n\nنکته کوچک: شید را می‌شود تا بالا جمع کرد؛ برای مطالعه یا تلویزیون خیلی راحت است."
+      : preferred.includes("zebra") || /زبرا/.test(t)
+        ? "\n\nنکته کوچک: در زبرا با چرخاندن نوارها می‌توانی بین شفاف و مات جابه‌جا شوی."
+        : preferred.includes("roman") || /رومن/.test(t)
+          ? "\n\nنکته کوچک: رومن وقتی بالا می‌رود تاهای پارچه‌ای مرتب می‌سازد و ظاهر رسمی‌تری دارد."
+          : "\n\nاگر رنگ دیوار یا اندازه پنجره را بگی، همان را تنگ‌تر می‌کنم.";
+
+  return pack(`${intro}${teach}\n\nروی کارت بزن تا مدل را کامل ببینی ✨`, [
+    modelCards(top),
+    {
+      type: "quick_replies",
+      items: [
+        { label: "تاریک‌تر", message: "نسخه تاریک‌تر یا بلک‌اوت" },
+        { label: "روشن‌تر", message: "نسخه روشن‌تر و شفاف" },
+        { label: "قیمت و نصب", message: "درباره قیمت و نصب بگو" },
+      ],
+    },
+    {
+      type: "link_buttons",
+      items: [
+        { label: "کاتالوگ کامل", href: "/catalog" },
+        { label: "مشاوره حضوری", href: "/contact" },
+      ],
+    },
+  ]);
 }
 
-/** اکشن‌های ادمین با دسترسی خواندن/نوشتن دیتابیس */
 async function runAdminAction(
   userText: string,
   context: AssistantContext
@@ -446,7 +402,6 @@ async function runAdminAction(
   const t = normalize(userText);
   const path = context.path || "";
 
-  // --- WRITE: وضعیت درخواست مشاوره ---
   const statusMatch = t.match(
     /(?:وضعیت|status)\s*(?:درخواست)?\s*([a-z0-9_-]{6,})\s*(?:را|=|به)?\s*(جدید|new|انجام|done|بسته|closed|درحال|processing)/i
   );
@@ -467,21 +422,16 @@ async function runAdminAction(
     const found = await prisma.consultationRequest.findFirst({
       where: { id: { contains: idPart } },
     });
-    if (!found) {
-      return pack(`درخواستی با شناسه شبیه «${idPart}» پیدا نشد.`);
-    }
+    if (!found) return pack(`درخواستی با شناسه شبیه «${idPart}» پیدا نشد.`);
     const updated = await prisma.consultationRequest.update({
       where: { id: found.id },
       data: { status },
     });
-    return pack(
-      `وضعیت درخواست **${updated.name}** به **${updated.status}** تغییر کرد.`,
-      [{ type: "link_buttons", items: [{ label: "لیست درخواست‌ها", href: "/admin/requests" }] }],
-      { action: "update_consultation_status", id: updated.id }
-    );
+    return pack(`وضعیت درخواست **${updated.name}** → **${updated.status}**`, [
+      { type: "link_buttons", items: [{ label: "درخواست‌ها", href: "/admin/requests" }] },
+    ]);
   }
 
-  // --- WRITE: دسته کاتالوگ جدید ---
   if (/دسته\s*جدید|افزودن\s*دسته|create\s*category/.test(t)) {
     const nameM = userText.match(/نام\s*[:：=]?\s*([^,\n]+)/i);
     const slugM = userText.match(/(?:slug|شناسه)\s*[:：=]?\s*([a-z0-9-]+)/i);
@@ -493,34 +443,27 @@ async function runAdminAction(
         create: { name, slug, order: 99 },
         update: { name },
       });
-      return pack(
-        `دسته **${row.name}** (\\`${row.slug}\\`) ذخیره شد.`,
-        [{ type: "link_buttons", items: [{ label: "مدیریت دسته‌ها", href: "/admin/categories" }] }],
-        { action: "upsert_category", slug }
-      );
+      return pack(`دسته **${row.name}** ذخیره شد.`, [
+        { type: "link_buttons", items: [{ label: "دسته‌ها", href: "/admin/categories" }] },
+      ]);
     }
-    return pack(
-      `برای ساخت دسته بنویس:\n` +
-        `دسته جدید نام: رومن شناسه: roman`
-    );
+    return pack("فرمت: دسته جدید نام: رومن شناسه: roman");
   }
 
-  // --- READ: سفارش‌ها ---
   if (/سفارش|orders?/.test(t) || path.includes("order")) {
     const orders = await prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 8 });
     if (!orders.length) return pack("سفارشی ثبت نشده.");
     const lines = orders
       .map(
         (o) =>
-          `• **${o.customerName}** — ${o.amountToman.toLocaleString("fa-IR")} تومان — ${o.status}`
+          `• **${o.customerName}** — ${o.amountToman.toLocaleString("fa-IR")} ت — ${o.status}`
       )
       .join("\n");
     return pack(`آخرین سفارش‌ها:\n${lines}`, [
-      { type: "link_buttons", items: [{ label: "صفحه سفارش‌ها", href: "/admin/orders" }] },
+      { type: "link_buttons", items: [{ label: "سفارش‌ها", href: "/admin/orders" }] },
     ]);
   }
 
-  // --- READ: درخواست‌ها ---
   if (/درخواست|مشاوره|inbox|request/.test(t) || path.includes("request")) {
     const reqs = await prisma.consultationRequest.findMany({
       orderBy: { createdAt: "desc" },
@@ -528,35 +471,28 @@ async function runAdminAction(
     });
     if (!reqs.length) return pack("درخواستی نیست.");
     const lines = reqs
-      .map(
-        (r) =>
-          `• **${r.name}** (${r.phone}) — ${r.status} — id: \\`${r.id.slice(0, 8)}\\``
-      )
+      .map((r) => `• **${r.name}** (${r.phone}) — ${r.status} — \`${r.id.slice(0, 8)}\``)
       .join("\n");
-    return pack(
-      `آخرین درخواست‌ها:\n${lines}\n\nبرای تغییر وضعیت:\nوضعیت درخواست ${reqs[0].id.slice(0, 8)} را انجام`,
-      [{ type: "link_buttons", items: [{ label: "پنل درخواست‌ها", href: "/admin/requests" }] }]
-    );
+    return pack(`آخرین درخواست‌ها:\n${lines}`, [
+      { type: "link_buttons", items: [{ label: "پنل درخواست", href: "/admin/requests" }] },
+    ]);
   }
 
-  // --- READ: مدل‌ها ---
   if (/لیست\s*مدل|مدل‌ها|models/.test(t) || (path.includes("models") && /لیست|چند|تعداد/.test(t))) {
-    const models = await prisma.curtainModel.findMany({
-      orderBy: { updatedAt: "desc" },
-      take: 8,
-    });
+    const list = await prisma.curtainModel.findMany({ orderBy: { updatedAt: "desc" }, take: 8 });
     const count = await prisma.curtainModel.count();
-    return pack(`**${count}** مدل در دیتابیس. آخرین‌ها:`, [
-      modelCards(models),
+    return pack(`**${count}** مدل در دیتابیس:`, [
+      modelCards(list),
       { type: "link_buttons", items: [{ label: "مدیریت مدل‌ها", href: "/admin/models" }] },
     ]);
   }
 
-  // --- READ: محصولات فروشگاه ---
   if (/محصول|فروشگاه|product/.test(t) || path.includes("product")) {
     const products = await prisma.product.findMany({ orderBy: { updatedAt: "desc" }, take: 6 });
     const count = await prisma.product.count();
-    const lines = products.map((p) => `• **${p.name}** — ${p.price.toLocaleString("fa-IR")} ت`).join("\n");
+    const lines = products
+      .map((p) => `• **${p.name}** — ${p.price.toLocaleString("fa-IR")} ت`)
+      .join("\n");
     return pack(`**${count}** محصول اکسسوری.\n${lines || "—"}`, [
       { type: "link_buttons", items: [{ label: "محصولات", href: "/admin/products" }] },
     ]);
@@ -581,16 +517,7 @@ export async function buildAdminAssistantReply(
 
   if (/وضعیت|خلاصه|داشبورد|چیکار/.test(t) || path === "/admin") {
     return pack(
-      `📊 وضعیت زنده دیتابیس:\n` +
-        `• مدل پرده: **${modelCount}**\n` +
-        `• دسته کاتالوگ: **${categories.length}**\n` +
-        `• سفارش: **${orderCount}**\n` +
-        `• درخواست مشاوره: **${requestCount}**\n\n` +
-        `می‌توانم لیست بخوانم یا بنویسم — مثلاً:\n` +
-        `• «لیست مدل‌ها»\n` +
-        `• «درخواست‌های مشاوره»\n` +
-        `• «دسته جدید نام: زبرا شناسه: zebra»\n` +
-        `• «وضعیت درخواست ab12cd را انجام»`,
+      `وضعیت DB:\n• مدل: **${modelCount}**\n• دسته: **${categories.length}**\n• سفارش: **${orderCount}**\n• درخواست: **${requestCount}**\n\nدستورات: «لیست مدل‌ها» · «درخواست‌های مشاوره» · «دسته جدید نام: … شناسه: …»`,
       [
         {
           type: "quick_replies",
@@ -600,85 +527,51 @@ export async function buildAdminAssistantReply(
             { label: "سفارش‌ها", message: "آخرین سفارش‌ها" },
           ],
         },
-        {
-          type: "link_buttons",
-          items: [
-            { label: "مدل‌ها", href: "/admin/models" },
-            { label: "درخواست‌ها", href: "/admin/requests" },
-            { label: "سفارش‌ها", href: "/admin/orders" },
-          ],
-        },
       ]
     );
   }
 
   if (GREETING_RE.test(t)) {
-    return pack(
-      `سلام — دستیار ادمین آنتیک. الان روی **${page}** هستی.\n` +
-        `خواندن و نوشتن دیتابیس را پشتیبانی می‌کنم. بگو چه کار کنی.`,
-      [
-        {
-          type: "quick_replies",
-          items: [
-            { label: "وضعیت سایت", message: "خلاصه وضعیت" },
-            { label: "لیست مدل", message: "لیست مدل‌ها" },
-            { label: "درخواست‌ها", message: "درخواست‌های مشاوره" },
-          ],
-        },
-      ]
-    );
-  }
-
-  if (/قالب|chroma|کروم|سبز|رندر/.test(t)) {
-    return pack(
-      `ساخت قالب chroma:\n۱) برو پنجره مجازی\n۲) روی سبک **ساخت قالب** بزن\n۳) پیش‌نمایش سبز را چک کن\n\nعکس پارچه مدل بدون برچسب کد باشد.`,
-      [{ type: "link_buttons", items: [{ label: "پنجره مجازی", href: "/admin/window" }] }]
-    );
-  }
-
-  if (/مدل|پارچه|کاتالوگ|افزودن مدل/.test(t) || path.includes("models")) {
-    return pack(
-      `ثبت مدل:\n۱) /admin/models → افزودن\n۲) فقط تکه پارچه\n۳) کد محصول + دسته نصب\n\nالان **${modelCount}** مدل در DB است. برای دیدن لیست بگو «لیست مدل‌ها».`,
-      [
-        modelCards(models.slice(0, 4)),
-        { type: "link_buttons", items: [{ label: "صفحه مدل‌ها", href: "/admin/models" }] },
-      ]
-    );
-  }
-
-  if (/متن|توضیح|کپی|محتوا|بنویس|کپشن/.test(t)) {
-    const sample = models[0];
-    const code = sample?.code || "CODE";
-    const name = sample?.name || "نام مدل";
-    return pack(
-      `نمونه متن:\n\n**عنوان:** پرده ${name} — کد ${code}\n**کوتاه:** پارچه منتخب کاتالوگ؛ مناسب فضای مدرن.\n**بلند:** بافت واقعی پارچه در پیش‌نمایش نصب دیده می‌شود. نصب پس از اندازه‌گیری.`
-    );
-  }
-
-  if (/دسته|زیردسته|category/.test(t) || path.includes("categor")) {
-    const lines = categories.slice(0, 12).map((c) => `• ${c.name} (\\`${c.slug}\\`)`).join("\n");
-    return pack(
-      `دسته‌های فعلی:\n${lines || "—"}\n\nساخت: «دسته جدید نام: رومن شناسه: roman»`,
-      [{ type: "link_buttons", items: [{ label: "دسته‌بندی کاتالوگ", href: "/admin/categories" }] }]
-    );
-  }
-
-  return pack(
-    `روی **${page}** هستی. می‌توانم:\n` +
-      `• خواندن: مدل، سفارش، درخواست، محصول\n` +
-      `• نوشتن: وضعیت درخواست، ساخت/بروزرسانی دسته\n\n` +
-      `دقیق بگو چه شود — مثلاً «لیست سفارش‌ها» یا «خلاصه وضعیت».`,
-    [
+    return pack(`سلام — روی **${page}** هستی. بگو چه کار دیتابیسی انجام شود.`, [
       {
         type: "quick_replies",
         items: [
           { label: "خلاصه وضعیت", message: "خلاصه وضعیت" },
-          { label: "لیست مدل‌ها", message: "لیست مدل‌ها" },
-          { label: "درخواست‌ها", message: "درخواست‌های مشاوره" },
+          { label: "لیست مدل", message: "لیست مدل‌ها" },
         ],
       },
-    ]
-  );
+    ]);
+  }
+
+  if (/قالب|chroma|رندر/.test(t)) {
+    return pack("از پنجره مجازی قالب chroma هر سبک را بساز.", [
+      { type: "link_buttons", items: [{ label: "پنجره مجازی", href: "/admin/window" }] },
+    ]);
+  }
+
+  if (/مدل|پارچه|افزودن مدل/.test(t) || path.includes("models")) {
+    return pack(`ثبت مدل از /admin/models. الان **${modelCount}** مدل داریم.`, [
+      modelCards(models.slice(0, 4)),
+      { type: "link_buttons", items: [{ label: "مدل‌ها", href: "/admin/models" }] },
+    ]);
+  }
+
+  if (/دسته|category/.test(t) || path.includes("categor")) {
+    const lines = categories.slice(0, 12).map((c) => `• ${c.name}`).join("\n");
+    return pack(`دسته‌ها:\n${lines}`, [
+      { type: "link_buttons", items: [{ label: "دسته‌ها", href: "/admin/categories" }] },
+    ]);
+  }
+
+  return pack(`روی **${page}** هستی. بگو: لیست مدل‌ها، سفارش‌ها، درخواست‌ها، یا ساخت دسته.`, [
+    {
+      type: "quick_replies",
+      items: [
+        { label: "خلاصه وضعیت", message: "خلاصه وضعیت" },
+        { label: "لیست مدل‌ها", message: "لیست مدل‌ها" },
+      ],
+    },
+  ]);
 }
 
 export async function buildAssistantReply(
