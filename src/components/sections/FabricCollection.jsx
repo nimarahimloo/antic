@@ -1,21 +1,13 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
-import { useCurtainCategories } from "@/hooks/useCurtainCategories";
+import { useCurtainCategories, pickSecondaryCategories } from "@/hooks/useCurtainCategories";
 
 const FA_DIGITS = ["۰۱", "۰۲", "۰۳", "۰۴", "۰۵", "۰۶", "۰۷", "۰۸"];
 
-/** ردیف پایین‌تر ترتیب — باز هم از همان CurtainCategory API */
 export default function FabricCollection() {
   const { categories, loading } = useCurtainCategories();
-
-  // اگر دسته‌های با توضیح در Premium رفته‌اند، بقیه را اینجا نشان بده؛ وگرنه از وسط لیست
-  const withDesc = categories.filter((c) => c.description);
-  const rest = categories.filter((c) => !c.description);
-  const items = (rest.length >= 2 ? rest : categories.slice(Math.floor(categories.length / 2))).slice(
-    0,
-    8
-  );
+  const items = pickSecondaryCategories(categories, 8);
 
   if (loading && !items.length) return null;
   if (!items.length) return null;
@@ -31,7 +23,7 @@ export default function FabricCollection() {
           </h2>
           <div className="mx-auto mt-6 h-px w-24 bg-primary/60" />
           <p className="mx-auto mt-6 max-w-xl font-body text-sm leading-7 text-muted-foreground">
-            همه از پنل ادمین؛ با افزودن یا حذف دسته، این بخش هم به‌روز می‌شود.
+            همان منبع `CurtainCategory` — با افزودن یا حذف دسته در ادمین به‌روز می‌شود.
           </p>
         </div>
 
