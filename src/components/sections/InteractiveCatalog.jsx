@@ -118,39 +118,58 @@ export default function InteractiveCatalog({ initialCategory }) {
           )}
         </div>
 
-        <div className="mb-8 flex gap-2 overflow-x-auto no-scrollbar pb-1" dir="rtl">
+        {/* کارت کاور دسته‌ها — نه دکمه گرد */}
+        <div className="mb-8 flex gap-3 overflow-x-auto no-scrollbar pb-1" dir="rtl">
           {catsLoading && !CATEGORIES.length
             ? [...Array(5)].map((_, i) => (
-                <div key={i} className="h-9 w-24 shrink-0 animate-pulse rounded-full bg-secondary/40" />
+                <div
+                  key={i}
+                  className="h-28 w-28 shrink-0 animate-pulse rounded-2xl bg-secondary/40 lg:h-32 lg:w-32"
+                />
               ))
-            : CATEGORIES.map((cat) => (
-                <button
-                  type="button"
-                  key={cat.slug}
-                  onClick={() => {
-                    setSearch("");
-                    setSelectedCategory(cat.slug);
-                  }}
-                  className={`shrink-0 rounded-full border px-5 py-2.5 font-display text-xs font-bold transition-all duration-300 ${
-                    selectedCategory === cat.slug && !search.trim()
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-secondary/70 text-muted-foreground hover:border-primary hover:text-primary"
-                  }`}
-                >
-                  {cat.name}
-                  {categoryCounts[cat.slug] != null && (
-                    <span
-                      className={`mr-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold ${
-                        selectedCategory === cat.slug && !search.trim()
-                          ? "bg-primary-foreground/20 text-primary-foreground"
-                          : "bg-secondary/60 text-muted-foreground"
-                      }`}
-                    >
-                      {categoryCounts[cat.slug]}
-                    </span>
-                  )}
-                </button>
-              ))}
+            : CATEGORIES.map((cat) => {
+                const active = selectedCategory === cat.slug && !search.trim();
+                return (
+                  <button
+                    type="button"
+                    key={cat.slug}
+                    onClick={() => {
+                      setSearch("");
+                      setSelectedCategory(cat.slug);
+                    }}
+                    className={`group relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl border transition-all lg:h-32 lg:w-32 ${
+                      active
+                        ? "border-primary ring-2 ring-primary/40"
+                        : "border-secondary/60 hover:border-primary/60"
+                    }`}
+                  >
+                    {cat.image ? (
+                      <img
+                        src={cat.image}
+                        alt={cat.name}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-secondary/40">
+                        <span className="px-2 text-center font-display text-[11px] font-bold text-muted-foreground">
+                          {cat.name}
+                        </span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 p-2 text-center">
+                      <span className="font-display text-[11px] font-bold text-foreground lg:text-xs">
+                        {cat.name}
+                      </span>
+                      {categoryCounts[cat.slug] != null && (
+                        <span className="mt-0.5 block font-body text-[9px] text-muted-foreground">
+                          {categoryCounts[cat.slug]} مدل
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
         </div>
 
         <div className="grid gap-8 lg:grid-cols-5">
