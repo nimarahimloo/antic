@@ -2,6 +2,8 @@ import { prisma } from "../lib/prisma.js";
 import { renderInstallImage, styleFromModel, guessMaterial } from "./installEngine.js";
 import { renderFromProductPhoto } from "./productRetexture.js";
 import path from "path";
+import fs from "fs";
+import sharp from "sharp";
 
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 
@@ -39,10 +41,54 @@ type ResolvedTemplate = {
   mode: "chroma" | "hybrid";
 };
 
+function localPathFromPublic(publicPath: string): string | null {
+  if (!publicPath) return null;
+  if (publicPath.startsWith("/uploads/")) {
+    return path.join(path.resolve(uploadDir), publicPath.replace(/^\/uploads\//, ""));
+  }
+  if (publicPath.startsWith("uploads/")) {
+    return path.join(path.resolve(uploadDir), publicPath.replace(/^uploads\//, ""));
+  }
+  return null;
+}
+
+/** عکس‌هایی که عمدتاً سبز chroma هستند نباید به‌عنوان «مرجع واقعی» استفاده شوند */
+async function isMostlyGreenChroma(publicPath: string): Promise<boolean> {
+  try {
+    const local = localPathFromPublic(publicPath);
+    let buf: Buffer;
+    if (local && fs.existsSync(local)) {
+      buf = await fs.promises.readFile(local);
+    } else if (/^https?:\/\//i.test(publicPath)) {
+      const res = await fetch(publicPath);
+      if (!res.ok) return false;
+      buf = Buffer.from(await res.arrayBuffer());
+    } else {
+      return false;
+    }
+    const { data, info } = await sharp(buf)
+      .resize(64, 64, { fit: "inside" })
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let greenish = 0;
+    const n = info.width * info.height;
+    for (let i = 0; i < data.length; i += 3) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      if (g > 90 && g > r * 1.25 && g > b * 1.25) greenish++;
+    }
+    return greenish / n > 0.45;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * اولویت (بعد از آپلود قالب سبز تمیز توسط ادمین):
- *  1) RenderTemplate سبز → بهترین کیفیت نگاشت پارچه
- *  2) InstallReference → hybrid auto-chroma از عکس واقعی
+ * اولویت صحیح:
+ *  1) InstallReference واقعی (نه سبز خالص) → hybrid
+ *  2) RenderTemplate سبز → chroma
  */
 async function resolveTemplateCandidates(opts: {
   categorySlug?: string | null;
@@ -55,7 +101,32 @@ async function resolveTemplateCandidates(opts: {
   const out: ResolvedTemplate[] = [];
   const seen = new Set<string>();
 
-  // 1) Admin green chroma first (user-uploaded quality templates)
+  // 1) Real product photos first
+  for (const k of unique) {
+    const refs = await prisma.installReference.findMany({
+      where: { style: k },
+      orderBy: { updatedAt: "desc" },
+      take: 4,
+    });
+    for (const ref of refs) {
+      if (!ref?.image) continue;
+      if (await isMostlyGreenChroma(ref.image)) {
+        console.warn("[render] skip green InstallReference as real photo", k, ref.id);
+        continue;
+      }
+      const id = `ref:${k}:${ref.image}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push({
+        image: ref.image,
+        source: "install_reference",
+        key: k,
+        mode: "hybrid",
+      });
+    }
+  }
+
+  // 2) Green chroma templates
   for (const k of unique) {
     const tpl = await prisma.renderTemplate.findFirst({
       where: { style: k },
@@ -75,25 +146,6 @@ async function resolveTemplateCandidates(opts: {
     }
   }
 
-  // 2) Real product photo hybrid
-  for (const k of unique) {
-    const ref = await prisma.installReference.findFirst({
-      where: { style: k },
-      orderBy: { updatedAt: "desc" },
-    });
-    if (ref?.image) {
-      const id = `ref:${k}:${ref.image}`;
-      if (!seen.has(id)) {
-        seen.add(id);
-        out.push({
-          image: ref.image,
-          source: "install_reference",
-          key: k,
-          mode: "hybrid",
-        });
-      }
-    }
-  }
   return out;
 }
 
@@ -104,12 +156,16 @@ export async function listCategoryTemplateCoverage() {
     prisma.installReference.findMany({ select: { style: true, image: true, note: true } }),
   ]);
   const tplBy = new Map(templates.map((t) => [t.style.toLowerCase(), t]));
-  const refBy = new Map(refs.map((r) => [r.style.toLowerCase(), r]));
+  const refsBy = new Map<string, (typeof refs)[0]>();
+  for (const r of refs) {
+    const k = r.style.toLowerCase();
+    if (!refsBy.has(k)) refsBy.set(k, r);
+  }
 
   return categories.map((c) => {
     const slug = c.slug.toLowerCase();
     const tpl = tplBy.get(slug);
-    const ref = refBy.get(slug);
+    const ref = refsBy.get(slug);
     return {
       id: c.id,
       name: c.name,
@@ -148,8 +204,8 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
   const candidates = await resolveTemplateCandidates({ categorySlug, style });
   if (!candidates.length) {
     throw new Error(
-      `برای دسته «${categorySlug || "—"}» قالب سبز یا عکس مرجع نیست. ` +
-        `قالب سبز رومن/پلیسه را در بخش قالب‌ها آپلود کنید.`
+      `برای دسته «${categorySlug || "—"}» قالب سبز یا عکس مرجع واقعی نیست. ` +
+        `در «نمونه‌های اجرای واقعی» عکس محصول آپلود کنید یا قالب سبز بسازید.`
     );
   }
 
@@ -181,9 +237,9 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
       const threshold = autoApproveThreshold();
       const autoOk = result.qualityScore >= threshold;
       const status = autoOk ? "approved" : "pending";
-      const label = resolved.mode === "chroma" ? "قالب سبز" : "عکس مرجع";
+      const label = resolved.mode === "chroma" ? "قالب سبز" : "عکس مرجع واقعی";
       const review = autoOk
-        ? `${label} · امتیاز ${result.qualityScore}/10 · تأیید خودکار · ${resolved.source}`
+        ? `${label} · امتیاز ${result.qualityScore}/10 · تأیید خودکار · ${resolved.source} · key=${resolved.key}`
         : `${label} · امتیاز ${result.qualityScore}/10 · پوشش ${Math.round(result.coverage * 100)}٪ · ${resolved.source}`;
 
       await prisma.curtainModel.update({
