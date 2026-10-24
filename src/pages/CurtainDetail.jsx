@@ -3,9 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowRight, Phone, CheckCircle2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import CurtainPreview from "@/components/catalog/CurtainPreview";
-import VisualPreviewTool from "@/components/catalog/VisualPreviewTool";
 import FabricSwatch from "@/components/catalog/FabricSwatch";
 
+/** جزئیات مدل — همان install_image ادمین، بدون پیش‌نمایش کارتونی جدا */
 export default function CurtainDetail() {
   const { id } = useParams();
   const [model, setModel] = useState(null);
@@ -45,8 +45,7 @@ export default function CurtainDetail() {
     );
   }
 
-  const hasApprovedInstall =
-    model.install_status === "approved" && Boolean(model.install_image);
+  const hasInstall = Boolean(model.install_image);
 
   return (
     <div className="bg-background pb-24">
@@ -67,26 +66,17 @@ export default function CurtainDetail() {
       <div className="mx-auto max-w-7xl px-5 py-8 lg:px-10 lg:py-12">
         <div className="grid gap-10 lg:grid-cols-2 lg:gap-14">
           <div>
-            <CurtainPreview fabric={model} />
+            <CurtainPreview fabric={model} publicMode />
 
-            {hasApprovedInstall && (
-              <div className="mt-4 overflow-hidden rounded-2xl border border-primary/30 bg-card">
-                <div className="flex items-center gap-2 border-b border-secondary/50 px-4 py-2.5">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-                  <p className="font-display text-xs font-bold text-foreground">نمونه نصب تأییدشده</p>
-                </div>
-                <img
-                  src={model.install_image}
-                  alt={`نصب ${model.code}`}
-                  className="aspect-[4/3] w-full object-cover"
-                />
+            {hasInstall && (
+              <div className="mt-3 flex items-center gap-2 text-[11px] text-primary">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                همان نمونه نصب تولیدشده در پنل ادمین
               </div>
             )}
 
             <div className="mt-6 rounded-2xl border border-secondary/60 bg-card p-4">
-              <p className="mb-3 font-display text-xs font-bold text-foreground">
-                تکهٔ پارچه از کاتالوگ فیزیکی
-              </p>
+              <p className="mb-3 font-display text-xs font-bold text-foreground">تکهٔ پارچه از کاتالوگ</p>
               <div className="overflow-hidden rounded-xl">
                 <FabricSwatch fabric={model} className="aspect-[4/3] w-full" />
               </div>
@@ -104,11 +94,6 @@ export default function CurtainDetail() {
                 {model.texture && <span className="text-muted-foreground">{model.texture}</span>}
                 {model.material && <span className="text-muted-foreground">{model.material}</span>}
               </div>
-              {!model.image && (
-                <p className="mt-2 text-[10px] text-muted-foreground">
-                  عکس ورق کاتالوگ هنوز آپلود نشده — فقط شبیه‌سازی رنگی نمایش داده می‌شود.
-                </p>
-              )}
             </div>
           </div>
 
@@ -153,10 +138,6 @@ export default function CurtainDetail() {
               </Link>
             </div>
           </div>
-        </div>
-
-        <div className="mt-10 lg:mt-14">
-          <VisualPreviewTool fabric={model} />
         </div>
       </div>
     </div>
