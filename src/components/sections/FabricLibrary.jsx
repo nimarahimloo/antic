@@ -2,24 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Phone } from "lucide-react";
 import { Image } from "@/components/ui/image";
-import { useCurtainCategories } from "@/hooks/useCurtainCategories";
-
-/** ترجیح دسته‌های پارچه‌ای اگر در DB باشند؛ وگرنه چند دسته اول با تصویر */
-const FABRIC_SLUG_ORDER = ["velvet", "sheer", "silk", "cotton"];
-
-function pickFabricCategories(categories) {
-  if (!categories?.length) return [];
-  const bySlug = new Map(categories.map((c) => [String(c.slug || "").toLowerCase(), c]));
-  const preferred = FABRIC_SLUG_ORDER.map((s) => bySlug.get(s)).filter(Boolean);
-  if (preferred.length >= 2) return preferred.slice(0, 6);
-  const withImage = categories.filter((c) => c.image);
-  const pool = withImage.length >= 2 ? withImage : categories;
-  return pool.slice(0, 6);
-}
+import { useCurtainCategories, pickVisualCategories } from "@/hooks/useCurtainCategories";
 
 export default function FabricLibrary() {
   const { categories, loading } = useCurtainCategories();
-  const items = pickFabricCategories(categories);
+  const items = pickVisualCategories(categories, 6);
   const [active, setActive] = useState(0);
 
   useEffect(() => {
@@ -46,13 +33,13 @@ export default function FabricLibrary() {
       <div className="mx-auto max-w-7xl px-5 lg:px-10">
         <div className="mb-14 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <span className="eyebrow mb-4 block">دسته‌بندی · کتابخانه پارچه</span>
+            <span className="eyebrow mb-4 block">کاتالوگ · دسته‌بندی</span>
             <h2 className="font-display text-3xl font-bold leading-tight text-foreground lg:text-4xl">
               حس <span className="text-gold-gradient">بافت</span> را کشف کنید
             </h2>
           </div>
           <p className="max-w-md font-body text-sm leading-7 text-muted-foreground">
-            دسته‌بندی‌ها از پنل ادمین بارگذاری می‌شوند — با افزودن یا ویرایش دسته، این بخش به‌روز می‌شود.
+            همه از یک منبع: دسته‌بندی کاتالوگ در پنل ادمین (`CurtainCategory`).
           </p>
         </div>
 
