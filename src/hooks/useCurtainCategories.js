@@ -1,6 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 
+/**
+ * منبع واحد دسته‌های کاتالوگ پرده (غیر از فروشگاه).
+ * همهٔ سکشن‌های سایت باید از این hook / helpers استفاده کنند.
+ * فروشگاه جداست: ShopCategory via src/rest/store-catalog.js
+ */
+
 let cache = null;
 let inflight = null;
 
@@ -66,7 +72,7 @@ function fetchCategories(force = false) {
   return inflight;
 }
 
-/** دسته‌های پرده از /api/entities/CurtainCategory */
+/** دسته‌های پرده از /api/entities/CurtainCategory — تنها منبع غیر‌فروشگاه */
 export function useCurtainCategories() {
   const [categories, setCategories] = useState(cache || []);
   const [loading, setLoading] = useState(!cache);
@@ -91,7 +97,6 @@ export function useCurtainCategories() {
         /* unmounted */
       }
     });
-    // وقتی تب دوباره فعال شد، لیست را تازه کن (بعد از تغییر ادمین)
     const onVis = () => {
       if (document.visibilityState === "visible") reload(true);
     };
@@ -118,4 +123,63 @@ export function getCategoryMechanismMap() {
     if (c.slug && c.mechanism) map[c.slug] = c.mechanism;
   }
   return map;
+}
+
+/** برش بر اساس order — بدون لیست slug هاردکد */
+export function pickCategoriesByOrder(categories, limit = 8) {
+  if (!categories?.length) return [];
+  return categories.slice(0, limit);
+}
+
+/** دسته‌هایی که توضیح دارند؛ در غیر این صورت اول لیست */
+export function pickFeaturedCategories(categories, limit = 6) {
+  if (!categories?.length) return [];
+  const withDesc = categories.filter((c) => c.description);
+  const pool = withDesc.length >= 2 ? withDesc : categories;
+  return pool.slice(0, limit);
+}
+
+/** ترجیح تصویر؛ وگرنه order */
+export function pickVisualCategories(categories, limit = 6) {
+  if (!categories?.length) return [];
+  const withImage = categories.filter((c) => c.image);
+  const pool = withImage.length >= 2 ? withImage : categories;
+  return pool.slice(0, limit);
+}
+
+/**
+ * سیستم‌های فنی/شرکتی: mechanism ثبت‌شده در ادمین، یا زیردسته دارد
+ * (بدون هاردکد نام دسته)
+ */
+const SYSTEM_MECHANISMS = new Set([
+  "shade",
+  "double",
+  "roman",
+  "zebra",
+  "roller",
+  "panel",
+  "pleated-manual",
+  "pleated-chain",
+  "pleated-sheer",
+]);
+
+export function pickSystemCategories(categories, limit = 6) {
+  if (!categories?.length) return [];
+  const system = categories.filter(
+    (c) =>
+      (c.mechanism && SYSTEM_MECHANISMS.has(c.mechanism)) ||
+      (c.subcategories && c.subcategories.length > 0)
+  );
+  const pool = system.length >= 2 ? system : categories;
+  return pool.slice(0, limit);
+}
+
+/** بقیه بعد از featured — برای سکشن دوم صفحه */
+export function pickSecondaryCategories(categories, limit = 8) {
+  if (!categories?.length) return [];
+  const featured = pickFeaturedCategories(categories, 6);
+  const featuredSlugs = new Set(featured.map((c) => c.slug));
+  const rest = categories.filter((c) => !featuredSlugs.has(c.slug));
+  if (rest.length >= 2) return rest.slice(0, limit);
+  return categories.slice(Math.floor(categories.length / 2), Math.floor(categories.length / 2) + limit);
 }
