@@ -15,16 +15,13 @@ function authHeaders() {
 
 const empty = {
   name: "",
-  slug: "",
   description: "",
   price: "",
   compareAtPrice: "",
   image: "",
   categoryId: "",
-  stock: "100",
   visible: true,
   inStock: true,
-  ribbon: "",
 };
 
 export default function AdminProducts() {
@@ -64,16 +61,13 @@ export default function AdminProducts() {
   function openEdit(p) {
     setForm({
       name: p.name || "",
-      slug: p.slug || "",
       description: (p.plainDescription || "").replace(/<[^>]+>/g, ""),
       price: p.actualPriceRange?.minValue?.amount || "",
       compareAtPrice: p.compareAtPriceRange?.minValue?.amount || "",
       image: p.media?.main?.image?.url || "",
       categoryId: p.mainCategoryId || "",
-      stock: "100",
       visible: p.visible !== false,
       inStock: p.inventory?.availabilityStatus === "IN_STOCK",
-      ribbon: p.ribbon?.name || "",
     });
     setEditing(p);
     setError("");
@@ -106,16 +100,13 @@ export default function AdminProducts() {
     setError("");
     const body = {
       name: form.name,
-      slug: form.slug || undefined,
       description: form.description ? `<p>${form.description}</p>` : "",
       price: Number(form.price) || 0,
       compareAtPrice: form.compareAtPrice ? Number(form.compareAtPrice) : null,
       image: form.image || null,
       categoryId: form.categoryId || null,
-      stock: Number(form.stock) || 0,
       visible: form.visible,
       inStock: form.inStock,
-      ribbon: form.ribbon || null,
     };
     try {
       const url = editing?.id
@@ -152,7 +143,7 @@ export default function AdminProducts() {
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-xl font-black">محصولات فروشگاه</h1>
+          <h1 className="font-display text-xl font-black">محصولات اکسسوری</h1>
           <p className="mt-1 font-body text-xs text-muted-foreground">
             {loading ? "…" : `${rows.length} محصول`}
           </p>
@@ -168,7 +159,7 @@ export default function AdminProducts() {
             <tr className="border-b border-secondary/60">
               <th className="px-4 py-3 text-right font-body text-xs text-muted-foreground">نام</th>
               <th className="px-4 py-3 text-right font-body text-xs text-muted-foreground">قیمت</th>
-              <th className="px-4 py-3 text-right font-body text-xs text-muted-foreground">موجودی</th>
+              <th className="px-4 py-3 text-right font-body text-xs text-muted-foreground">وضعیت</th>
               <th className="px-4 py-3 text-left font-body text-xs text-muted-foreground">عملیات</th>
             </tr>
           </thead>
@@ -182,7 +173,7 @@ export default function AdminProducts() {
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={4} className="py-16 text-center font-body text-sm text-muted-foreground">
-                  محصولی نیست. از «افزودن» شروع کنید.
+                  محصولی نیست.
                 </td>
               </tr>
             ) : (
@@ -197,18 +188,10 @@ export default function AdminProducts() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(p)}
-                        className="rounded-lg border border-secondary/70 p-2"
-                      >
+                      <button type="button" onClick={() => openEdit(p)} className="rounded-lg border border-secondary/70 p-2">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => remove(p)}
-                        className="rounded-lg border border-secondary/70 p-2"
-                      >
+                      <button type="button" onClick={() => remove(p)} className="rounded-lg border border-secondary/70 p-2">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -221,14 +204,11 @@ export default function AdminProducts() {
       </div>
 
       {editing !== null && (
-        <div
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4"
-          onClick={() => setEditing(null)}
-        >
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4" onClick={() => setEditing(null)}>
           <form
             onSubmit={save}
             onClick={(e) => e.stopPropagation()}
-            className="mx-auto my-8 max-w-xl rounded-3xl border border-secondary/60 bg-card p-6"
+            className="mx-auto my-8 max-w-lg rounded-3xl border border-secondary/60 bg-card p-6"
             noValidate
           >
             <div className="mb-6 flex items-center justify-between">
@@ -241,20 +221,11 @@ export default function AdminProducts() {
             </div>
             <div className="grid gap-4">
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">نام</label>
+                <label className="mb-1 block text-xs text-muted-foreground">نام *</label>
                 <input
                   className={input}
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs text-muted-foreground">اسلاگ</label>
-                <input
-                  className={input}
-                  dir="ltr"
-                  value={form.slug}
-                  onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -288,12 +259,8 @@ export default function AdminProducts() {
                     )}
                   </div>
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 px-3 py-2 text-xs text-primary">
-                    {uploading ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="h-3.5 w-3.5" />
-                    )}
-                    {uploading ? "آپلود…" : form.image ? "تعویض" : "انتخاب تصویر"}
+                    {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    {uploading ? "آپلود…" : form.image ? "تعویض" : "انتخاب"}
                     <input
                       type="file"
                       accept="image/*"
@@ -306,19 +273,10 @@ export default function AdminProducts() {
                       }}
                     />
                   </label>
-                  {form.image && (
-                    <button
-                      type="button"
-                      className="text-xs text-muted-foreground"
-                      onClick={() => setForm((f) => ({ ...f, image: "" }))}
-                    >
-                      حذف
-                    </button>
-                  )}
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">دسته</label>
+                <label className="mb-1 block text-xs text-muted-foreground">دسته اکسسوری</label>
                 <select
                   className={input}
                   value={form.categoryId}
@@ -336,7 +294,7 @@ export default function AdminProducts() {
                 <label className="mb-1 block text-xs text-muted-foreground">توضیح</label>
                 <textarea
                   className={`${input} resize-none`}
-                  rows={3}
+                  rows={2}
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 />
@@ -362,11 +320,7 @@ export default function AdminProducts() {
             </div>
             {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
             <div className="mt-6 flex gap-3">
-              <button
-                type="submit"
-                disabled={saving || uploading}
-                className="btn-gold flex-1 justify-center"
-              >
+              <button type="submit" disabled={saving || uploading} className="btn-gold flex-1 justify-center">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
               </button>
               <button type="button" onClick={() => setEditing(null)} className="btn-ghost-gold">
