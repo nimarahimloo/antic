@@ -30,14 +30,14 @@ function welcome(agent: string): ChatMessage {
     return {
       role: "assistant",
       content:
-        "سلام — دستیار ادمین آنتیک. می‌توانم از دیتابیس بخوانم و بنویسم (مدل، دسته، سفارش، درخواست). بگو چه کاری انجام شود.",
+        "سلام — دستیار ادمین آنتیک.\nمی‌توانم روی دیتابیس **افزودن، ویرایش، حذف و لیست** انجام دهم:\nمدل · دسته کاتالوگ · دسته نمونه · نمونه اجرا · محصول · دسته فروشگاه · سفارش · درخواست.\n\nمثال: «حذف مدل ZB-001» یا «افزودن محصول نام: قلاب قیمت: 120000»",
       blocks: [
         {
           type: "quick_replies",
           items: [
             { label: "خلاصه وضعیت", message: "خلاصه وضعیت" },
             { label: "لیست مدل‌ها", message: "لیست مدل‌ها" },
-            { label: "درخواست‌ها", message: "درخواست‌های مشاوره" },
+            { label: "راهنمای دستورات", message: "راهنمای دستورات" },
           ],
         },
       ],
@@ -130,7 +130,6 @@ router.post("/conversations/:id/messages", optionalAuth, async (req: AuthedReque
       })
       .parse(req.body || {});
 
-    // نوشتن در DB فقط برای ادمین احراز هویت‌شده
     if (conv.agent_name === "admin_assistant") {
       if (!req.user || req.user.role !== "admin") {
         throw new HttpError(403, "Admin authentication required for admin assistant");
@@ -154,17 +153,14 @@ router.post("/conversations/:id/messages", optionalAuth, async (req: AuthedReque
         ...body.context,
       };
 
-      let contentForModel = body.content;
-      if (body.attachments?.length) {
-        contentForModel +=
-          "\n[تصویر پیوست: " + body.attachments.map((a) => a.url).join(", ") + "]";
-      }
+      const imageUrl = body.attachments?.find((a) => a.type === "image")?.url;
 
       const { text, blocks } = await buildAssistantReply(
         conv.agent_name,
-        contentForModel,
+        body.content,
         history,
-        ctx
+        ctx,
+        { imageUrl }
       );
 
       conv.messages.push({
