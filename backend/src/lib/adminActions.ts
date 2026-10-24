@@ -3,9 +3,29 @@
  * فقط از مسیر admin_assistant و بعد از requireAdmin فراخوانی شود.
  */
 import { prisma } from "./prisma.js";
-import type { AssistantResult, RichBlock } from "./consultant.js";
 
-function pack(text: string, blocks?: RichBlock[], meta?: Record<string, unknown>): AssistantResult {
+export type AdminBlock =
+  | { type: "text"; markdown: string }
+  | {
+      type: "model_cards";
+      items: Array<{
+        id: string;
+        title: string;
+        subtitle?: string;
+        image?: string | null;
+        href: string;
+      }>;
+    }
+  | { type: "link_buttons"; items: Array<{ label: string; href: string }> }
+  | { type: "quick_replies"; items: Array<{ label: string; message: string }> };
+
+export type AdminActionResult = {
+  text: string;
+  blocks?: AdminBlock[];
+  meta?: Record<string, unknown>;
+};
+
+function pack(text: string, blocks?: AdminBlock[], meta?: Record<string, unknown>): AdminActionResult {
   return { text, blocks, meta };
 }
 
@@ -17,7 +37,6 @@ function normalize(s: string) {
     .trim();
 }
 
-/** استخراج جفت‌های کلید:مقدار از متن */
 function parseFields(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   const re =
@@ -28,7 +47,6 @@ function parseFields(text: string): Record<string, string> {
     const val = m[2].trim();
     if (key && val) out[key] = val;
   }
-  // alias های فارسی
   const map: Record<string, string> = {
     نام: "name",
     عنوان: "title",
@@ -49,7 +67,6 @@ function parseFields(text: string): Record<string, string> {
     وضعیت: "status",
     ترتیب: "order",
     مکانیزم: "mechanism",
-    visible: "visible",
   };
   const normalized: Record<string, string> = {};
   for (const [k, v] of Object.entries(out)) {
@@ -59,7 +76,6 @@ function parseFields(text: string): Record<string, string> {
 }
 
 function pickIdToken(text: string): string | null {
-  // cuid-ish or short id
   const m =
     text.match(/\b(c[a-z0-9]{20,})\b/i) ||
     text.match(/(?:id|شناسه)\s*[:：=]?\s*([a-z0-9_-]{6,})/i) ||
@@ -82,13 +98,12 @@ type EntityKind =
   | "window";
 
 function detectEntity(t: string): EntityKind | null {
-  if (/نمونه\s*اجرا|پروژه|project|portfolio\s*item/.test(t) && !/دسته/.test(t))
-    return "project";
-  if (/دسته\s*نمونه|portfolio\s*categor|دسته.?گالری/.test(t)) return "portfolio_category";
-  if (/دسته\s*فروشگاه|shop\s*categor|اکسسوری.?دسته/.test(t)) return "shop_category";
+  if (/نمونه\s*اجرا|پروژه|project/.test(t) && !/دسته/.test(t)) return "project";
+  if (/دسته\s*نمونه|portfolio\s*categor/.test(t)) return "portfolio_category";
+  if (/دسته\s*فروشگاه|shop\s*categor/.test(t)) return "shop_category";
   if (/دسته\s*کاتالوگ|curtain\s*categor|دسته.?پرده/.test(t)) return "category";
   if (/\bدسته\b|category/.test(t) && !/مدل|محصول|سفارش/.test(t)) return "category";
-  if (/مدل|curtain\s*model|پارچه.?مدل/.test(t)) return "model";
+  if (/مدل|curtain\s*model/.test(t)) return "model";
   if (/محصول|product/.test(t)) return "product";
   if (/سفارش|order/.test(t)) return "order";
   if (/درخواست|مشاوره|request|consultation/.test(t)) return "request";
@@ -103,28 +118,23 @@ type Action = "create" | "update" | "delete" | "list" | "count";
 
 function detectAction(t: string): Action | null {
   if (/حذف|پاک\s*کن|delete|remove/.test(t)) return "delete";
-  if (/افزودن|اضافه|بساز|ثبت\s*کن|create|add|new/.test(t)) return "create";
-  if (/ویرایش|بروز|تغییر|عوض|update|edit|set|rename/.test(t)) return "update";
-  if (/تعداد|چند|count/.test(t)) return "count";
+  if (/افزودن|اضافه|بساز|ثبت\s*کن|create|add\b|new\b/.test(t)) return "create";
+  if (/ویرایش|بروز|تغییر|عوض|update|edit|set\b|rename/.test(t)) return "update";
+  if (/تعداد|چندتا|count/.test(t)) return "count";
   if (/لیست|نشان\s*بده|list|show|همه/.test(t)) return "list";
   return null;
 }
 
 function slugify(s: string) {
-  return s
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9\u0600-\u06FF-]/g, "")
-    .replace(/-+/g, "-")
-    .slice(0, 64) || `item-${Date.now().toString(36)}`;
-}
-
-async function resolveModel(token: string) {
-  const byId = await prisma.curtainModel.findFirst({
-    where: { OR: [{ id: { contains: token } }, { code: token }, { name: { contains: token } }] },
-  });
-  return byId;
+  return (
+    s
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9\u0600-\u06FF-]/g, "")
+      .replace(/-+/g, "-")
+      .slice(0, 64) || `item-${Date.now().toString(36)}`
+  );
 }
 
 async function resolveByIdOrName(
@@ -133,7 +143,11 @@ async function resolveByIdOrName(
 ): Promise<{ id: string; label: string } | null> {
   switch (entity) {
     case "model": {
-      const r = await resolveModel(token);
+      const r = await prisma.curtainModel.findFirst({
+        where: {
+          OR: [{ id: { contains: token } }, { code: token }, { name: { contains: token } }],
+        },
+      });
       return r ? { id: r.id, label: r.name || r.code } : null;
     }
     case "category": {
@@ -208,7 +222,7 @@ async function resolveByIdOrName(
 export async function executeAdminCommand(
   userText: string,
   options?: { imageUrl?: string }
-): Promise<AssistantResult | null> {
+): Promise<AdminActionResult | null> {
   const t = normalize(userText);
   const action = detectAction(t);
   const entity = detectEntity(t);
@@ -218,10 +232,8 @@ export async function executeAdminCommand(
     fields.cover = fields.cover || options.imageUrl;
   }
 
-  // دستورات بدون entity مشخص اما با action کلی
   if (!action && !entity) return null;
 
-  // ——— COUNT ———
   if (action === "count" || (/تعداد/.test(t) && entity)) {
     const e = entity || "model";
     const counts: Record<string, number> = {
@@ -244,7 +256,6 @@ export async function executeAdminCommand(
     );
   }
 
-  // ——— LIST ———
   if (action === "list" || (entity && !action && /لیست|نشان|همه/.test(t))) {
     return listEntity(entity || "model");
   }
@@ -252,32 +263,32 @@ export async function executeAdminCommand(
   if (!entity) {
     if (action) {
       return pack(
-        `نوع موجودیت را مشخص کن. مثال:\n` +
+        `نوع موجودیت را بگو. مثال‌ها:\n` +
           `• حذف مدل ZB-001\n` +
+          `• افزودن مدل کد: ZB-10 نام: زبرا طوسی دسته: zebra\n` +
+          `• ویرایش مدل ZB-001 رنگ: کرم\n` +
           `• افزودن دسته کاتالوگ نام: زبرا شناسه: zebra\n` +
-          `• ویرایش محصول slug:x قیمت:250000\n` +
-          `• وضعیت سفارش id را paid کن`
+          `• حذف محصول hook-1\n` +
+          `• ویرایش سفارش abc123 وضعیت: paid\n` +
+          `• لیست درخواست‌ها`
       );
     }
     return null;
   }
 
-  // ——— DELETE ———
   if (action === "delete") {
     const token = pickIdToken(userText) || fields.code || fields.slug || fields.name || fields.title;
     if (!token) {
-      return pack(`برای حذف ${labelEntity(entity)} کد، نام یا id را بگو. مثال: حذف مدل ZB-001`);
+      return pack(`برای حذف ${labelEntity(entity)} کد، نام یا id را بگو.`);
     }
     const found = await resolveByIdOrName(entity, token);
     if (!found) return pack(`${labelEntity(entity)} با «${token}» پیدا نشد.`);
-
     await deleteEntity(entity, found.id);
     return pack(`✅ **${found.label}** (${labelEntity(entity)}) حذف شد.`, [
       { type: "link_buttons", items: adminLink(entity) },
     ]);
   }
 
-  // ——— CREATE ———
   if (action === "create") {
     try {
       const created = await createEntity(entity, fields);
@@ -290,7 +301,6 @@ export async function executeAdminCommand(
     }
   }
 
-  // ——— UPDATE ———
   if (action === "update") {
     const token =
       pickIdToken(userText) || fields.code || fields.slug || fields.name || fields.title || "";
@@ -300,14 +310,11 @@ export async function executeAdminCommand(
     const found = await resolveByIdOrName(entity, token);
     if (!found) return pack(`${labelEntity(entity)} با «${token}» پیدا نشد.`);
 
-    // وضعیت سریع برای سفارش/درخواست
-    if ((entity === "order" || entity === "request") && fields.status) {
-      /* already in fields */
-    } else if (entity === "order" || entity === "request") {
+    if (entity === "order" || entity === "request") {
       const st = t.match(
         /(?:را|به|=)\s*(جدید|new|انجام|done|بسته|closed|درحال|processing|pending|paid|cancelled|shipped)/i
       );
-      if (st) {
+      if (st && !fields.status) {
         const map: Record<string, string> = {
           جدید: "new",
           new: "new",
@@ -384,24 +391,26 @@ function createHelp(e: EntityKind) {
     project: "افزودن نمونه اجرا عنوان: ویلا شمال دسته: living",
     product: "افزودن محصول نام: قلاب فلزی شناسه: hook-1 قیمت: 120000",
     shop_category: "افزودن دسته فروشگاه نام: اکسسوری شناسه: accessory",
-    order: "سفارش را از پنل بساز؛ از چت فقط وضعیت را عوض کن",
-    request: "درخواست‌ها از فرم سایت می‌آیند؛ وضعیت را عوض کن",
+    order: "از چت فقط وضعیت سفارش را عوض کن",
+    request: "از چت فقط وضعیت درخواست را عوض کن",
     template: "افزودن قالب style: roman تصویر: /uploads/...",
-    install_ref: "افزودن مرجع نصب style: zebra",
-    saved_design: "افزودن طراحی عنوان: طرح۱",
+    install_ref: "افزودن مرجع نصب style: zebra تصویر: /uploads/...",
+    saved_design: "افزودن طراحی عنوان: طرح۱ تصویر: /uploads/...",
     window: "ویرایش پنجره مجازی wallColor: #fff",
   };
   return helps[e];
 }
 
-async function listEntity(entity: EntityKind): Promise<AssistantResult> {
+async function listEntity(entity: EntityKind): Promise<AdminActionResult> {
   switch (entity) {
     case "model": {
       const rows = await prisma.curtainModel.findMany({ orderBy: { updatedAt: "desc" }, take: 10 });
       const n = await prisma.curtainModel.count();
       return pack(
         `**${n}** مدل — آخرین‌ها:\n` +
-          rows.map((r) => `• **${r.name}** (${r.code}) — ${r.categorySlug} — \`${r.id.slice(0, 8)}\``).join("\n"),
+          rows
+            .map((r) => `• **${r.name}** (${r.code}) — ${r.categorySlug} — \`${r.id.slice(0, 8)}\``)
+            .join("\n"),
         [{ type: "link_buttons", items: adminLink("model") }]
       );
     }
@@ -467,11 +476,10 @@ async function listEntity(entity: EntityKind): Promise<AssistantResult> {
         [{ type: "link_buttons", items: adminLink("request") }]
       );
     }
-    default: {
-      return pack(`لیست ${labelEntity(entity)} از پنل مربوطه قابل مشاهده است.`, [
+    default:
+      return pack(`لیست ${labelEntity(entity)} از پنل قابل مشاهده است.`, [
         { type: "link_buttons", items: adminLink(entity) },
       ]);
-    }
   }
 }
 
@@ -627,7 +635,7 @@ async function createEntity(
     }
     case "order":
     case "request":
-      throw new Error("ایجاد سفارش/درخواست از چت پشتیبانی نمی‌شود — از فرم سایت استفاده کن");
+      throw new Error("ایجاد سفارش/درخواست از چت پشتیبانی نمی‌شود");
     case "window": {
       const row = await prisma.virtualWindowSetting.create({
         data: {
