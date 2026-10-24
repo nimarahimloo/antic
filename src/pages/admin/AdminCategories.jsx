@@ -1,39 +1,37 @@
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { MECHANISM_KEYS, MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
 
-/** تنها منبع دسته‌های کاتالوگ پرده (غیر از اکسسوری فروشگاه) */
+/** یک فرم دسته برای کاتالوگ و نمونه‌های اجرا */
 export default function AdminCategories() {
   const fields = [
-    { key: "name", label: "نام دسته", required: true, placeholder: "مثلاً: زبرا" },
+    { key: "name", label: "نام", required: true, placeholder: "مثلاً: زبرا" },
     {
       key: "slug",
-      label: "شناسه",
+      label: "شناسه انگلیسی",
       required: true,
-      placeholder: "مثلاً: zebra",
-      help: "کلید فیلتر کاتالوگ و قالب نصب. بعد از ذخیره، قالب chroma این دسته خودکار ساخته می‌شود.",
+      placeholder: "zebra",
     },
     {
       key: "mechanism",
-      label: "سبک رندر پنجره",
+      label: "سازوکار نصب",
       type: "select",
-      help: "اگر خالی باشد از روی شناسه حدس زده می‌شود. برای دسته‌های جدید تنظیم کنید.",
     },
-    { key: "order", label: "ترتیب نمایش", type: "number", placeholder: "مثلاً: 1" },
-    { key: "image", label: "تصویر", type: "image" },
-    { key: "description", label: "توضیحات", type: "textarea" },
+    { key: "order", label: "ترتیب", type: "number", placeholder: "1" },
+    { key: "image", label: "کاور", type: "image" },
+    { key: "description", label: "توضیح کوتاه", type: "textarea" },
     {
       key: "subcategories",
       label: "زیردسته‌ها",
       type: "sublist",
-      help: "با کاما جدا کنید؛ برای شناسه سفارشی از قالب «نام:شناسه» استفاده کنید",
       placeholder: "ساده:plain, طرح‌دار:patterned",
+      help: "اختیاری — با کاما؛ قالب نام:شناسه",
     },
   ];
 
   const columns = [
     {
       key: "image",
-      label: "تصویر",
+      label: "کاور",
       render: (v) =>
         v ? <img src={v} alt="" className="h-10 w-10 rounded-lg object-cover" /> : "—",
     },
@@ -45,20 +43,15 @@ export default function AdminCategories() {
     { key: "slug", label: "شناسه" },
     {
       key: "mechanism",
-      label: "رندر",
-      render: (v) => (v ? MECHANISM_LABELS[v] || v : "خودکار"),
+      label: "سازوکار",
+      render: (v) => (v ? MECHANISM_LABELS[v] || v : "—"),
     },
     { key: "order", label: "ترتیب" },
-    {
-      key: "subcategories",
-      label: "زیردسته‌ها",
-      render: (v) => (Array.isArray(v) ? v.length : 0),
-    },
   ];
 
   return (
     <AdminEntityPage
-      title="دسته‌بندی کاتالوگ پرده"
+      title="دسته‌بندی"
       entity="CurtainCategory"
       fields={fields}
       columns={columns}
