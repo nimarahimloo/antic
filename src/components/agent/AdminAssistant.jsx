@@ -2,16 +2,16 @@ import { useLocation } from "react-router-dom";
 import FloatingBot from "@/components/agent/FloatingBot";
 
 const STARTERS_BY_PATH = {
-  "/admin": ["خلاصه وضعیت", "لیست مدل‌ها", "درخواست‌های مشاوره"],
-  "/admin/models": ["لیست مدل‌ها", "چطور مدل اضافه کنم؟"],
-  "/admin/window": ["برای رومن قالب بساز", "راهنمای chroma"],
-  "/admin/categories": ["لیست دسته‌ها", "دسته جدید نام: زبرا شناسه: zebra"],
-  "/admin/projects": ["راهنمای نمونه اجرا"],
-  "/admin/portfolio-categories": ["دسته نمونه‌های اجرا"],
-  "/admin/products": ["محصولات فروشگاه"],
-  "/admin/orders": ["آخرین سفارش‌ها"],
-  "/admin/requests": ["درخواست‌های مشاوره"],
-  "/admin/settings": ["تنظیمات ضروری"],
+  "/admin": ["خلاصه وضعیت", "لیست مدل‌ها", "راهنمای دستورات"],
+  "/admin/models": ["لیست مدل‌ها", "افزودن مدل کد: NEW-1 نام: تست دسته: roman"],
+  "/admin/window": ["لیست قالب‌ها", "راهنمای دستورات"],
+  "/admin/categories": ["لیست دسته کاتالوگ", "افزودن دسته کاتالوگ نام: تست شناسه: test-cat"],
+  "/admin/projects": ["لیست نمونه اجرا", "افزودن نمونه اجرا عنوان: پروژه تست دسته: living"],
+  "/admin/portfolio-categories": ["لیست دسته نمونه", "افزودن دسته نمونه نام: تست شناسه: test-p"],
+  "/admin/products": ["لیست محصول", "افزودن محصول نام: تست شناسه: test-p قیمت: 1000"],
+  "/admin/orders": ["لیست سفارش‌ها"],
+  "/admin/requests": ["لیست درخواست‌ها"],
+  "/admin/settings": ["خلاصه وضعیت"],
 };
 
 function startersFor(path) {
@@ -19,7 +19,7 @@ function startersFor(path) {
   for (const [k, v] of Object.entries(STARTERS_BY_PATH)) {
     if (path.startsWith(k) && k !== "/admin") return v;
   }
-  return ["خلاصه وضعیت", "لیست مدل‌ها"];
+  return ["خلاصه وضعیت", "راهنمای دستورات"];
 }
 
 function labelFor(path) {
@@ -50,9 +50,9 @@ export default function AdminAssistant() {
     <FloatingBot
       mode="admin"
       agentName="admin_assistant"
-      storageKey={`antic_bot_admin_${pathname.split("/")[2] || "root"}`}
+      storageKey={`antic_bot_admin_v2_${pathname.split("/")[2] || "root"}`}
       title="دستیار ادمین آنتیک"
-      subtitle={`الان: ${labelFor(pathname)} · خواندن و نوشتن DB`}
+      subtitle={`الان: ${labelFor(pathname)} · CRUD کامل DB`}
       context={context}
       starters={startersFor(pathname)}
       accentClass="bg-foreground text-background"
