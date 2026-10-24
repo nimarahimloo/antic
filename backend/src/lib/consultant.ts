@@ -1,7 +1,6 @@
 /**
- * Customer design assistant — local NLU + catalog knowledge.
- * Answers product, style, install, price, shop, projects, and general questions
- * with warm Persian tone and rich UI blocks (cards / links / quick replies).
+ * Customer assistant — strong local NLU over full catalog/projects/shop data.
+ * Matches any tone (casual/formal/slang), answers free-form questions, returns rich blocks.
  */
 import { prisma } from "./prisma.js";
 import { buildAdminAssistantReply as buildAdminReply } from "./consultantAdmin.js";
@@ -40,6 +39,7 @@ export type AssistantResult = {
   meta?: Record<string, unknown>;
 };
 
+/* ═══════════════ text utils ═══════════════ */
 function normalize(s: string) {
   return String(s || "")
     .toLowerCase()
@@ -47,6 +47,8 @@ function normalize(s: string) {
     .replace(/[کك]/g, "ک")
     .replace(/\u200c/g, " ")
     .replace(/[ًٌٍَُِّْ]/g, "")
+    .replace(/[ـ_]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -54,57 +56,82 @@ function pack(text: string, blocks?: RichBlock[], meta?: Record<string, unknown>
   return { text, blocks, meta };
 }
 
+/** expand common slang / typos so matching is looser */
+function expandText(raw: string) {
+  let t = normalize(raw);
+  const pairs: [RegExp, string][] = [
+    [/میخوام|می خام|میخاه|می خوام/g, "میخوام"],
+    [/چیه|چیست|چیزی|چی هست/g, "چیست"],
+    [/کدوم|کدام|کدومه/g, "کدام"],
+    [/گرون|گرانه|گران/g, "گران"],
+    [/ارزون|ارزان/g, "ارزان"],
+    [/بفرست|بفرستین|بده|بدهید/g, "بده"],
+    [/دارین|دارید|داری/g, "دارید"],
+    [/نمیخوام|نمی خام/g, "نمیخوام"],
+    [/لطفا|خواهشا|خواهش میکنم/g, "لطفا"],
+    [/آخه|اخه/g, " "],
+    [/والا|والله/g, " "],
+  ];
+  for (const [re, rep] of pairs) t = t.replace(re, rep);
+  return t;
+}
+
+type Tone = "warm" | "formal" | "playful" | "short";
+function detectTone(raw: string): Tone {
+  const t = normalize(raw);
+  if (/[؟!?]{2,}|😂|😅|😆|خخخ|ههه|جدی|والا/.test(raw) || /جوک|شوخی/.test(t)) return "playful";
+  if (/لطفاً|خواهشمند|جناب|با سلام|احتراما/.test(t) || raw.length > 120) return "formal";
+  if (raw.length < 18 || /^(آره|نه|باشه|اوکی|ok|بله|نخیر)$/i.test(t)) return "short";
+  return "warm";
+}
+
+function voice(tone: Tone, warm: string, formal: string, playful: string, short?: string) {
+  if (tone === "formal") return formal;
+  if (tone === "playful") return playful;
+  if (tone === "short" && short) return short;
+  return warm;
+}
+
+/* ═══════════════ domain knowledge ═══════════════ */
 const STYLE_HINTS: { keys: string[]; slugs: string[]; tip: string }[] = [
   {
-    keys: ["بلک", "blackout", "تاریک", "خواب", "نور نده", "اتاق خواب", "سیاه"],
+    keys: ["بلک", "blackout", "تاریک", "خواب", "نور نده", "اتاق خواب", "سیاه", "شب"],
     slugs: ["shade", "zebra", "roman"],
-    tip: "برای اتاق خواب معمولاً شید بلک‌اوت یا زبرا انتخاب می‌شود تا صبح راحت بخوابی.",
+    tip: "برای خواب عمیق معمولاً شید بلک‌اوت یا زبرا بهترین‌اند.",
   },
   {
-    keys: ["شفاف", "تور", "نورگیر", "روشن", "sheer", "حریر", "دلباز"],
+    keys: ["شفاف", "تور", "نورگیر", "روشن", "sheer", "حریر", "دلباز", "پرنور"],
     slugs: ["sheer", "silk"],
-    tip: "تور و حریر نور را نرم رد می‌کنند و فضا را دلباز نشان می‌دهند.",
+    tip: "تور و حریر نور را نرم می‌کنند و فضا را بزرگ‌تر نشان می‌دهند.",
   },
   {
-    keys: ["کلاسیک", "لوکس", "مجلل", "مجلسی", "سلیقه", "سنتی"],
+    keys: ["کلاسیک", "لوکس", "مجلل", "مجلسی", "سلیقه", "سنتی", "لاکچری"],
     slugs: ["velvet", "roman", "silk", "sheer"],
-    tip: "برای حس کلاسیک، مخمل و رومن با تور روی هم خیلی شیک می‌نشینند.",
+    tip: "حس کلاسیک با مخمل/رومن و لایه تور خیلی شیک درمی‌آید.",
   },
   {
-    keys: ["مدرن", "ساده", "مینیمال", "جوان"],
+    keys: ["مدرن", "ساده", "مینیمال", "جوان", "اسکاندی"],
     slugs: ["turk-panel", "shade", "zebra", "roller", "cubism"],
-    tip: "خط‌های تمیز ترک‌پنل، شید یا زبرا با دکوراسیون مدرن جورتر است.",
+    tip: "برای مدرن: ترک‌پنل، شید یا زبرا خط تمیز می‌دهند.",
   },
   {
-    keys: ["اداری", "دفتر", "تجاری", "شرکت", "محل کار"],
+    keys: ["اداری", "دفتر", "تجاری", "شرکت", "محل کار", "اداره"],
     slugs: ["zebra", "shade", "roller", "office"],
-    tip: "در دفتر زبرا و شید هم حریم می‌دهند هم نور را کنترل می‌کنند.",
+    tip: "دفتر: زبرا و شید هم حریم می‌دهند هم نور را کنترل می‌کنند.",
   },
   {
-    keys: ["آشپزخانه", "kitchen"],
+    keys: ["آشپزخانه", "kitchen", "اپن"],
     slugs: ["kitchen", "roman", "shade", "roller"],
-    tip: "آشپزخانه بهتر است پرده‌اش جمع‌وجور باشد — رومن یا شید.",
+    tip: "آشپزخانه بهتر است جمع‌وجور باشد — رومن یا شید.",
   },
   {
-    keys: ["نشیمن", "پذیرایی", "سالن", "living", "هال"],
+    keys: ["نشیمن", "پذیرایی", "سالن", "living", "هال", "لابی"],
     slugs: ["velvet", "sheer", "roman", "zebra", "silk"],
     tip: "پذیرایی اغلب ترکیب تور + لایه ضخیم‌تر یا رومن جواب می‌دهد.",
   },
-  {
-    keys: ["شید", "shade"],
-    slugs: ["shade"],
-    tip: "شید را می‌شود تا بالا جمع کرد؛ برای مطالعه و تلویزیون خیلی راحت است.",
-  },
-  {
-    keys: ["زبرا", "zebra"],
-    slugs: ["zebra"],
-    tip: "در زبرا با چرخاندن نوارها بین شفاف و مات جابه‌جا می‌شوی.",
-  },
-  {
-    keys: ["رومن", "roman"],
-    slugs: ["roman"],
-    tip: "رومن وقتی بالا می‌رود تاهای مرتب می‌سازد و ظاهر رسمی‌تری دارد.",
-  },
+  { keys: ["شید", "shade"], slugs: ["shade"], tip: "شید تا بالا جمع می‌شود؛ برای مطالعه و تلویزیون راحت است." },
+  { keys: ["زبرا", "zebra"], slugs: ["zebra"], tip: "زبرا با چرخاندن نوارها بین شفاف و مات جابه‌جا می‌شود." },
+  { keys: ["رومن", "roman"], slugs: ["roman"], tip: "رومن تاهای مرتب می‌سازد و ظاهر رسمی‌تری دارد." },
   {
     keys: ["پلیسه", "pleated"],
     slugs: ["pleated", "pleated-manual", "pleated-chain"],
@@ -116,35 +143,43 @@ const STYLE_HINTS: { keys: string[]; slugs: string[]; tip: string }[] = [
     tip: "ترک‌پنل خطوط عمودی تمیز و مدرن می‌دهد.",
   },
   {
-    keys: ["کرکره", "رولر", "roller", "رول"],
+    keys: ["کرکره", "رولر", "roller", "رول", "blind"],
     slugs: ["roller"],
-    tip: "کرکره‌ای/رولر برای کنترل نور کاربردی است.",
+    tip: "کرکره/رولر کاربردی و اقتصادی برای کنترل نور است.",
   },
+  { keys: ["مخمل", "velvet"], slugs: ["velvet"], tip: "مخمل عمق رنگی و حس لوکس برای پذیرایی می‌آورد." },
   {
-    keys: ["مخمل", "velvet"],
-    slugs: ["velvet"],
-    tip: "مخمل عمق رنگی و حس لوکس می‌آورد؛ برای پذیرایی عالی است.",
+    keys: ["کرم", "بژ", "طوسی", "خاکستری", "سفید", "ذغالی", "نوک مدادی", "قهوه"],
+    slugs: [],
+    tip: "رنگ را با دیوار و مبل ست کن؛ اگر کد مدل بگی دقیق‌تر پیدا می‌کنم.",
   },
 ];
 
+const COLOR_WORDS = [
+  "کرم", "بژ", "طوسی", "خاکستری", "سفید", "مشکی", "ذغالی", "قهوه", "طلایی",
+  "نوک مدادی", "صورتی", "آبی", "سبز", "کرم روشن", "طوسی روشن",
+];
+
 function detectHints(text: string) {
-  const t = normalize(text);
+  const t = expandText(text);
   return STYLE_HINTS.filter((h) => h.keys.some((k) => t.includes(normalize(k))));
 }
 
 function extractTerms(text: string): string[] {
   const stop = new Set([
     "سلام", "درود", "برای", "یک", "یه", "از", "به", "با", "که", "می", "میخوام",
-    "می‌خوام", "لطفا", "لطفاً", "پیشنهاد", "بده", "کن", "مدل", "پرده", "دارید",
-    "دارین", "هست", "چیست", "چی", "آیا", "میشه", "میشود", "میتونم", "می‌تونم",
-    "خواهش", "عالی", "خوب", "خیلی", "هم", "یا", "این", "آن", "اون", "رو",
+    "لطفا", "پیشنهاد", "بده", "کن", "مدل", "پرده", "دارید", "هست", "چیست", "چی",
+    "آیا", "میشه", "میشود", "میتونم", "خواهش", "عالی", "خوب", "خیلی", "هم", "یا",
+    "این", "آن", "اون", "رو", "را", "تو", "من", "ما", "شما", "دیگه", "دیگر",
+    "فقط", "یعنی", "حالا", "بعد", "قبل", "پس", "اگر", "ولی", "اما", "نه", "آره",
   ]);
-  return normalize(text)
-    .split(/[\s,،.؟!؛:\/\\]+/)
+  return expandText(text)
+    .split(/[\s,،.؟!؛:\/\\|\-]+/)
     .map((w) => w.trim())
     .filter((w) => w.length >= 2 && !stop.has(w));
 }
 
+/* ═══════════════ data load ═══════════════ */
 type CatRow = {
   id: string;
   name: string;
@@ -164,6 +199,7 @@ type ModelRow = {
   categorySlug: string | null;
   subcategory: string | null;
   material: string | null;
+  texture: string | null;
   image: string | null;
   installImage: string | null;
 };
@@ -175,21 +211,34 @@ type ProjectRow = {
   categorySlug: string | null;
   subcategory: string | null;
 };
+type ProductRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  price: unknown;
+  image: string | null;
+};
 
-async function loadCatalog() {
-  const [categories, models, projects, modelCount, projectCount] = await Promise.all([
-    prisma.curtainCategory.findMany({ orderBy: { order: "asc" }, take: 80 }),
-    prisma.curtainModel.findMany({ orderBy: { updatedAt: "desc" }, take: 200 }),
-    prisma.project.findMany({ orderBy: { updatedAt: "desc" }, take: 40 }),
-    prisma.curtainModel.count(),
-    prisma.project.count(),
-  ]);
+async function loadAll() {
+  const [categories, models, projects, products, modelCount, projectCount, productCount] =
+    await Promise.all([
+      prisma.curtainCategory.findMany({ orderBy: { order: "asc" }, take: 120 }),
+      prisma.curtainModel.findMany({ orderBy: { updatedAt: "desc" }, take: 400 }),
+      prisma.project.findMany({ orderBy: { updatedAt: "desc" }, take: 80 }),
+      prisma.product.findMany({ where: { visible: true }, orderBy: { updatedAt: "desc" }, take: 60 }).catch(() => []),
+      prisma.curtainModel.count(),
+      prisma.project.count(),
+      prisma.product.count().catch(() => 0),
+    ]);
   return {
     categories: categories as CatRow[],
     models: models as ModelRow[],
     projects: projects as ProjectRow[],
+    products: (products || []) as ProductRow[],
     modelCount,
     projectCount,
+    productCount: productCount as number,
   };
 }
 
@@ -206,34 +255,52 @@ function modelCards(list: ModelRow[]): RichBlock {
   };
 }
 
-function scoreModel(m: ModelRow, preferredSlugs: string[], terms: string[]) {
+function scoreModel(m: ModelRow, preferredSlugs: string[], terms: string[], colors: string[]) {
   const slug = (m.categorySlug || "").toLowerCase();
   const sub = (m.subcategory || "").toLowerCase();
   const blob = normalize(
-    `${m.name} ${m.code || ""} ${m.fabric || ""} ${m.color || ""} ${m.description || ""} ${m.material || ""} ${slug} ${sub}`
+    `${m.name} ${m.code || ""} ${m.fabric || ""} ${m.color || ""} ${m.description || ""} ${m.material || ""} ${m.texture || ""} ${slug} ${sub}`
   );
   let score = 0;
   for (const s of preferredSlugs) {
     const ns = normalize(s);
-    if (slug === ns) score += 12;
-    else if (slug.includes(ns) || sub.includes(ns)) score += 7;
+    if (!ns) continue;
+    if (slug === ns) score += 14;
+    else if (slug.includes(ns) || sub.includes(ns)) score += 8;
   }
   for (const t of terms) {
     if (blob.includes(t)) score += 3;
-    if ((m.code || "").toLowerCase().includes(t)) score += 5;
+    if ((m.code || "").toLowerCase().includes(t)) score += 8;
+    if ((m.name || "").toLowerCase().includes(t)) score += 4;
   }
-  if (m.installImage || m.image) score += 0.5;
+  for (const c of colors) {
+    if (blob.includes(normalize(c))) score += 5;
+  }
+  if (m.installImage) score += 1;
+  else if (m.image) score += 0.4;
+  return score;
+}
+
+function scoreProject(p: ProjectRow, preferredSlugs: string[], terms: string[]) {
+  const blob = normalize(`${p.title} ${p.description || ""} ${p.categorySlug || ""} ${p.subcategory || ""}`);
+  let score = 0;
+  for (const s of preferredSlugs) {
+    if ((p.categorySlug || "").toLowerCase().includes(normalize(s))) score += 10;
+  }
+  for (const t of terms) if (blob.includes(t)) score += 3;
+  if (p.coverImage) score += 0.5;
   return score;
 }
 
 function historyBlob(history: ChatMessage[]) {
   return history
     .filter((m) => m.role === "user")
-    .slice(-8)
+    .slice(-10)
     .map((m) => m.content)
     .join(" ");
 }
 
+/* ═══════════════ intents ═══════════════ */
 type Intent =
   | "greeting"
   | "thanks"
@@ -250,90 +317,117 @@ type Intent =
   | "help"
   | "recommend"
   | "search"
+  | "yesno"
+  | "rude"
   | "unknown";
 
-function detectIntent(t: string): Intent {
-  const n = normalize(t);
-  if (/^(سلام|درود|hi|hello|hey|سلام علیکم|صبح بخیر|عصر بخیر|شب بخیر|خوبی|چطوری)[\s!.؟?]*$/i.test(n))
+function detectIntent(raw: string): Intent {
+  const n = expandText(raw);
+  if (/^(سلام|درود|hi|hello|hey|سلام علیکم|صبح بخیر|عصر بخیر|شب بخیر|خوبی|چطوری|چه خبر)[\s!.؟?]*$/i.test(n))
     return "greeting";
-  if (/^(ممنون|مرسی|تشکر|thanks|thank you|خداحافظ|bye)[\s!.؟?]*$/i.test(n)) return "thanks";
-  if (/قیمت|هزینه|مبلغ|چند|ارزان|گرون|بودجه/.test(n)) return "price";
-  if (/نصب|اندازه|بازدید|اجرا|اندازه گیری|اندازه‌گیری|دوخت/.test(n)) return "install";
-  if (/نمونه|پروژه|اجرا شده|گالری کار|نمونه کار/.test(n)) return "projects";
+  if (/^(ممنون|مرسی|تشکر|thanks|thank you|خداحافظ|bye|فعلا)[\s!.؟?]*$/i.test(n)) return "thanks";
+  if (/^(آره|بله|باشه|اوکی|ok|yes|نه|نخیر|no)$/i.test(n)) return "yesno";
+  if (/احمق|خر|لعنت|آشغال|بدرد|به درد نمی/.test(n)) return "rude";
+  if (/قیمت|هزینه|مبلغ|چند|ارزان|گران|بودجه|تخفیف/.test(n)) return "price";
+  if (/نصب|اندازه|بازدید|اجرا|اندازه گیری|اندازه‌گیری|دوخت|نصاب/.test(n)) return "install";
+  if (/نمونه|پروژه|اجرا شده|گالری کار|نمونه کار|کارهای شما/.test(n)) return "projects";
   if (/فروشگاه|اکسسوری|یراق|قلاب|ریله|ریسمان|محصول/.test(n)) return "shop";
-  if (/درباره|شما کی|شرکت|آنتیک کی|سابقه|اعتماد/.test(n)) return "about";
-  if (/تماس|آدرس|تلفن|واتساپ|محل|شعبه|ساعت کار/.test(n)) return "contact";
-  if (/شستشو|نگهداری|تمیز|لکه|مراقبت/.test(n)) return "care";
-  if (/تفاوت|فرق|مقایسه|کدام بهتر|کدوم بهتر/.test(n)) return "compare";
-  if (/دسته|انواع پرده|چه مدل|چه سبک|لیست دسته/.test(n)) return "categories";
-  if (/کاتالوگ|همه مدل|ببینم/.test(n)) return "catalog";
-  if (/کمک|راهنما|چیکار|چه کار|چطور کار/.test(n)) return "help";
-  if (/پیشنهاد|پیشنهاد بده|چی بخرم|چیه خوب|مناسب/.test(n)) return "recommend";
-  if (n.length >= 2) return "search";
+  if (/درباره|شما کی|شرکت|آنتیک|سابقه|اعتماد|برند/.test(n)) return "about";
+  if (/تماس|آدرس|تلفن|واتساپ|محل|شعبه|ساعت کار|شماره/.test(n)) return "contact";
+  if (/شستشو|نگهداری|تمیز|لکه|مراقبت|خشکشویی/.test(n)) return "care";
+  if (/تفاوت|فرق|مقایسه|کدام بهتر|کدوم بهتر|یا .* یا/.test(n)) return "compare";
+  if (/دسته|انواع پرده|چه مدل|چه سبک|لیست دسته|سبک ها/.test(n)) return "categories";
+  if (/کاتالوگ|همه مدل|ببینم|نمایشگاه/.test(n)) return "catalog";
+  if (/کمک|راهنما|چیکار|چه کار|چطور کار|نمیدونم|نمی دونم/.test(n)) return "help";
+  if (/پیشنهاد|پیشنهاد بده|چی بخرم|چیه خوب|مناسب|چی خوبه/.test(n)) return "recommend";
+  if (n.length >= 1) return "search";
   return "unknown";
 }
 
-const FAQ_REPLIES: { keys: string[]; answer: string; links?: Array<{ label: string; href: string }> }[] =
-  [
-    {
-      keys: ["گارانتی", "ضمانت", "warranty"],
-      answer:
-        "روی دوخت و نصب استاندارد، پشتیبانی داریم. جزئیات گارانتی هر مدل را هنگام سفارش اعلام می‌کنیم. اگر مشکلی پیش آمد از صفحه تماس پیام بگذار.",
-      links: [{ label: "تماس", href: "/contact" }],
-    },
-    {
-      keys: ["زمان", "چقدر طول", "مدت", "تحویل"],
-      answer:
-        "بعد از اندازه‌گیری و تأیید سفارش، معمولاً آماده‌سازی چند روز تا حدود دو هفته طول می‌کشد (بسته به مدل و حجم). زمان دقیق را در مشاوره اعلام می‌کنیم.",
-    },
-    {
-      keys: ["رنگ دیوار", "هماهنگ با مبل", "ست کردن"],
-      answer:
-        "برای ست کردن با دیوار و مبل، یا کد رنگ را بگو یا از کاتالوگ مدل‌های نزدیک به رنگ فضا را ببین. اگر عکس فضا داری بفرست تا نزدیک‌تر پیشنهاد بدهم.",
-      links: [{ label: "کاتالوگ", href: "/catalog" }],
-    },
-    {
-      keys: ["موتور", "برقی", "ریموت", "هوشمند"],
-      answer:
-        "برای بعضی سبک‌ها امکان موتور و ریموت وجود دارد. بگو کدام فضا و سبک را می‌خواهی تا مسیر درست را نشان بدهم و از تماس هماهنگی فنی انجام شود.",
-      links: [{ label: "مشاوره فنی", href: "/contact" }],
-    },
-  ];
+const FAQ: { keys: string[]; answer: (tone: Tone) => string; links?: Array<{ label: string; href: string }> }[] = [
+  {
+    keys: ["گارانتی", "ضمانت", "warranty"],
+    answer: (tone) =>
+      voice(
+        tone,
+        "روی دوخت و نصب استاندارد پشتیبانی داریم. جزئیات را موقع سفارش می‌گوییم؛ مشکلی بود از تماس پیام بگذار.",
+        "گارانتی دوخت و نصب طبق شرایط اعلام‌شده هنگام سفارش اعمال می‌شود. برای پیگیری از صفحه تماس اقدام فرمایید.",
+        "خیالت راحت — کار استاندارد رو پشتیبانی می‌کنیم. جزئیات رو موقع سفارش می‌گیم 👍"
+      ),
+    links: [{ label: "تماس", href: "/contact" }],
+  },
+  {
+    keys: ["زمان", "چقدر طول", "مدت", "تحویل", "کی میرسه"],
+    answer: (tone) =>
+      voice(
+        tone,
+        "بعد از اندازه‌گیری و تأیید، معمولاً چند روز تا حدود دو هفته طول می‌کشد — بسته به مدل و حجم.",
+        "زمان آماده‌سازی پس از اندازه‌گیری و تأیید سفارش، بسته به مدل و حجم کار متغیر است و معمولاً چند روز تا حدود دو هفته است.",
+        "معمولاً چند روز تا حدود دو هفته بعد از تأیید و اندازه‌گیری آماده‌ست؛ دقیق‌ترش رو تو مشاوره می‌گیم."
+      ),
+  },
+  {
+    keys: ["رنگ دیوار", "هماهنگ با مبل", "ست کردن", "ست با"],
+    answer: (tone) =>
+      voice(
+        tone,
+        "برای ست با دیوار و مبل، رنگ یا کد مدل را بگو؛ یا از کاتالوگ نزدیک به فضای خودت را ببین.",
+        "جهت هماهنگی با دکوراسیون، اعلام رنگ دیوار/مبل یا انتخاب از کاتالوگ کمک‌کننده است.",
+        "رنگ دیوار یا مبل رو بگو تا نزدیک‌ترین مدل‌ها رو بیارم 🎨"
+      ),
+    links: [{ label: "کاتالوگ", href: "/catalog" }],
+  },
+  {
+    keys: ["موتور", "برقی", "ریموت", "هوشمند", "اتومات"],
+    answer: (tone) =>
+      voice(
+        tone,
+        "برای بعضی سبک‌ها موتور و ریموت ممکن است. بگو کدام فضا را می‌خواهی تا مسیر فنی را هماهنگ کنیم.",
+        "امکان موتور و ریموت برای برخی سبک‌ها فراهم است؛ لطفاً نوع فضا را اعلام کنید.",
+        "آره بعضی مدل‌ها موتور و ریموت دارن — بگو کجا می‌خوای نصب شه تا راهش رو بگم."
+      ),
+    links: [{ label: "مشاوره فنی", href: "/contact" }],
+  },
+];
 
 function matchFaq(t: string) {
-  const n = normalize(t);
-  return FAQ_REPLIES.find((f) => f.keys.some((k) => n.includes(normalize(k))));
+  const n = expandText(t);
+  return FAQ.find((f) => f.keys.some((k) => n.includes(normalize(k))));
 }
 
 const COMPARE_NOTES: Record<string, string> = {
   shade: "شید: سطح صاف، جمع‌شونده به بالا، کنترل نور ساده.",
-  zebra: "زبرا: نوارهای متناوب شفاف/مات؛ نور را دقیق تنظیم می‌کنی.",
-  roman: "رومن: تاهای افقی شیک؛ ظاهر رسمی‌تر.",
-  panel: "ترک‌پنل: خطوط عمودی مدرن و تمیز.",
-  roller: "کرکره/رولر: کاربردی و اقتصادی برای کنترل نور.",
-  "pleated-manual": "پلیسه: بافت ظریف، مناسب پنجره‌های متوسط.",
-  sheer: "تور/حریر: نور نرم و حس دلباز.",
+  zebra: "زبرا: نوارهای شفاف/مات؛ نور را دقیق تنظیم می‌کنی.",
+  roman: "رومن: تاهای افقی شیک و رسمی.",
+  panel: "ترک‌پنل: خطوط عمودی مدرن.",
+  roller: "کرکره/رولر: کاربردی و اقتصادی.",
+  "pleated-manual": "پلیسه: بافت ظریف برای پنجره متوسط.",
+  sheer: "تور/حریر: نور نرم و فضای دلباز.",
   velvet: "مخمل: لوکس و عمیق برای پذیرایی.",
 };
 
+/* ═══════════════ main ═══════════════ */
 export async function buildConsultantReply(
   userText: string,
   history: ChatMessage[] = []
 ): Promise<AssistantResult> {
-  const t = normalize(userText);
+  const tone = detectTone(userText);
+  const t = expandText(userText);
   const intent = detectIntent(userText);
-  const catalog = await loadCatalog();
-  const { categories, models, projects, modelCount, projectCount } = catalog;
+  const data = await loadAll();
+  const { categories, models, projects, products, modelCount, projectCount, productCount } = data;
+
   const fullContext = `${historyBlob(history)} ${userText}`;
   const hints = detectHints(fullContext);
-  const preferred = [...new Set(hints.flatMap((h) => h.slugs))];
+  const preferred = [...new Set(hints.flatMap((h) => h.slugs).filter(Boolean))];
   const terms = extractTerms(userText);
+  const colors = COLOR_WORDS.filter((c) => t.includes(normalize(c)));
   const tip = hints.map((h) => h.tip).filter(Boolean)[0];
 
   const faq = matchFaq(userText);
   if (faq) {
     return pack(
-      faq.answer,
+      faq.answer(tone),
       faq.links
         ? [{ type: "link_buttons", items: faq.links }]
         : [
@@ -348,24 +442,50 @@ export async function buildConsultantReply(
     );
   }
 
+  if (intent === "rude") {
+    return pack(
+      voice(
+        tone,
+        "متوجه نارضایتی‌ات هستم. اگر بگویی دقیقاً چه می‌خواهی (اتاق، نور، بودجه)، مستقیم کمکت می‌کنم.",
+        "از ناراحتی شما متأسفیم. لطفاً نیاز خود را مطرح کنید تا راهنمایی دقیق ارائه شود.",
+        "اوکی آروم باش 😅 بگو دقیقاً چی می‌خوای تا برات پیدا کنم."
+      ),
+      [
+        {
+          type: "quick_replies",
+          items: [
+            { label: "پیشنهاد سریع", message: "چند مدل خوب پیشنهاد بده" },
+            { label: "تماس با تیم", message: "چطور تماس بگیرم؟" },
+          ],
+        },
+      ]
+    );
+  }
+
   if (intent === "greeting") {
     return pack(
-      `سلام، خوش اومدی 🌿\nمن دستیار طراحی **پرده آنتیک** هستم — از کاتالوگ واقعی (${modelCount} مدل) و نمونه‌های اجرا (${projectCount}) کمکت می‌کنم.\n\nبگو کدام اتاق است و فضا را **تاریک** می‌خواهی یا **روشن**؟ هر سوالی هم داشتی بپرس.`,
+      voice(
+        tone,
+        `سلام 🌿 من دستیار آنتیک‌ام — ${modelCount} مدل کاتالوگ و ${projectCount} نمونه اجرا دم دستم است.\nاتاق و نور را بگو، یا هر سوالی بپرس.`,
+        `سلام و احترام. دستیار طراحی پرده آنتیک هستم. از میان ${modelCount} مدل و ${projectCount} نمونه اجرا راهنمایی می‌کنم. لطفاً نوع فضا را بفرمایید.`,
+        `سلامی💚 ${modelCount} مدل و ${projectCount} نمونه آماده‌ست. بگو کجا می‌خوای پرده بزنی؟`,
+        `سلام! اتاق و نورش چیه؟`
+      ),
       [
         {
           type: "quick_replies",
           items: [
             { label: "نشیمن روشن", message: "نشیمن روشن و دلباز" },
             { label: "خواب تاریک", message: "اتاق خواب تاریک بلک‌اوت" },
-            { label: "کلاسیک لوکس", message: "پذیرایی کلاسیک و لوکس" },
-            { label: "انواع پرده؟", message: "چه دسته‌هایی دارید؟" },
+            { label: "انواع پرده", message: "چه دسته‌هایی دارید؟" },
+            { label: "قیمت؟", message: "قیمت پرده چطور حساب می‌شود؟" },
           ],
         },
         {
           type: "link_buttons",
           items: [
             { label: "کاتالوگ", href: "/catalog" },
-            { label: "نمونه‌های اجرا", href: "/projects" },
+            { label: "نمونه‌ها", href: "/projects" },
           ],
         },
       ]
@@ -373,19 +493,48 @@ export async function buildConsultantReply(
   }
 
   if (intent === "thanks") {
-    return pack("قابلی نداشت 💛 هر وقت خواستی دوباره تنظیمش می‌کنیم. موفق باشی.");
+    return pack(
+      voice(tone, "قابلی نداشت 💛 هر وقت خواستی برگرد.", "خواهش می‌کنم. در خدمتیم.", "مرسی از تو 😄 هر وقت بودی!")
+    );
+  }
+
+  if (intent === "yesno") {
+    return pack(
+      voice(
+        tone,
+        "باشه — اگر جزئیات بیشتری بدهی (اتاق، نور، سبک) دقیق‌تر پیشنهاد می‌دهم.",
+        "متوجه شدم. در صورت تمایل جزئیات فضا را بفرستید.",
+        "اوکی! بگو اتاق و نورش چیه تا بریم سر اصل مطلب 😉",
+        "بگو اتاق و نور؟"
+      ),
+      [
+        {
+          type: "quick_replies",
+          items: [
+            { label: "نشیمن", message: "نشیمن مدرن" },
+            { label: "خواب", message: "اتاق خواب تاریک" },
+            { label: "شید", message: "شید می‌خوام" },
+          ],
+        },
+      ]
+    );
   }
 
   if (intent === "help") {
     return pack(
-      "می‌توانم کمکت کنم با:\n• پیشنهاد مدل از کاتالوگ واقعی\n• توضیح تفاوت شید / زبرا / رومن / پنل\n• راهنمای نصب و قیمت تقریبی\n• نمونه‌های اجرا شده\n• فروشگاه اکسسوری\n\nفقط به زبان خودت بپرس — لازم نیست اصطلاح تخصصی بلد باشی.",
+      voice(
+        tone,
+        "می‌توانم: پیشنهاد مدل · مقایسه سبک‌ها · قیمت/نصب · نمونه اجرا · اکسسوری.\nهرجوری راحت هستی بپرس.",
+        "خدمات راهنمایی شامل پیشنهاد مدل، مقایسه سبک، نصب و قیمت، نمونه‌کار و فروشگاه اکسسوری است.",
+        "هرچی بپرسی حول پرده و دکور پنجره، اینجام 💪 از «شید می‌خوام» تا «فرق زبرا و رومن»."
+      ),
       [
         {
           type: "quick_replies",
           items: [
             { label: "پیشنهاد مدل", message: "برای نشیمن پیشنهاد بده" },
-            { label: "تفاوت شید و زبرا", message: "تفاوت شید و زبرا چیست؟" },
-            { label: "قیمت؟", message: "قیمت پرده چطور حساب می‌شود؟" },
+            { label: "تفاوت سبک‌ها", message: "تفاوت شید و زبرا چیست؟" },
+            { label: "قیمت", message: "قیمت پرده چطور حساب می‌شود؟" },
           ],
         },
       ]
@@ -394,7 +543,12 @@ export async function buildConsultantReply(
 
   if (intent === "price") {
     return pack(
-      "قیمت پرده مثل لباس آماده روی تگ نیست — به **عرض و ارتفاع پنجره**، نوع پارچه، سبک نصب و یراق بستگی دارد.\n\nمسیر درست:\n۱) مدل را از کاتالوگ انتخاب کن\n۲) ابعاد تقریبی را بگو یا درخواست بازدید بده\n۳) برآورد دقیق برات می‌فرستیم",
+      voice(
+        tone,
+        "قیمت ثابت روی تگ نیست — به عرض/ارتفاع، پارچه و نصب بستگی دارد.\nمدل را انتخاب کن، ابعاد را بگو یا بازدید بگیر تا برآورد دقیق بدهیم.",
+        "هزینه بر اساس ابعاد پنجره، جنس پارچه و سبک نصب محاسبه می‌شود. پس از انتخاب مدل و اندازه‌گیری، برآورد ارائه می‌گردد.",
+        "قیمت آماده تو فروشگاه نیست — بستگی داره پنجره چقدر باشه و چه پارچه‌ای. مدل رو بگو تا مسیر قیمت رو برات باز کنم."
+      ),
       [
         {
           type: "link_buttons",
@@ -403,20 +557,18 @@ export async function buildConsultantReply(
             { label: "کاتالوگ", href: "/catalog" },
           ],
         },
-        {
-          type: "quick_replies",
-          items: [
-            { label: "مدل پیشنهاد بده", message: "چند مدل خوب پیشنهاد بده" },
-            { label: "نصب چطور؟", message: "نصب چگونه انجام می‌شود؟" },
-          ],
-        },
       ]
     );
   }
 
   if (intent === "install") {
     return pack(
-      "نصب استاندارد آنتیک:\n۱) انتخاب مدل از کاتالوگ\n۲) هماهنگی **بازدید و اندازه‌گیری**\n۳) دوخت / آماده‌سازی\n۴) نصب در محل\n\nاگر مدل را انتخاب کردی، از تماس اقدام کن تا نوبت بازدید بگیری.",
+      voice(
+        tone,
+        "مسیر نصب: انتخاب مدل → بازدید و اندازه‌گیری → آماده‌سازی → نصب در محل.",
+        "فرآیند: انتخاب مدل، بازدید و اندازه‌گیری، آماده‌سازی، سپس نصب.",
+        "مدل رو وردار → میان اندازه می‌گیرن → دوخت/آماده‌سازی → نصب خونه. ساده!"
+      ),
       [
         {
           type: "link_buttons",
@@ -431,7 +583,12 @@ export async function buildConsultantReply(
 
   if (intent === "contact") {
     return pack(
-      "برای مشاوره، اندازه‌گیری و سفارش از صفحه **تماس** اقدام کن. نام، شماره و توضیح کوتاه فضا کافی است تا تیم برگردد سراغت.",
+      voice(
+        tone,
+        "از صفحه تماس نام و شماره و توضیح کوتاه فضا را بفرست؛ تیم برمی‌گردد سراغت.",
+        "لطفاً از صفحه تماس اطلاعات تماس و شرح فضا را ارسال فرمایید.",
+        "برو تماس، اسم و شماره‌ت رو بذار — زنگ می‌زنن."
+      ),
       [
         {
           type: "link_buttons",
@@ -446,14 +603,18 @@ export async function buildConsultantReply(
 
   if (intent === "about") {
     return pack(
-      "**پرده آنتیک** روی طراحی، دوخت و نصب پرده تخصصی کار می‌کند — از پذیرایی کلاسیک تا دفتر مدرن.\nکاتالوگ واقعی مدل‌ها و نمونه‌های اجرا را می‌توانی در سایت ببینی؛ من هم اینجام که انتخاب را ساده کنم.",
+      voice(
+        tone,
+        `پرده آنتیک روی طراحی، دوخت و نصب تمرکز دارد — ${modelCount} مدل در کاتالوگ و ${projectCount} نمونه اجرا.`,
+        `برند پرده آنتیک در زمینه طراحی و اجرای پرده فعالیت می‌کند؛ کاتالوگ شامل ${modelCount} مدل است.`,
+        `ما اوناییم که پرده رو از انتخاب تا نصب جمع می‌کنیم 😎 ${modelCount} مدل آماده.`
+      ),
       [
         {
           type: "link_buttons",
           items: [
             { label: "درباره ما", href: "/about" },
             { label: "کاتالوگ", href: "/catalog" },
-            { label: "نمونه‌ها", href: "/projects" },
           ],
         },
       ]
@@ -462,18 +623,33 @@ export async function buildConsultantReply(
 
   if (intent === "care") {
     return pack(
-      "نگهداری کلی:\n• گردگیری آرام با جاروبرقی در حالت کم\n• لکه‌های تازه را سریع و بدون فشار پاک کن\n• شستشوی کامل معمولاً تخصصی است — نوع پارچه را اعلام کن تا راهنمایی دقیق‌تر بدهم\n\nاگر مدل خاصی مد نظرته کدش را بگو."
+      voice(
+        tone,
+        "گردگیری آرام، لکه تازه بدون فشار، شستشوی کامل معمولاً تخصصی. نوع پارچه را بگو دقیق‌تر بگویم.",
+        "نگهداری: گردگیری ملایم؛ لکه‌گیری سریع؛ شستشوی تخصصی بر اساس جنس پارچه.",
+        "جارو آروم، لکه رو سریع پاک کن، شستشوی کامل رو بسپار به متخصص."
+      )
     );
   }
 
   if (intent === "shop") {
+    const top = products.slice(0, 5);
+    const extra =
+      top.length > 0
+        ? `\n\nچند قلم از فروشگاه:\n${top.map((p, i) => `${i + 1}. ${p.name}`).join("\n")}`
+        : "";
     return pack(
-      "بخش **فروشگاه** فقط اکسسوری و یراق پرده است (قلاب، ریل و …) — خودِ پارچه و مدل پرده از **کاتالوگ** انتخاب می‌شود.",
+      voice(
+        tone,
+        `فروشگاه فقط اکسسوری و یراق است (${productCount} قلم). خود پرده از کاتالوگ انتخاب می‌شود.${extra}`,
+        `بخش فروشگاه شامل اکسسوری است. مدل پرده از کاتالوگ انتخاب می‌گردد.${extra}`,
+        `فروشگاه = قلاب و ریل و اینا. خود پرده برو کاتالوگ 🛒${extra}`
+      ),
       [
         {
           type: "link_buttons",
           items: [
-            { label: "فروشگاه اکسسوری", href: "/shop" },
+            { label: "فروشگاه", href: "/shop" },
             { label: "کاتالوگ پرده", href: "/catalog" },
           ],
         },
@@ -482,29 +658,47 @@ export async function buildConsultantReply(
   }
 
   if (intent === "projects") {
-    const top = projects.slice(0, 4);
+    const scoredP = projects
+      .map((p) => ({ p, score: scoreProject(p, preferred, terms) }))
+      .sort((a, b) => b.score - a.score);
+    const top = (scoredP[0]?.score > 0 ? scoredP : projects.map((p) => ({ p, score: 1 })))
+      .slice(0, 5)
+      .map((x) => x.p);
     const lines =
       top.length === 0
-        ? "هنوز نمونه ثبت نشده؛ از کاتالوگ شروع کن."
-        : `چند نمونه اجرا:\n${top.map((p, i) => `${i + 1}. **${p.title}**${p.categorySlug ? ` (${p.categorySlug})` : ""}`).join("\n")}`;
-    return pack(`${lines}\n\nبرای دیدن گالری کامل برو به نمونه‌های اجرا.`, [
-      {
-        type: "link_buttons",
-        items: [
-          { label: "نمونه‌های اجرا", href: "/projects" },
-          { label: "کاتالوگ", href: "/catalog" },
-        ],
-      },
-    ]);
+        ? "هنوز نمونه ثبت نشده."
+        : top.map((p, i) => `${i + 1}. **${p.title}**${p.categorySlug ? ` — ${p.categorySlug}` : ""}`).join("\n");
+    return pack(
+      voice(
+        tone,
+        `نمونه‌های اجرا:\n${lines}`,
+        `گزیده‌ای از نمونه‌های اجرا:\n${lines}`,
+        `ببین چی کار کردیم:\n${lines}`
+      ),
+      [
+        {
+          type: "link_buttons",
+          items: [
+            { label: "گالری نمونه‌ها", href: "/projects" },
+            { label: "کاتالوگ", href: "/catalog" },
+          ],
+        },
+      ]
+    );
   }
 
   if (intent === "categories" || intent === "catalog") {
     const names = categories
-      .slice(0, 12)
-      .map((c) => `• **${c.name}**`)
+      .slice(0, 14)
+      .map((c) => `• **${c.name}**${c.mechanism ? ` (${c.mechanism})` : ""}`)
       .join("\n");
     return pack(
-      `دسته‌های اصلی کاتالوگ:\n${names || "—"}\n\nروی هر کدام کلیک کن یا بگو کدام را می‌خواهی تا مدل پیشنهاد بدهم.`,
+      voice(
+        tone,
+        `دسته‌های کاتالوگ (${categories.length}):\n${names || "—"}`,
+        `فهرست دسته‌ها:\n${names || "—"}`,
+        `اینا رو داریم:\n${names || "—"}`
+      ),
       [
         {
           type: "link_buttons",
@@ -512,9 +706,9 @@ export async function buildConsultantReply(
         },
         {
           type: "quick_replies",
-          items: categories.slice(0, 4).map((c) => ({
+          items: categories.slice(0, 5).map((c) => ({
             label: c.name,
-            message: `مدل‌های دسته ${c.name}`,
+            message: `مدل‌های ${c.name}`,
           })),
         },
       ]
@@ -522,42 +716,51 @@ export async function buildConsultantReply(
   }
 
   if (intent === "compare") {
-    const hit = hints.length
-      ? hints
-      : STYLE_HINTS.filter((h) => h.slugs.some((s) => t.includes(s)));
-    const notes = (hit.length ? hit : STYLE_HINTS.slice(0, 3))
+    const hit = hints.length ? hints : STYLE_HINTS.filter((h) => h.slugs.some((s) => t.includes(s)));
+    const notes = (hit.length ? hit : STYLE_HINTS.slice(7, 11))
       .slice(0, 4)
-      .map((h) => {
-        const key = h.slugs[0];
-        return COMPARE_NOTES[key] || h.tip;
-      });
+      .map((h) => COMPARE_NOTES[h.slugs[0]] || h.tip);
     return pack(
-      `مقایسه کوتاه:\n${notes.map((n) => `• ${n}`).join("\n")}\n\nبگو فضا روشن می‌خواهی یا تاریک تا یکی را قطعی‌تر پیشنهاد بدهم.`,
+      `مقایسه:\n${notes.map((n) => `• ${n}`).join("\n")}\n\n${voice(tone, "روشن می‌خواهی یا تاریک؟", "ترجیح نور فضا را بفرمایید.", "بگو روشن یا تاریک؟")}`,
       [
         {
           type: "quick_replies",
           items: [
-            { label: "شید می‌خوام", message: "شید برای کنترل نور" },
-            { label: "زبرا می‌خوام", message: "زبرا اداری یا خانگی" },
-            { label: "رومن می‌خوام", message: "رومن کلاسیک" },
+            { label: "شید", message: "شید برای کنترل نور" },
+            { label: "زبرا", message: "زبرا می‌خوام" },
+            { label: "رومن", message: "رومن کلاسیک" },
           ],
         },
       ]
     );
   }
 
+  /* ─── search / recommend / free-form ─── */
+  // category name match → treat as preferred slug
+  for (const c of categories) {
+    if (t.includes(normalize(c.name)) || t.includes(normalize(c.slug))) {
+      preferred.push(c.slug);
+    }
+  }
+
   const scored = models
-    .map((m) => ({ m, score: scoreModel(m, preferred, terms) }))
+    .map((m) => ({ m, score: scoreModel(m, preferred, terms, colors) }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
 
+  // exact code
   const codeHit = models.find((m) => {
     const code = (m.code || "").toLowerCase();
     return code && (t.includes(code) || terms.some((term) => code.includes(term)));
   });
   if (codeHit) {
     return pack(
-      `مدل **${codeHit.name || codeHit.code}** را پیدا کردم.${codeHit.color ? ` رنگ تقریبی: ${codeHit.color}.` : ""}\nروی کارت بزن تا جزئیات و پیش‌نمایش نصب را ببینی.`,
+      voice(
+        tone,
+        `مدل **${codeHit.name || codeHit.code}** را پیدا کردم.${codeHit.color ? ` رنگ: ${codeHit.color}.` : ""}`,
+        `مورد درخواستی: **${codeHit.name || codeHit.code}**.`,
+        `پیداش کردم: **${codeHit.name || codeHit.code}** ✨`
+      ),
       [
         modelCards([codeHit]),
         {
@@ -572,81 +775,85 @@ export async function buildConsultantReply(
   }
 
   if (scored.length === 0) {
-    if (/کجا|چطور|چگونه|چرا|آیا|میشه|می‌شود/.test(t) || intent === "unknown") {
-      return pack(
-        "سوالت را گرفتم 😊 اگر درباره **انتخاب پرده، سبک، نور، نصب، قیمت یا نمونه‌کار** است دقیق‌تر بگو.\n\nمثال:\n• «اتاق خواب تاریک می‌خوام»\n• «تفاوت شید و زبرا؟»\n• «مدل ZB-001 رو دارین؟»\n\nیا مستقیم برو کاتالوگ / تماس.",
-        [
-          {
-            type: "quick_replies",
-            items: [
-              { label: "نشیمن کلاسیک", message: "نشیمن کلاسیک لوکس" },
-              { label: "خواب تاریک", message: "اتاق خواب تاریک" },
-              { label: "انواع پرده", message: "چه دسته‌هایی دارید؟" },
-              { label: "قیمت؟", message: "قیمت پرده چطور حساب می‌شود؟" },
-            ],
-          },
-          {
-            type: "link_buttons",
-            items: [
-              { label: "کاتالوگ", href: "/catalog" },
-              { label: "تماس", href: "/contact" },
-            ],
-          },
-        ],
-        { intent, model_count: modelCount }
-      );
-    }
+    // soft fallback still useful
+    const sample = models.slice(0, 3);
     return pack(
-      "دوست دارم دقیق‌تر کمکت کنم 😊\nفقط بگو:\n• اتاق کجاست؟\n• نور را بیشتر می‌خواهی یا کمتر؟\n• حس مدرن می‌خواهی یا کلاسیک؟",
+      voice(
+        tone,
+        "سوالت را گرفتم. اگر حول پرده، سبک، نور، نصب یا نمونه است دقیق‌تر بگو — یا از نمونه‌های زیر شروع کن.",
+        "لطفاً نیاز را با جزئیات بیشتر بیان کنید. در غیر این صورت می‌توانید از کاتالوگ آغاز کنید.",
+        "اوکی هنوز قفل نشدم روی مدل 😄 بگو اتاق/نور/سبک یا یکی از اینا رو باز کن.",
+        "اتاق و نور؟ یا کاتالوگ:"
+      ),
       [
+        ...(sample.length ? [modelCards(sample)] : []),
         {
           type: "quick_replies",
           items: [
-            { label: "نشیمن کلاسیک", message: "نشیمن کلاسیک لوکس" },
+            { label: "نشیمن", message: "نشیمن کلاسیک لوکس" },
             { label: "خواب تاریک", message: "اتاق خواب تاریک" },
-            { label: "شید می‌خوام", message: "شید برای کنترل نور" },
-            { label: "زبرا می‌خوام", message: "زبرا اداری یا خانگی" },
+            { label: "انواع پرده", message: "چه دسته‌هایی دارید؟" },
+            { label: "قیمت", message: "قیمت پرده چطور حساب می‌شود؟" },
           ],
         },
-      ]
+        {
+          type: "link_buttons",
+          items: [
+            { label: "کاتالوگ", href: "/catalog" },
+            { label: "تماس", href: "/contact" },
+          ],
+        },
+      ],
+      { intent, model_count: modelCount }
     );
   }
 
-  const top = scored.slice(0, 4).map((x) => x.m);
+  const top = scored.slice(0, 5).map((x) => x.m);
   const intro =
     tip ||
-    (preferred.length
-      ? "طبق چیزی که گفتی، این چند مدل از کاتالوگ واقعاً به کارت می‌آید:"
-      : "چند مدل مرتبط از کاتالوگ پیدا کردم:");
+    voice(
+      tone,
+      preferred.length
+        ? "طبق حرف‌هات این‌ها از کاتالوگ نزدیک‌ترند:"
+        : "چند مدل مرتبط از کاتالوگ:",
+      "موارد پیشنهادی بر اساس درخواست شما:",
+      preferred.length ? "اینا به نظر نزدیک‌ترن به چیزی که گفتی:" : "چندتا مرتبط پیدا کردم:"
+    );
 
   const teach =
     preferred.includes("shade") || /شید/.test(t)
-      ? "\n\nنکته: شید را می‌شود تا بالا جمع کرد؛ برای مطالعه یا تلویزیون راحت است."
+      ? "\n\nشید تا بالا جمع می‌شود و برای کنترل نور روز عالی است."
       : preferred.includes("zebra") || /زبرا/.test(t)
-        ? "\n\nنکته: در زبرا با چرخاندن نوارها بین شفاف و مات جابه‌جا می‌شوی."
+        ? "\n\nزبرا بین شفاف و مات با چرخش نوارها جابه‌جا می‌شود."
         : preferred.includes("roman") || /رومن/.test(t)
-          ? "\n\nنکته: رومن وقتی بالا می‌رود تاهای مرتب می‌سازد و ظاهر رسمی‌تری دارد."
-          : "\n\nاگر رنگ دیوار یا اندازه پنجره را بگی، پیشنهاد را تنگ‌تر می‌کنم.";
+          ? "\n\nرومن ظاهر رسمی با تاهای مرتب دارد."
+          : colors.length
+            ? `\n\nرنگ‌هایی که گفتی (${colors.join("، ")}) را در پیشنهاد لحاظ کردم.`
+            : "\n\nاگر رنگ دیوار یا نور دقیق‌تر بگی، تنگ‌تر می‌کنم.";
 
-  return pack(`${intro}${teach}\n\nروی کارت بزن تا مدل را کامل ببینی ✨`, [
-    modelCards(top),
-    {
-      type: "quick_replies",
-      items: [
-        { label: "تاریک‌تر", message: "نسخه تاریک‌تر یا بلک‌اوت" },
-        { label: "روشن‌تر", message: "نسخه روشن‌تر و شفاف" },
-        { label: "قیمت و نصب", message: "درباره قیمت و نصب بگو" },
-        { label: "نمونه اجرا", message: "نمونه اجرای مشابه نشان بده" },
-      ],
-    },
-    {
-      type: "link_buttons",
-      items: [
-        { label: "کاتالوگ کامل", href: "/catalog" },
-        { label: "مشاوره حضوری", href: "/contact" },
-      ],
-    },
-  ], { intent, preferred, hits: scored.length });
+  return pack(
+    `${intro}${teach}\n\n${voice(tone, "روی کارت بزن و مدل را ببین.", "جهت مشاهده جزئیات روی کارت کلیک کنید.", "بزن روی کارت ببینش ✨")}`,
+    [
+      modelCards(top),
+      {
+        type: "quick_replies",
+        items: [
+          { label: "تاریک‌تر", message: "نسخه تاریک‌تر یا بلک‌اوت" },
+          { label: "روشن‌تر", message: "نسخه روشن‌تر و شفاف" },
+          { label: "قیمت و نصب", message: "درباره قیمت و نصب بگو" },
+          { label: "نمونه اجرا", message: "نمونه اجرای مشابه نشان بده" },
+        ],
+      },
+      {
+        type: "link_buttons",
+        items: [
+          { label: "کاتالوگ کامل", href: "/catalog" },
+          { label: "مشاوره", href: "/contact" },
+        ],
+      },
+    ],
+    { intent, preferred, hits: scored.length, tone }
+  );
 }
 
 export async function buildAdminAssistantReply(
