@@ -49,6 +49,8 @@ model CurtainCategory {
   description   String?
   image         String?
   order         Int      @default(0)
+  /// کلید سبک رندر: drape | wave | panel | roman | zebra | shade | double | roller | pleated-*
+  mechanism     String?
   subcategories String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
