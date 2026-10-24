@@ -1,23 +1,11 @@
 import { Link } from "react-router-dom";
 import { Phone, ArrowLeft } from "lucide-react";
 import { Image } from "@/components/ui/image";
-import { useCurtainCategories } from "@/hooks/useCurtainCategories";
-
-const CORPORATE_SLUGS = ["office", "zebra", "roman", "roller", "cubism", "shade", "pleated"];
-
-function pickCorporate(categories) {
-  if (!categories?.length) return [];
-  const bySlug = new Map(categories.map((c) => [String(c.slug || "").toLowerCase(), c]));
-  const preferred = CORPORATE_SLUGS.map((s) => bySlug.get(s)).filter(Boolean);
-  if (preferred.length >= 2) return preferred.slice(0, 6);
-  const withDesc = categories.filter((c) => c.description);
-  const pool = withDesc.length >= 2 ? withDesc : categories;
-  return pool.slice(0, 6);
-}
+import { useCurtainCategories, pickSystemCategories } from "@/hooks/useCurtainCategories";
 
 export default function CorporateCurtains() {
   const { categories, loading } = useCurtainCategories();
-  const items = pickCorporate(categories);
+  const items = pickSystemCategories(categories, 6);
 
   if (loading && !items.length) {
     return (
@@ -41,13 +29,13 @@ export default function CorporateCurtains() {
       <div className="mx-auto max-w-7xl px-5 lg:px-10">
         <div className="mb-14 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <span className="eyebrow mb-4 block">دسته‌بندی · پرده‌های شرکتی</span>
+            <span className="eyebrow mb-4 block">کاتالوگ · سیستم‌های پرده</span>
             <h2 className="font-display text-3xl font-bold leading-tight text-foreground lg:text-4xl">
               سیستم‌هایی با <span className="text-gold-gradient">دقت معماری</span>
             </h2>
           </div>
           <p className="max-w-md font-body text-sm leading-7 text-muted-foreground">
-            از دسته‌های ثبت‌شده در پنل ادمین. برای ابعاد سفارشی و مشاوره اجرا، با ما تماس بگیرید.
+            بر اساس `mechanism` و زیردسته‌های ثبت‌شده در پنل ادمین — بدون لیست ثابت نام.
           </p>
         </div>
 
