@@ -91,8 +91,8 @@ export default function HeroSlider() {
         transition={{ duration: 0.8, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
         className="absolute bottom-24 left-1/2 z-10 -translate-x-1/2 lg:bottom-28"
       >
-        <Link to={`/projects?space=${encodeURIComponent(slide.space)}`} className="btn-gold">
-          مشاهده پروژه‌ها
+        <Link to="/projects" className="btn-gold">
+          نمونه‌های اجرا شده
           <ArrowDown className="h-4 w-4" />
         </Link>
       </motion.div>
