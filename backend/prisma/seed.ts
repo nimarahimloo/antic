@@ -28,6 +28,25 @@ const ACCESSORY_SLUGS = new Set([
   "tieback",
 ]);
 
+/** mechanism پیش‌فرض برای ریشه دسته‌های پرده (قابل ویرایش در ادمین) */
+const SLUG_MECHANISM: Record<string, string> = {
+  shade: "shade",
+  roman: "roman",
+  pleated: "pleated-manual",
+  "turk-panel": "panel",
+  roller: "roller",
+  cubism: "drape",
+  printed: "drape",
+  aurora: "wave",
+  zebra: "zebra",
+  silk: "drape",
+  velvet: "drape",
+  cotton: "drape",
+  sheer: "drape",
+  kitchen: "roman",
+  office: "zebra",
+};
+
 const WOO_PRODUCT_CATS: WooCat[] = [
   // ── اصلی ──
   { termId: 64, name: "شید", slug: "shade", parentTermId: 0, order: 1 },
@@ -81,6 +100,7 @@ function buildCurtainCategories() {
       name: root.name,
       slug: root.slug,
       order: root.order,
+      mechanism: SLUG_MECHANISM[root.slug] || null,
       subcategories: children.map((ch) => ({ name: ch.name, slug: ch.slug })),
     };
   });
@@ -208,7 +228,6 @@ async function removeAccessoriesFromDb() {
   const accessoryIds = accessoryShopCats.map((c) => c.id);
 
   if (accessoryIds.length) {
-    // detach products from accessory categories
     await prisma.product.updateMany({
       where: { categoryId: { in: accessoryIds } },
       data: { categoryId: null },
@@ -223,7 +242,6 @@ async function removeAccessoriesFromDb() {
     where: { slug: { in: [...ACCESSORY_SLUGS] } },
   });
 
-  // محصولات نمونه اکسسوری قبلی
   await prisma.product.deleteMany({
     where: {
       slug: {
@@ -249,16 +267,18 @@ async function seedCurtainCategories() {
         name: c.name,
         slug: c.slug,
         order: c.order,
+        mechanism: c.mechanism,
         subcategories: JSON.stringify(c.subcategories),
       },
       update: {
         name: c.name,
         order: c.order,
+        mechanism: c.mechanism,
         subcategories: JSON.stringify(c.subcategories),
       },
     });
   }
-  console.log(`Curtain categories: ${cats.length} (بدون اکسسوری)`);
+  console.log(`Curtain categories: ${cats.length} (با mechanism)`);
 }
 
 async function seedShopCategories() {
