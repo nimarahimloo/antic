@@ -126,47 +126,49 @@ export function isFlatStyle(style?: string): boolean {
 }
 
 /**
- * ~1 = یک تصویر پارچه عرض ناحیه سبز را می‌پوشاند (بدون تکرار ریز).
- * برای استایل‌های صاف کمی بالاتر تا طرح کش نیاید.
+ * Scale factor: how many times the fabric photo spans the green width.
+ * Fabric photos are close-ups → need smaller number so pattern looks natural on full curtain.
+ * ~0.55–0.7 for flat styles (close-up geometric / textured)
+ * ~0.85–0.95 for draped styles
  */
 export function styleTileFactor(style?: string) {
-  if (isFlatStyle(style)) return 1.05;
+  if (isFlatStyle(style)) return 0.58;
   switch (style) {
     case "zebra":
-      return 1.0;
+      return 0.72;
     case "panel":
-      return 0.98;
+      return 0.75;
     case "pleated-manual":
     case "pleated-chain":
     case "pleated-sheer":
-      return 1.0;
+      return 0.7;
     case "wave":
-      return 0.95;
+      return 0.85;
     case "drape":
       return 0.9;
     default:
-      return 1.0;
+      return 0.75;
   }
 }
 
 /** Warp strength — near zero for flat styles to avoid geometric stretch */
 export function styleWarpFactor(style?: string): number {
-  if (isFlatStyle(style)) return 0.006;
+  if (isFlatStyle(style)) return 0.004;
   switch (style) {
     case "zebra":
-      return 0.018;
+      return 0.015;
     case "panel":
       return 0.012;
     case "pleated-manual":
     case "pleated-chain":
     case "pleated-sheer":
-      return 0.022;
+      return 0.02;
     case "wave":
       return 0.028;
     case "drape":
       return 0.032;
     default:
-      return 0.025;
+      return 0.022;
   }
 }
 
