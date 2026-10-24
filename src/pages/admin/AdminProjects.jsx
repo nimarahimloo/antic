@@ -1,17 +1,15 @@
 import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { base44 } from "@/api/base44Client";
+import { getSubOptionsForParent, rootSelectOptions } from "@/lib/categoryTree";
 
 export default function AdminProjects() {
-  const [catOptions, setCatOptions] = useState([]);
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     base44.entities.CurtainCategory.list("order", 200)
-      .then((rows) => {
-        const list = Array.isArray(rows) ? rows : [];
-        setCatOptions(list.map((c) => ({ value: c.slug, label: c.name })));
-      })
-      .catch(() => setCatOptions([]));
+      .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
+      .catch(() => setCategories([]));
   }, []);
 
   const fields = [
@@ -19,14 +17,16 @@ export default function AdminProjects() {
     { key: "cover_image", label: "کاور", type: "image", required: true },
     {
       key: "category_slug",
-      label: "دسته",
+      label: "دسته مادر",
       type: "select",
       required: true,
+      clearFields: ["subcategory"],
     },
     {
       key: "subcategory",
-      label: "زیردسته (اختیاری)",
-      placeholder: "مثلاً classic",
+      label: "زیردسته",
+      type: "select",
+      getOptions: (form) => getSubOptionsForParent(categories, form.category_slug),
     },
     { key: "description", label: "توضیح", type: "textarea" },
     {
@@ -49,7 +49,11 @@ export default function AdminProjects() {
       label: "عنوان",
       render: (v) => <span className="font-display font-bold text-foreground">{v}</span>,
     },
-    { key: "category_slug", label: "دسته" },
+    {
+      key: "category_slug",
+      label: "دسته",
+      render: (v, r) => (r.subcategory ? `${v} / ${r.subcategory}` : v || "—"),
+    },
   ];
 
   return (
@@ -58,7 +62,7 @@ export default function AdminProjects() {
       entity="Project"
       fields={fields}
       columns={columns}
-      options={{ category_slug: catOptions }}
+      options={{ category_slug: rootSelectOptions(categories, { includeSpace: true }) }}
     />
   );
 }
