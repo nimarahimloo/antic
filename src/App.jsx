@@ -29,7 +29,6 @@ import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminModels from '@/pages/admin/AdminModels';
 import AdminProjects from '@/pages/admin/AdminProjects';
 import AdminCategories from '@/pages/admin/AdminCategories';
-import AdminPortfolioCategories from '@/pages/admin/AdminPortfolioCategories';
 import AdminRequests from '@/pages/admin/AdminRequests';
 import AdminWindowSettings from '@/pages/admin/AdminWindowSettings';
 import AdminSettings from '@/pages/admin/AdminSettings';
@@ -81,7 +80,6 @@ const AuthenticatedApp = () => {
           <Route path="requests" element={<AdminRequests />} />
           <Route path="models" element={<AdminModels />} />
           <Route path="projects" element={<AdminProjects />} />
-          <Route path="portfolio-categories" element={<AdminPortfolioCategories />} />
           <Route path="categories" element={<AdminCategories />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="orders" element={<AdminOrders />} />
