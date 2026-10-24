@@ -32,7 +32,6 @@ const JSON_FIELDS = new Set([
   "products_used",
 ]);
 
-/** Whitelist of writable Prisma fields per entity (camelCase). Prevents Prisma unknown-arg crashes. */
 const ALLOWED: Record<string, Set<string>> = {
   CurtainModel: new Set([
     "code",
@@ -61,16 +60,21 @@ const ALLOWED: Record<string, Set<string>> = {
     "mechanism",
     "subcategories",
   ]),
+  PortfolioCategory: new Set([
+    "name",
+    "slug",
+    "description",
+    "image",
+    "order",
+    "subcategories",
+  ]),
   Project: new Set([
     "title",
-    "spaceType",
     "description",
-    "location",
-    "date",
     "coverImage",
     "images",
-    "productsUsed",
-    "featured",
+    "categorySlug",
+    "subcategory",
   ]),
   ConsultationRequest: new Set([
     "name",
@@ -94,7 +98,6 @@ const ALLOWED: Record<string, Set<string>> = {
     "designerName",
   ]),
   VirtualWindowSetting: new Set(["wallColor", "frameColor", "railColor", "viewImage"]),
-  // User writes blocked via entities route — not listed for mutation
   User: new Set([]),
 };
 
@@ -153,7 +156,6 @@ export function fromApi(body: AnyRec, entity: string): AnyRec {
       const n = Number(v);
       out[camel] = Number.isFinite(n) ? n : v;
     } else if (v === null || v === "") {
-      // optional clears
       out[camel] = null;
     } else {
       out[camel] = v;
@@ -162,9 +164,6 @@ export function fromApi(body: AnyRec, entity: string): AnyRec {
 
   if (entity === "ConsultationRequest" && (out.status == null || out.status === "")) {
     out.status = "new";
-  }
-  if (entity === "Project" && out.featured == null) {
-    out.featured = false;
   }
 
   return out;
