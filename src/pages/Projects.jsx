@@ -1,9 +1,9 @@
 import CategoryCoverCard from "@/components/CategoryCoverCard";
-import { usePortfolioCategories } from "@/hooks/usePortfolioCategories";
+import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 
-/** نمونه‌های اجرا شده — سطح اول: کارت دسته‌بندی */
+/** نمونه‌های اجرا شده — دسته‌ها از همان جدول کاتالوگ */
 export default function Projects() {
-  const { categories, loading } = usePortfolioCategories();
+  const { categories, loading } = useCurtainCategories();
 
   return (
     <div className="bg-background">
@@ -14,7 +14,8 @@ export default function Projects() {
             نمونه‌های <span className="text-gold-gradient">اجرا شده</span>
           </h1>
           <p className="mt-5 max-w-xl font-body text-sm leading-7 text-muted-foreground">
-            دسته‌بندی نمونه‌ها را انتخاب کنید تا زیردسته‌ها و نمونه‌های همان گروه را ببینید.
+            دسته‌بندی‌ها با کاتالوگ مشترک‌اند. روی کارت بزنید تا زیردسته‌ها و نمونه‌های همان گروه را
+            ببینید.
           </p>
         </div>
       </section>
@@ -29,7 +30,7 @@ export default function Projects() {
         ) : !categories.length ? (
           <div className="py-20 text-center">
             <p className="font-body text-sm text-muted-foreground">
-              هنوز دسته‌ای برای نمونه‌های اجرا ثبت نشده است.
+              هنوز دسته‌ای ثبت نشده است. از پنل ادمین دسته‌بندی را اضافه کنید.
             </p>
           </div>
         ) : (
