@@ -2,71 +2,39 @@ import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import FabricSwatch from "@/components/catalog/FabricSwatch";
 import { api } from "@/api/client";
-
-function parseSubs(c) {
-  let subs = c?.subcategories;
-  if (typeof subs === "string") {
-    try {
-      subs = JSON.parse(subs);
-    } catch {
-      subs = [];
-    }
-  }
-  return Array.isArray(subs) ? subs : [];
-}
+import { getRootCategories, getSubOptionsForParent, rootSelectOptions } from "@/lib/categoryTree";
 
 export default function AdminModels() {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    api.entities.CurtainCategory.list("order", 100)
+    api.entities.CurtainCategory.list("order", 200)
       .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
       .catch(() => setCategories([]));
   }, []);
 
-  const subOptions = categories.flatMap((c) =>
-    parseSubs(c).map((s) => {
-      const value = typeof s === "string" ? s : s.slug || s.id || s.name;
-      const label = typeof s === "string" ? s : s.name || s.slug || value;
-      return { value: String(value), label: `${c.name} → ${label}` };
-    })
-  );
+  const roots = getRootCategories(categories, { includeSpace: false });
 
-  // فقط فیلدهای ضروری برای بارگذاری سریع
   const fields = [
-    {
-      key: "image",
-      label: "عکس پارچه",
-      type: "image",
-      required: true,
-    },
-    {
-      key: "code",
-      label: "کد محصول",
-      required: true,
-      placeholder: "مثلاً ZB-001",
-    },
-    {
-      key: "name",
-      label: "نام (اختیاری)",
-      placeholder: "خالی = همان کد محصول",
-    },
+    { key: "image", label: "عکس پارچه", type: "image", required: true },
+    { key: "code", label: "کد محصول", required: true, placeholder: "ZB-001" },
+    { key: "name", label: "نام (اختیاری)", placeholder: "خالی = همان کد" },
     {
       key: "category_slug",
-      label: "دسته",
+      label: "دسته مادر",
       required: true,
       type: "select",
+      clearFields: ["subcategory"],
+      help: "فقط دسته مادر — زیردسته را جدا انتخاب کنید",
     },
     {
       key: "subcategory",
-      label: "زیردسته (اختیاری)",
-      type: subOptions.length ? "select" : "text",
+      label: "زیردسته",
+      type: "select",
+      help: "بعد از انتخاب دسته مادر پر می‌شود",
+      getOptions: (form) => getSubOptionsForParent(categories, form.category_slug),
     },
-    {
-      key: "description",
-      label: "یادداشت (اختیاری)",
-      type: "textarea",
-    },
+    { key: "description", label: "یادداشت (اختیاری)", type: "textarea" },
   ];
 
   const columns = [
@@ -86,15 +54,17 @@ export default function AdminModels() {
     {
       key: "code",
       label: "کد",
-      render: (v, r) => (
-        <span className="font-display font-bold text-primary">{v || r.name}</span>
-      ),
+      render: (v, r) => <span className="font-display font-bold text-primary">{v || r.name}</span>,
     },
-    { key: "category_slug", label: "دسته" },
+    {
+      key: "category_slug",
+      label: "دسته",
+      render: (v, r) => (r.subcategory ? `${v} / ${r.subcategory}` : v || "—"),
+    },
     {
       key: "install_status",
       label: "نصب",
-      render: (v, r) => {
+      render: (_v, r) => {
         if (r.install_pending === "rendering")
           return <span className="text-[10px] text-primary">رندر…</span>;
         if (r.install_image)
@@ -116,8 +86,9 @@ export default function AdminModels() {
       columns={columns}
       autoAnalyzeFabric
       options={{
-        category_slug: categories.map((c) => ({ value: c.slug, label: c.name })),
-        subcategory: subOptions,
+        category_slug: rootSelectOptions(roots.length ? roots : categories, {
+          includeSpace: false,
+        }),
       }}
     />
   );
