@@ -4,13 +4,8 @@ import { base44 } from "@/api/base44Client";
 import { refreshRenderTemplates } from "@/hooks/useRenderTemplates";
 
 /**
- * Optional real install photos, keyed by CurtainCategory.slug (same as templates).
- *
- * When the photo has a clear GREEN fabric region, the engine prefers it over the
- * procedural chroma template (higher realism). Finished product shots without green
- * cannot map a new fabric — use those only as visual guide, or shoot with green cloth.
- *
- * Not required: catalog works with RenderTemplate alone.
+ * Real product install photos, keyed by CurtainCategory.slug.
+ * Engine retextures fabric onto these photos (no green required).
  */
 export default function InstallReferencesAdmin() {
   const [categories, setCategories] = useState([]);
@@ -71,14 +66,13 @@ export default function InstallReferencesAdmin() {
 
   return (
     <div className="mt-6 rounded-2xl border border-secondary/60 bg-card p-5">
-      <span className="eyebrow mb-2 block">نمونه‌های اجرای واقعی (اختیاری)</span>
+      <span className="eyebrow mb-2 block">نمونه‌های اجرای واقعی (قالب اصلی)</span>
       <p className="mb-2 text-xs leading-6 text-muted-foreground">
-        <strong>اجباری نیست.</strong> اگر برای یک دسته عکس نصب واقعی با پارچهٔ سبز (chroma) بگذارید، موتور
-        همان را به قالب procedural ترجیح می‌دهد و بافت مدل‌ها طبیعی‌تر می‌نشیند. عکس محصول نهایی بدون سبز
-        برای تعویض پارچه قابل استفاده نیست — فقط الهام فرم است.
+        همین عکس‌های محصول (مثل Roman80، PNF1210، PX2607) را برای هر دسته آپلود کنید. موتور پارچهٔ مدل را
+        روی <strong>همان عکس</strong> می‌نشاند — سبز لازم نیست. قاب، کاست و دیوار دست‌نخورده می‌مانند.
       </p>
       <p className="mb-4 text-[11px] leading-5 text-muted-foreground">
-        لیست از همان دسته‌بندی‌های کاتالوگ است؛ با کم/زیاد شدن دسته‌ها اینجا هم عوض می‌شود.
+        لیست از دسته‌بندی کاتالوگ است. بعد از آپلود، در بخش بازبینی «ساخت دوباره» بزنید یا batch را اجرا کنید.
       </p>
 
       {!categories.length ? (
@@ -87,7 +81,9 @@ export default function InstallReferencesAdmin() {
         <div className="space-y-3">
           {categories.map((cat) => {
             const slug = cat.slug;
-            const mine = rows.filter((r) => String(r.style || "").toLowerCase() === String(slug).toLowerCase());
+            const mine = rows.filter(
+              (r) => String(r.style || "").toLowerCase() === String(slug).toLowerCase()
+            );
             return (
               <div key={cat.id || slug} className="rounded-xl border border-secondary/60 bg-background p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
