@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { base44 } from "@/api/base44Client";
 
-/** نمونه اجرا — فقط عنوان، توضیح، کاور، گالری (+ دسته برای ساختار صفحه) */
+/** نمونه اجرا — عنوان، توضیح، کاور، گالری + دسته از جدول مادر یکسان */
 export default function AdminProjects() {
   const [catOptions, setCatOptions] = useState([]);
 
   useEffect(() => {
-    base44.entities.PortfolioCategory.list("order", 200)
+    base44.entities.CurtainCategory.list("order", 200)
       .then((rows) => {
         const list = Array.isArray(rows) ? rows : [];
         setCatOptions(
@@ -28,19 +28,18 @@ export default function AdminProjects() {
       key: "images",
       label: "گالری",
       type: "list",
-      help: "آدرس تصاویر را با کاما جدا کنید (پس از آپلود می‌توانید لینک را اضافه کنید)",
+      help: "آدرس تصاویر را با کاما جدا کنید",
     },
     {
       key: "category_slug",
-      label: "دسته نمونه",
+      label: "دسته (همان دسته‌بندی کاتالوگ)",
       type: "select",
-      help: "برای نمایش زیر دستهٔ درست در سایت",
+      help: "از جدول یکسان دسته‌ها — اگر مدل کاتالوگ نباشد همین پروژه‌ها در کاتالوگ دیده می‌شوند",
     },
     {
       key: "subcategory",
       label: "زیردسته (اختیاری)",
       placeholder: "slug زیردسته",
-      help: "اگر خالی باشد زیر خود دسته مادر نمایش داده می‌شود",
     },
   ];
 
