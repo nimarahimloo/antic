@@ -1,7 +1,11 @@
 import { Link } from "react-router-dom";
 import { Phone, Mail, MapPin, Instagram, ShieldCheck, BadgeCheck } from "lucide-react";
+import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 
 export default function Footer() {
+  const { categories } = useCurtainCategories();
+  const topCats = (categories || []).slice(0, 6);
+
   return (
     <footer className="border-t border-secondary/60 bg-background">
       <div className="mx-auto max-w-7xl px-5 py-16 lg:px-10">
@@ -22,26 +26,64 @@ export default function Footer() {
           <div>
             <h4 className="eyebrow mb-5">دسته‌بندی‌ها</h4>
             <ul className="space-y-3 font-body text-sm text-muted-foreground">
-              <li><Link to="/catalog" className="transition-colors hover:text-primary">کاتالوگ پرده</Link></li>
-              <li><Link to="/projects" className="transition-colors hover:text-primary">پروژه‌های اجرا شده</Link></li>
-              <li><Link to="/shop" className="transition-colors hover:text-primary">اکسسوری پرده</Link></li>
-              <li><Link to="/about" className="transition-colors hover:text-primary">درباره ما</Link></li>
-              <li><Link to="/contact" className="transition-colors hover:text-primary">مشاوره و سفارش</Link></li>
+              {topCats.map((c) => (
+                <li key={c.slug}>
+                  <Link
+                    to={`/catalog?category=${c.slug}`}
+                    className="transition-colors hover:text-primary"
+                  >
+                    {c.name}
+                  </Link>
+                </li>
+              ))}
+              {!topCats.length && (
+                <li>
+                  <Link to="/catalog" className="transition-colors hover:text-primary">
+                    کاتالوگ پرده
+                  </Link>
+                </li>
+              )}
+              <li>
+                <Link to="/shop" className="transition-colors hover:text-primary">
+                  فروشگاه
+                </Link>
+              </li>
+              <li>
+                <Link to="/projects" className="transition-colors hover:text-primary">
+                  پروژه‌ها
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="transition-colors hover:text-primary">
+                  مشاوره و سفارش
+                </Link>
+              </li>
             </ul>
           </div>
 
           <div>
             <h4 className="eyebrow mb-5">تماس</h4>
             <ul className="space-y-3 font-body text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Phone className="h-4 w-4 text-primary" /> ۰۲۱-۱۲۳۴۵۶۷۸</li>
-              <li className="flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /> info@pardehantik.com</li>
-              <li className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> تهران، نمایشگاه دائمی پرده</li>
+              <li className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-primary" /> ۰۲۱-۱۲۳۴۵۶۷۸
+              </li>
+              <li className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-primary" /> info@pardehantik.com
+              </li>
+              <li className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-primary" /> تهران، نمایشگاه دائمی پرده
+              </li>
             </ul>
           </div>
 
           <div>
             <h4 className="eyebrow mb-5">ما را دنبال کنید</h4>
-            <a href="https://instagram.com" target="_blank" rel="noreferrer" className="btn-ghost-gold w-full justify-center">
+            <a
+              href="https://instagram.com"
+              target="_blank"
+              rel="noreferrer"
+              className="btn-ghost-gold w-full justify-center"
+            >
               <Instagram className="h-4 w-4" /> اینستاگرام پرده آنتیک
             </a>
           </div>
