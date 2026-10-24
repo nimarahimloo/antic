@@ -1,6 +1,7 @@
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { MECHANISM_KEYS, MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
 
+/** تنها منبع دسته‌های کاتالوگ پرده (غیر از اکسسوری فروشگاه) */
 export default function AdminCategories() {
   const fields = [
     { key: "name", label: "نام دسته", required: true, placeholder: "مثلاً: زبرا" },
@@ -9,13 +10,13 @@ export default function AdminCategories() {
       label: "شناسه",
       required: true,
       placeholder: "مثلاً: zebra",
-      help: "همان کلید قالب نصب و فیلتر کاتالوگ است. بعد از ذخیره، قالب chroma این دسته خودکار ساخته می‌شود.",
+      help: "کلید فیلتر کاتالوگ و قالب نصب. بعد از ذخیره، قالب chroma این دسته خودکار ساخته می‌شود.",
     },
     {
       key: "mechanism",
       label: "سبک رندر پنجره",
       type: "select",
-      help: "اگر خالی باشد از روی شناسه حدس زده می‌شود. برای دسته‌های جدید حتماً تنظیم کنید.",
+      help: "اگر خالی باشد از روی شناسه حدس زده می‌شود. برای دسته‌های جدید تنظیم کنید.",
     },
     { key: "order", label: "ترتیب نمایش", type: "number", placeholder: "مثلاً: 1" },
     { key: "image", label: "تصویر", type: "image" },
@@ -57,7 +58,7 @@ export default function AdminCategories() {
 
   return (
     <AdminEntityPage
-      title="دسته‌بندی‌ها"
+      title="دسته‌بندی کاتالوگ پرده"
       entity="CurtainCategory"
       fields={fields}
       columns={columns}
