@@ -50,7 +50,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link to="/projects" className="transition-colors hover:text-primary">
-                  پروژه‌ها
+                  نمونه‌های اجرا شده
                 </Link>
               </li>
               <li>
