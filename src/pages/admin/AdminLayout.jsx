@@ -15,19 +15,17 @@ import {
   Settings,
   ShoppingBag,
   Package,
-  Images,
 } from "lucide-react";
 
 const MENU = [
   { to: "/admin", label: "داشبورد", icon: LayoutDashboard, end: true },
-  { to: "/admin/requests", label: "درخواست‌های مشاوره", icon: Inbox },
+  { to: "/admin/requests", label: "درخواست‌ها", icon: Inbox },
   { to: "/admin/models", label: "مدل‌های پرده", icon: Layers },
-  { to: "/admin/portfolio-categories", label: "دسته نمونه‌های اجرا", icon: Images },
-  { to: "/admin/projects", label: "نمونه‌های اجرا شده", icon: FolderKanban },
-  { to: "/admin/categories", label: "دسته‌بندی کاتالوگ", icon: ListTree },
-  { to: "/admin/products", label: "محصولات اکسسوری", icon: ShoppingBag },
+  { to: "/admin/categories", label: "دسته‌بندی", icon: ListTree },
+  { to: "/admin/projects", label: "نمونه‌های اجرا", icon: FolderKanban },
+  { to: "/admin/products", label: "فروشگاه (اکسسوری)", icon: ShoppingBag },
   { to: "/admin/orders", label: "سفارش‌ها", icon: Package },
-  { to: "/admin/window", label: "پنجرهٔ مجازی", icon: AppWindow },
+  { to: "/admin/window", label: "پنجره مجازی / قالب", icon: AppWindow },
   { to: "/admin/settings", label: "تنظیمات", icon: Settings },
 ];
 
@@ -87,7 +85,7 @@ export default function AdminLayout() {
       </div>
 
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-8 lg:flex-row lg:px-10">
-        <aside className="lg:w-60 lg:shrink-0">
+        <aside className="lg:w-56 lg:shrink-0">
           <nav className="flex gap-2 overflow-x-auto no-scrollbar lg:flex-col lg:gap-1.5 lg:overflow-visible">
             {MENU.map((item) => (
               <NavLink
