@@ -1,5 +1,6 @@
 /** Dual assistant: warm design chat + admin DB tools. Never dump raw paths in text. */
 import { prisma } from "./prisma.js";
+import { buildAdminAssistantReply as buildAdminReply } from "./consultantAdmin.js";
 
 export type RichBlock =
   | { type: "text"; markdown: string }
@@ -39,7 +40,6 @@ const GREETING_RE =
   /^(سلام|درود|hi|hello|hey|سلام علیکم|صبح بخیر|عصر بخیر|شب بخیر|خوبی|چطوری)[\s!.؟?]*$/i;
 const THANKS_RE = /^(ممنون|مرسی|تشکر|thanks|thank you|خداحافظ|bye)[\s!.؟?]*$/i;
 
-/** هر کلید → اسلاگ واقعی دسته در DB */
 const STYLE_HINTS: { keys: string[]; slugs: string[]; tip: string }[] = [
   {
     keys: ["بلک", "blackout", "تاریک", "خواب", "نور نده", "اتاق خواب"],
@@ -196,14 +196,12 @@ function scoreModel(
 }
 
 async function loadCatalog() {
-  const [categories, models, modelCount, orderCount, requestCount] = await Promise.all([
+  const [categories, models, modelCount] = await Promise.all([
     prisma.curtainCategory.findMany({ orderBy: { order: "asc" }, take: 40 }),
     prisma.curtainModel.findMany({ orderBy: { updatedAt: "desc" }, take: 150 }),
     prisma.curtainModel.count(),
-    prisma.order.count().catch(() => 0),
-    prisma.consultationRequest.count().catch(() => 0),
   ]);
-  return { categories, models, modelCount, orderCount, requestCount };
+  return { categories, models, modelCount };
 }
 
 function historyBlob(history: ChatMessage[]) {
@@ -219,14 +217,13 @@ export async function buildConsultantReply(
   history: ChatMessage[] = []
 ): Promise<AssistantResult> {
   const t = normalize(userText);
-  const { categories, models, modelCount } = await loadCatalog();
+  const { categories, models } = await loadCatalog();
   const fullContext = `${historyBlob(history)} ${userText}`;
   const hints = detectHints(fullContext);
   const preferred = [...new Set(hints.flatMap((h) => h.slugs))];
   const terms = extractTerms(userText);
   const tip = hints.map((h) => h.tip).filter(Boolean)[0];
 
-  // —— احوال‌پرسی ——
   if (GREETING_RE.test(t) || t.length < 2) {
     return pack(
       "سلام، خوش اومدی 🌿\nمن اینجام که کمکت کنم پرده‌ای انتخاب کنی که هم با سلیقه‌ت جور دربیاد هم با نور اتاقت.\n\nراستش را بگو: **کدام اتاق** است و دوست داری فضا **تاریک** بماند یا **روشن و پرنور**؟",
@@ -304,7 +301,6 @@ export async function buildConsultantReply(
     );
   }
 
-  // —— پیشنهاد مدل ——
   if (!models.length) {
     return pack("کاتالوگ هنوز خالی است. از تماس می‌تونی مشاوره بگیری.", [
       { type: "link_buttons", items: [{ label: "تماس", href: "/contact" }] },
@@ -316,11 +312,10 @@ export async function buildConsultantReply(
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  // فقط مدل‌هایی که واقعاً امتیاز دارند؛ اگر سبک مشخص است و چیزی نیست، نگوییم «نزدیک‌ترین» تصادفی
   if (preferred.length > 0 && scored.length === 0) {
     return pack(
       (tip ? tip + "\n\n" : "") +
-        `متأسفانه الان مدلی با این مشخصات در کاتالوگ ثبت نشده. می‌تونی از کاتالوگ کامل ببینی یا از تماس بپرسی — شاید مدل جدید اضافه شده باشد.`,
+        `متأسفانه الان مدلی با این مشخصات در کاتالوگ ثبت نشده. می‌تونی از کاتالوگ کامل ببینی یا از تماس بپرسی.`,
       [
         {
           type: "link_buttons",
@@ -329,19 +324,10 @@ export async function buildConsultantReply(
             { label: "تماس", href: "/contact" },
           ],
         },
-        {
-          type: "quick_replies",
-          items: [
-            { label: "زبرا ببینم", message: "زبرا دارید؟" },
-            { label: "شید ببینم", message: "شید بلک‌اوت" },
-            { label: "رومن", message: "رومن کلاسیک" },
-          ],
-        },
       ]
     );
   }
 
-  // بدون سرنخ کافی → سؤال راهنما، نه لیست تصادفی
   if (scored.length === 0) {
     return pack(
       "دوست دارم دقیق‌تر کمکت کنم 😊\nفقط بگو:\n• اتاق کجاست؟\n• نور را بیشتر می‌خواهی یا کمتر؟\n• حس مدرن می‌خواهی یا کلاسیک؟",
@@ -395,193 +381,24 @@ export async function buildConsultantReply(
   ]);
 }
 
-async function runAdminAction(
-  userText: string,
-  context: AssistantContext
-): Promise<AssistantResult | null> {
-  const t = normalize(userText);
-  const path = context.path || "";
-
-  const statusMatch = t.match(
-    /(?:وضعیت|status)\s*(?:درخواست)?\s*([a-z0-9_-]{6,})\s*(?:را|=|به)?\s*(جدید|new|انجام|done|بسته|closed|درحال|processing)/i
-  );
-  if (statusMatch) {
-    const idPart = statusMatch[1];
-    const stRaw = statusMatch[2];
-    const statusMap: Record<string, string> = {
-      جدید: "new",
-      new: "new",
-      انجام: "done",
-      done: "done",
-      بسته: "closed",
-      closed: "closed",
-      درحال: "processing",
-      processing: "processing",
-    };
-    const status = statusMap[stRaw] || stRaw;
-    const found = await prisma.consultationRequest.findFirst({
-      where: { id: { contains: idPart } },
-    });
-    if (!found) return pack(`درخواستی با شناسه شبیه «${idPart}» پیدا نشد.`);
-    const updated = await prisma.consultationRequest.update({
-      where: { id: found.id },
-      data: { status },
-    });
-    return pack(`وضعیت درخواست **${updated.name}** → **${updated.status}**`, [
-      { type: "link_buttons", items: [{ label: "درخواست‌ها", href: "/admin/requests" }] },
-    ]);
-  }
-
-  if (/دسته\s*جدید|افزودن\s*دسته|create\s*category/.test(t)) {
-    const nameM = userText.match(/نام\s*[:：=]?\s*([^,\n]+)/i);
-    const slugM = userText.match(/(?:slug|شناسه)\s*[:：=]?\s*([a-z0-9-]+)/i);
-    if (nameM && slugM) {
-      const name = nameM[1].trim();
-      const slug = slugM[1].trim().toLowerCase();
-      const row = await prisma.curtainCategory.upsert({
-        where: { slug },
-        create: { name, slug, order: 99 },
-        update: { name },
-      });
-      return pack(`دسته **${row.name}** ذخیره شد.`, [
-        { type: "link_buttons", items: [{ label: "دسته‌ها", href: "/admin/categories" }] },
-      ]);
-    }
-    return pack("فرمت: دسته جدید نام: رومن شناسه: roman");
-  }
-
-  if (/سفارش|orders?/.test(t) || path.includes("order")) {
-    const orders = await prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 8 });
-    if (!orders.length) return pack("سفارشی ثبت نشده.");
-    const lines = orders
-      .map(
-        (o) =>
-          `• **${o.customerName}** — ${o.amountToman.toLocaleString("fa-IR")} ت — ${o.status}`
-      )
-      .join("\n");
-    return pack(`آخرین سفارش‌ها:\n${lines}`, [
-      { type: "link_buttons", items: [{ label: "سفارش‌ها", href: "/admin/orders" }] },
-    ]);
-  }
-
-  if (/درخواست|مشاوره|inbox|request/.test(t) || path.includes("request")) {
-    const reqs = await prisma.consultationRequest.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 8,
-    });
-    if (!reqs.length) return pack("درخواستی نیست.");
-    const lines = reqs
-      .map((r) => `• **${r.name}** (${r.phone}) — ${r.status} — \`${r.id.slice(0, 8)}\``)
-      .join("\n");
-    return pack(`آخرین درخواست‌ها:\n${lines}`, [
-      { type: "link_buttons", items: [{ label: "پنل درخواست", href: "/admin/requests" }] },
-    ]);
-  }
-
-  if (/لیست\s*مدل|مدل‌ها|models/.test(t) || (path.includes("models") && /لیست|چند|تعداد/.test(t))) {
-    const list = await prisma.curtainModel.findMany({ orderBy: { updatedAt: "desc" }, take: 8 });
-    const count = await prisma.curtainModel.count();
-    return pack(`**${count}** مدل در دیتابیس:`, [
-      modelCards(list),
-      { type: "link_buttons", items: [{ label: "مدیریت مدل‌ها", href: "/admin/models" }] },
-    ]);
-  }
-
-  if (/محصول|فروشگاه|product/.test(t) || path.includes("product")) {
-    const products = await prisma.product.findMany({ orderBy: { updatedAt: "desc" }, take: 6 });
-    const count = await prisma.product.count();
-    const lines = products
-      .map((p) => `• **${p.name}** — ${p.price.toLocaleString("fa-IR")} ت`)
-      .join("\n");
-    return pack(`**${count}** محصول اکسسوری.\n${lines || "—"}`, [
-      { type: "link_buttons", items: [{ label: "محصولات", href: "/admin/products" }] },
-    ]);
-  }
-
-  return null;
-}
-
 export async function buildAdminAssistantReply(
   userText: string,
-  _history: ChatMessage[] = [],
-  context: AssistantContext = {}
+  history: ChatMessage[] = [],
+  context: AssistantContext = {},
+  options?: { imageUrl?: string }
 ): Promise<AssistantResult> {
-  const t = normalize(userText);
-  const path = context.path || "";
-  const page = context.page || path || "پنل";
-
-  const acted = await runAdminAction(userText, context);
-  if (acted) return acted;
-
-  const { categories, models, modelCount, requestCount, orderCount } = await loadCatalog();
-
-  if (/وضعیت|خلاصه|داشبورد|چیکار/.test(t) || path === "/admin") {
-    return pack(
-      `وضعیت DB:\n• مدل: **${modelCount}**\n• دسته: **${categories.length}**\n• سفارش: **${orderCount}**\n• درخواست: **${requestCount}**\n\nدستورات: «لیست مدل‌ها» · «درخواست‌های مشاوره» · «دسته جدید نام: … شناسه: …»`,
-      [
-        {
-          type: "quick_replies",
-          items: [
-            { label: "لیست مدل‌ها", message: "لیست مدل‌ها" },
-            { label: "درخواست‌ها", message: "درخواست‌های مشاوره" },
-            { label: "سفارش‌ها", message: "آخرین سفارش‌ها" },
-          ],
-        },
-      ]
-    );
-  }
-
-  if (GREETING_RE.test(t)) {
-    return pack(`سلام — روی **${page}** هستی. بگو چه کار دیتابیسی انجام شود.`, [
-      {
-        type: "quick_replies",
-        items: [
-          { label: "خلاصه وضعیت", message: "خلاصه وضعیت" },
-          { label: "لیست مدل", message: "لیست مدل‌ها" },
-        ],
-      },
-    ]);
-  }
-
-  if (/قالب|chroma|رندر/.test(t)) {
-    return pack("از پنجره مجازی قالب chroma هر سبک را بساز.", [
-      { type: "link_buttons", items: [{ label: "پنجره مجازی", href: "/admin/window" }] },
-    ]);
-  }
-
-  if (/مدل|پارچه|افزودن مدل/.test(t) || path.includes("models")) {
-    return pack(`ثبت مدل از /admin/models. الان **${modelCount}** مدل داریم.`, [
-      modelCards(models.slice(0, 4)),
-      { type: "link_buttons", items: [{ label: "مدل‌ها", href: "/admin/models" }] },
-    ]);
-  }
-
-  if (/دسته|category/.test(t) || path.includes("categor")) {
-    const lines = categories.slice(0, 12).map((c) => `• ${c.name}`).join("\n");
-    return pack(`دسته‌ها:\n${lines}`, [
-      { type: "link_buttons", items: [{ label: "دسته‌ها", href: "/admin/categories" }] },
-    ]);
-  }
-
-  return pack(`روی **${page}** هستی. بگو: لیست مدل‌ها، سفارش‌ها، درخواست‌ها، یا ساخت دسته.`, [
-    {
-      type: "quick_replies",
-      items: [
-        { label: "خلاصه وضعیت", message: "خلاصه وضعیت" },
-        { label: "لیست مدل‌ها", message: "لیست مدل‌ها" },
-      ],
-    },
-  ]);
+  return buildAdminReply(userText, history, context, options);
 }
 
 export async function buildAssistantReply(
   agentName: string,
   userText: string,
   history: ChatMessage[] = [],
-  context: AssistantContext = {}
+  context: AssistantContext = {},
+  options?: { imageUrl?: string }
 ): Promise<AssistantResult> {
   if (agentName === "admin_assistant") {
-    return buildAdminAssistantReply(userText, history, context);
+    return buildAdminAssistantReply(userText, history, context, options);
   }
   return buildConsultantReply(userText, history);
 }
