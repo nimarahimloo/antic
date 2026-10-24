@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 
 let cache = null;
@@ -32,7 +32,6 @@ function parseSubs(raw) {
   return [];
 }
 
-/** نرمال‌سازی ردیف CurtainCategory از API */
 export function normalizeCategory(row) {
   if (!row) return null;
   return {
@@ -46,9 +45,9 @@ export function normalizeCategory(row) {
   };
 }
 
-function fetchCategories() {
-  if (cache) return Promise.resolve(cache);
-  if (inflight) return inflight;
+function fetchCategories(force = false) {
+  if (!force && cache) return Promise.resolve(cache);
+  if (!force && inflight) return inflight;
   inflight = base44.entities.CurtainCategory.list("order", 200)
     .then((rows) => {
       const list = (Array.isArray(rows) ? rows : [])
@@ -66,37 +65,43 @@ function fetchCategories() {
   return inflight;
 }
 
-/**
- * همهٔ دسته‌های پرده از API (CurtainCategory).
- * بعد از تغییر در ادمین، refreshCurtainCategories() را صدا بزن.
- */
+/** دسته‌های پرده از /api/entities/CurtainCategory */
 export function useCurtainCategories() {
   const [categories, setCategories] = useState(cache || []);
   const [loading, setLoading] = useState(!cache);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    let alive = true;
-    setLoading(!cache);
-    fetchCategories()
+  const reload = useCallback((force = false) => {
+    setLoading(true);
+    return fetchCategories(force)
       .then((list) => {
-        if (alive) {
-          setCategories(list);
-          setError(null);
-        }
+        setCategories(list);
+        setError(null);
+        return list;
       })
-      .catch(() => {
-        if (alive) setError("بارگذاری دسته‌ها ناموفق بود");
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
+      .catch(() => setError("بارگذاری دسته‌ها ناموفق بود"))
+      .finally(() => setLoading(false));
   }, []);
 
-  return { categories, loading, error };
+  useEffect(() => {
+    let alive = true;
+    reload(false).then((list) => {
+      if (!alive && list) {
+        /* unmounted */
+      }
+    });
+    // وقتی تب دوباره فعال شد، لیست را تازه کن (بعد از تغییر ادمین)
+    const onVis = () => {
+      if (document.visibilityState === "visible") reload(true);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      alive = false;
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [reload]);
+
+  return { categories, loading, error, reload };
 }
 
 export function refreshCurtainCategories() {

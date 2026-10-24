@@ -1,12 +1,9 @@
 import { Check } from "lucide-react";
 import FabricSwatch from "@/components/catalog/FabricSwatch";
+import { mediaUrl } from "@/lib/mediaUrl";
 
-/**
- * کارت مدل — همان منطق سایت بزرگ:
- * اگر install_image باشد همان را نشان بده (سینک با ادمین)، وگرنه عکس پارچه.
- */
 export default function CatalogCard({ model, active, onClick }) {
-  const thumb = model.install_image || model.image || null;
+  const thumb = mediaUrl(model.install_image || model.image) || null;
 
   return (
     <button

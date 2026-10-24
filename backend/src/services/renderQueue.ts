@@ -4,7 +4,6 @@ import path from "path";
 
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 
-/** Auto-approve when quality score >= this (default 7). Set 11 to disable. */
 function autoApproveThreshold() {
   const n = Number(process.env.RENDER_AUTO_APPROVE_SCORE ?? "7");
   return Number.isFinite(n) ? n : 7;
@@ -35,12 +34,11 @@ export function getQueueState() {
 type ResolvedTemplate = { image: string; source: string; key: string };
 
 /**
- * Resolve install base image for a model (category-first):
- *  1) InstallReference for categorySlug (real chroma photo) — optional boost
- *  2) RenderTemplate for categorySlug (from DB category)
- *  3) same for mechanism style (roman, zebra, …) as fallback
+ * اولویت:
+ *  1) RenderTemplate (chroma سبز) — برای نگاشت پارچه ضروری است
+ *  2) InstallReference فقط اگر chroma برای همان کلید نبود
  *
- * Categories live in CurtainCategory; template keys = category.slug.
+ * عکس محصول واقعی بدون سبز نباید قبل از قالب سبز امتحان شود.
  */
 async function resolveTemplateCandidates(opts: {
   categorySlug?: string | null;
@@ -53,19 +51,8 @@ async function resolveTemplateCandidates(opts: {
   const out: ResolvedTemplate[] = [];
   const seen = new Set<string>();
 
+  // 1) chroma templates first
   for (const k of unique) {
-    const ref = await prisma.installReference.findFirst({
-      where: { style: k },
-      orderBy: { updatedAt: "desc" },
-    });
-    if (ref?.image) {
-      const id = `ref:${k}:${ref.image}`;
-      if (!seen.has(id)) {
-        seen.add(id);
-        out.push({ image: ref.image, source: "install_reference", key: k });
-      }
-    }
-
     const tpl = await prisma.renderTemplate.findFirst({
       where: { style: k },
       orderBy: { updatedAt: "desc" },
@@ -78,10 +65,24 @@ async function resolveTemplateCandidates(opts: {
       }
     }
   }
+
+  // 2) optional real references (may lack green — tried only after chroma)
+  for (const k of unique) {
+    const ref = await prisma.installReference.findFirst({
+      where: { style: k },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (ref?.image) {
+      const id = `ref:${k}:${ref.image}`;
+      if (!seen.has(id)) {
+        seen.add(id);
+        out.push({ image: ref.image, source: "install_reference", key: k });
+      }
+    }
+  }
   return out;
 }
 
-/** Categories live in DB — list them for template coverage */
 export async function listCategoryTemplateCoverage() {
   const [categories, templates, refs] = await Promise.all([
     prisma.curtainCategory.findMany({ orderBy: { order: "asc" } }),
@@ -108,7 +109,6 @@ export async function listCategoryTemplateCoverage() {
   });
 }
 
-/** Admin-only: generate one model with high-accuracy engine */
 export async function renderOneModel(modelId: string, opts?: { regenerate?: boolean }) {
   const model = await prisma.curtainModel.findUnique({ where: { id: modelId } });
   if (!model) throw new Error("Model not found");
@@ -135,7 +135,7 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
   if (!candidates.length) {
     throw new Error(
       `برای دسته «${categorySlug || "—"}» / سبک «${style}» قالب chroma در دیتابیس نیست. ` +
-        `از پنل → پنجره مجازی، برای همین دسته «ساخت قالب» بزنید یا عکس سبز آپلود کنید.`
+        `از پنل → پنجره مجازی، برای همین دسته «ساخت قالب» بزنید.`
     );
   }
 
@@ -186,7 +186,6 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
       };
     } catch (e) {
       lastErr = e;
-      // try next candidate (e.g. real photo without green → fall back to chroma template)
       console.warn("[render] template candidate failed", resolved.source, resolved.key, e);
     }
   }
@@ -201,7 +200,6 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
-/** Admin batch — sequential; template cache makes later items much faster */
 export async function runBatch(opts?: {
   regenerate?: boolean;
   limit?: number;
