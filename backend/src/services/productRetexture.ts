@@ -7,13 +7,16 @@
  * Flow: detect curtain on reference → paint chroma (green×luminance) →
  * same fabric engine as installEngine → photoreal output.
  * No per-model manual work; one reference photo per category is enough.
+ *
+ * Flat styles (shade / roman / roller / double) use near-zero warp so
+ * geometric patterns stay undistorted.
  */
 
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { applyBrandWatermark } from "./brandWatermark.js";
-import { styleTileFactor } from "../lib/curtainStyles.js";
+import { styleTileFactor, styleWarpFactor, isFlatStyle } from "../lib/curtainStyles.js";
 
 export type ProductRetextureInput = {
   photoPathOrUrl: string;
@@ -352,23 +355,34 @@ async function mapFabricOntoChroma(
   material?: string
 ): Promise<{ out: Buffer; coverage: number; meanLin: number; logStd: number }> {
   const sharp = await getSharp();
+  const flat = isFlatStyle(style);
 
-  // Analyze green key
+  // Analyze green key + find green bbox for proper UV
   let sumLin = 0,
     nKey = 0,
     top = h;
+  let minX = w,
+    maxX = 0,
+    minY = h,
+    maxY = 0;
   const logs: number[] = [];
-  for (let i = 0; i < chroma.length; i += 4) {
-    const r = chroma[i] / 255,
-      g = chroma[i + 1] / 255,
-      b = chroma[i + 2] / 255;
-    if (g - Math.max(r, b) > 0.12) {
-      const linG = Math.pow(g, 2.2);
-      sumLin += linG;
-      nKey++;
-      logs.push(Math.log(linG + 1e-3));
-      const y = Math.floor(i / 4 / w);
-      if (y < top) top = y;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const r = chroma[i] / 255,
+        g = chroma[i + 1] / 255,
+        b = chroma[i + 2] / 255;
+      if (g - Math.max(r, b) > 0.12) {
+        const linG = Math.pow(g, 2.2);
+        sumLin += linG;
+        nKey++;
+        logs.push(Math.log(linG + 1e-3));
+        if (y < top) top = y;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
     }
   }
   const meanLin = nKey ? sumLin / nKey : 1;
@@ -377,10 +391,18 @@ async function mapFabricOntoChroma(
   const logStd = logs.length
     ? Math.sqrt(logs.reduce((a, v) => a + (v - avgLog) ** 2, 0) / logs.length)
     : 0.12;
-  const topFrac = 1 - top / h;
 
   if (coverage < 0.03) {
     throw new Error("chroma ساخته‌شده از عکس مرجع پوشش سبز کافی ندارد");
+  }
+
+  if (maxX <= minX) {
+    minX = 0;
+    maxX = w - 1;
+  }
+  if (maxY <= minY) {
+    minY = 0;
+    maxY = h - 1;
   }
 
   const target =
@@ -392,14 +414,15 @@ async function mapFabricOntoChroma(
           ? 0.16
           : 0.26;
   const contrast = Math.min(1.8, Math.max(0.6, target / Math.max(logStd, 0.05)));
+  const warp = styleWarpFactor(style);
   const mat = {
     contrast,
-    detail: material === "sheer" ? 0.14 : 0.26,
+    detail: material === "sheer" ? 0.12 : flat ? 0.16 : 0.26,
     tile: 1.0 * styleTileFactor(style),
-    warp: 0.03,
-    ao: material === "sheer" ? 0.18 : 0.38,
+    warp,
+    ao: material === "sheer" ? 0.16 : flat ? 0.24 : 0.38,
   };
-  const fabricScale = Math.min(1.25, Math.max(0.75, mat.tile));
+  const fabricScale = Math.min(1.18, Math.max(0.88, mat.tile));
 
   const fabricBuf = await loadBuffer(fabricPath);
   const fabMeta = await sharp(fabricBuf).metadata();
@@ -427,8 +450,12 @@ async function mapFabricOntoChroma(
   meanG = nF ? meanG / nF : 0.4;
   meanB = nF ? meanB / nF : 0.4;
 
-  const tileX = w * fabricScale;
-  const tileY = tileX / aspect;
+  // UV relative to green bbox (same as installEngine)
+  const gW = Math.max(1, maxX - minX);
+  const gH = Math.max(1, maxY - minY);
+  const tileX = gW * fabricScale;
+  // Flat styles: keep vertical scale proportional → no stretch on geometric patterns
+  const tileY = flat ? tileX / aspect : (tileX / aspect) * 0.92;
   const out = Buffer.alloc(w * h * 4);
 
   for (let y = 0; y < h; y++) {
@@ -466,10 +493,18 @@ async function mapFabricOntoChroma(
       s *= Math.pow(Math.min(2, Math.max(0.5, micro)), mat.detail);
       s = Math.pow(Math.max(s, 0), Math.min(mat.contrast, 1.05));
 
-      const py = (topFrac - y / h) * h;
-      const compress = 1 - 0.08 * smoothstep(0.75, 0.3, s);
-      const u = (x / tileX) * fi.width + gx * mat.warp * fi.width * 0.15;
-      const v = (py / (tileY * compress)) * fi.height + gy * mat.warp * fi.height * 0.08;
+      // Position inside green bbox → fabric UV
+      const localX = x - minX;
+      const localY = y - minY;
+
+      // Flat styles: pure planar mapping, almost zero gradient warp
+      const u =
+        (localX / tileX) * fi.width +
+        (flat ? 0 : gx * mat.warp * fi.width * 0.12);
+      const v =
+        (localY / Math.max(tileY, 1)) * fi.height +
+        (flat ? 0 : gy * mat.warp * fi.height * 0.07);
+
       const [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u, v);
 
       const flr = toLin(fr),
