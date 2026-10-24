@@ -16,7 +16,6 @@ export default function AdminEntityPage({
   columns,
   options = {},
   sortBy = "-created_date",
-  /** پس از آپلود تصویر مدل، فیلدها را از تحلیل پارچه پر کن */
   autoAnalyzeFabric = false,
 }) {
   const [records, setRecords] = useState([]);
@@ -49,7 +48,6 @@ export default function AdminEntityPage({
     const initial = {};
     fields.forEach((f) => {
       if (f.type === "boolean") initial[f.key] = false;
-      else if (f.type === "select") initial[f.key] = options[f.key]?.[0]?.value ?? "";
       else initial[f.key] = "";
     });
     setError("");
@@ -116,7 +114,6 @@ export default function AdminEntityPage({
         payload[f.key] = String(v ?? "").trim() === "" ? undefined : v;
       }
     });
-    // نام مدل = کد محصول اگر خالی باشد
     if (payload.code && !payload.name) payload.name = payload.code;
     setSaving(true);
     setError("");
@@ -154,23 +151,20 @@ export default function AdminEntityPage({
       }
       setForm((f) => {
         const next = { ...f };
-        // فقط فیلدهای خالی را پر کن تا ورودی دستی ادمین پاک نشود
         if (a.material && !String(next.material || "").trim()) next.material = a.material;
         if (a.fabric && !String(next.fabric || "").trim()) next.fabric = a.fabric;
         if (a.texture && !String(next.texture || "").trim()) next.texture = a.texture;
         if (a.color && !String(next.color || "").trim()) next.color = a.color;
-        // کد رنگ فقط برای پارچهٔ ساده؛ طرح‌دار عمداً خالی
         if (a.colorHex && !a.isPatterned && !String(next.color_code || "").trim()) {
           next.color_code = a.colorHex;
         }
         if (a.isPatterned) next.color_code = "";
-        // نام = کد اگر نام خالی است
         if (next.code && !String(next.name || "").trim()) next.name = next.code;
         return next;
       });
       setHint(
         a.isPatterned
-          ? `تشخیص: ${a.fabric} · ${a.texture} · ${a.color} — برای طرح‌دار کد رنگ لازم نیست.`
+          ? `تشخیص: ${a.fabric} · ${a.texture} · ${a.color}`
           : `تشخیص: ${a.fabric} · ${a.texture} · ${a.color}${a.colorHex ? ` (${a.colorHex})` : ""}`
       );
     } catch {
@@ -190,15 +184,10 @@ export default function AdminEntityPage({
       const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
       const url = res?.file_url || res?.url;
       if (!url) throw new Error("آپلود پاسخ معتبری نداد");
-      setForm((f) => ({
-        ...f,
-        [fieldKey]: url,
-      }));
-      if (fieldKey === "image" && autoAnalyzeFabric) {
-        await applyFabricAnalysis(url);
-      }
+      setForm((f) => ({ ...f, [fieldKey]: url }));
+      if (fieldKey === "image" && autoAnalyzeFabric) await applyFabricAnalysis(url);
     } catch (err) {
-      setError(err?.message || "آپلود تصویر ناموفق بود. فایل را بررسی کنید.");
+      setError(err?.message || "آپلود تصویر ناموفق بود.");
     } finally {
       setUploading(false);
     }
@@ -239,16 +228,11 @@ export default function AdminEntityPage({
             <thead>
               <tr className="border-b border-secondary/60">
                 {columns.map((c) => (
-                  <th
-                    key={c.key}
-                    className="px-4 py-3 text-right font-body text-xs text-muted-foreground"
-                  >
+                  <th key={c.key} className="px-4 py-3 text-right font-body text-xs text-muted-foreground">
                     {c.label}
                   </th>
                 ))}
-                <th className="px-4 py-3 text-left font-body text-xs text-muted-foreground">
-                  عملیات
-                </th>
+                <th className="px-4 py-3 text-left font-body text-xs text-muted-foreground">عملیات</th>
               </tr>
             </thead>
             <tbody>
@@ -260,43 +244,24 @@ export default function AdminEntityPage({
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={columns.length + 1}
-                    className="px-4 py-16 text-center font-body text-sm text-muted-foreground"
-                  >
+                  <td colSpan={columns.length + 1} className="px-4 py-16 text-center font-body text-sm text-muted-foreground">
                     موردی یافت نشد.
                   </td>
                 </tr>
               ) : (
                 filtered.map((record) => (
-                  <tr
-                    key={record.id}
-                    className="border-b border-secondary/40 transition-colors last:border-0 hover:bg-background/40"
-                  >
+                  <tr key={record.id} className="border-b border-secondary/40 last:border-0 hover:bg-background/40">
                     {columns.map((c) => (
-                      <td
-                        key={c.key}
-                        className="px-4 py-3 align-middle font-body text-xs text-foreground"
-                      >
+                      <td key={c.key} className="px-4 py-3 align-middle font-body text-xs text-foreground">
                         {c.render ? c.render(record[c.key], record) : record[c.key] ?? "—"}
                       </td>
                     ))}
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(record)}
-                          aria-label="ویرایش"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-secondary/70 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-                        >
+                        <button type="button" onClick={() => openEdit(record)} aria-label="ویرایش" className="flex h-8 w-8 items-center justify-center rounded-lg border border-secondary/70 text-muted-foreground hover:border-primary hover:text-primary">
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => remove(record)}
-                          aria-label="حذف"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-secondary/70 text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
-                        >
+                        <button type="button" onClick={() => remove(record)} aria-label="حذف" className="flex h-8 w-8 items-center justify-center rounded-lg border border-secondary/70 text-muted-foreground hover:border-destructive hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -311,22 +276,12 @@ export default function AdminEntityPage({
 
       {editing !== null && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4" onClick={closeModal}>
-          <form
-            onSubmit={submit}
-            onClick={(e) => e.stopPropagation()}
-            className="mx-auto my-8 w-full max-w-2xl rounded-3xl border border-secondary/60 bg-card p-6 lg:p-8"
-            noValidate
-          >
+          <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="mx-auto my-8 w-full max-w-2xl rounded-3xl border border-secondary/60 bg-card p-6 lg:p-8" noValidate>
             <div className="mb-6 flex items-center justify-between">
               <h3 className="font-display text-lg font-black text-foreground">
                 {editing?.id ? `ویرایش ${title}` : `افزودن ${title}`}
               </h3>
-              <button
-                type="button"
-                onClick={closeModal}
-                aria-label="بستن"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-secondary/70 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-              >
+              <button type="button" onClick={closeModal} aria-label="بستن" className="flex h-9 w-9 items-center justify-center rounded-full border border-secondary/70 text-muted-foreground hover:border-primary hover:text-primary">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -342,44 +297,35 @@ export default function AdminEntityPage({
                   {f.type === "select" ? (
                     <select
                       value={form[f.key] ?? ""}
-                      onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm((s) => {
+                          const next = { ...s, [f.key]: val };
+                          if (f.clearFields?.length) {
+                            for (const k of f.clearFields) next[k] = "";
+                          }
+                          return next;
+                        });
+                      }}
                       className={inputCls}
                     >
                       <option value="">انتخاب کنید…</option>
-                      {(options[f.key] || []).map((o) => (
+                      {(typeof f.getOptions === "function"
+                        ? f.getOptions(form, options)
+                        : options[f.key] || []
+                      ).map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
                         </option>
                       ))}
                     </select>
                   ) : f.type === "textarea" ? (
-                    <textarea
-                      rows={3}
-                      value={form[f.key] ?? ""}
-                      onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
-                      placeholder={f.placeholder}
-                      className={`${inputCls} resize-none`}
-                    />
+                    <textarea rows={3} value={form[f.key] ?? ""} onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))} placeholder={f.placeholder} className={`${inputCls} resize-none`} />
                   ) : f.type === "boolean" ? (
                     <label className="flex cursor-pointer items-center gap-2.5 py-2">
-                      <input
-                        type="checkbox"
-                        checked={!!form[f.key]}
-                        onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.checked }))}
-                        className="h-4 w-4"
-                        style={{ accentColor: "#C9A227" }}
-                      />
-                      <span className="font-body text-xs text-foreground">
-                        {f.placeholder || "فعال"}
-                      </span>
+                      <input type="checkbox" checked={!!form[f.key]} onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.checked }))} className="h-4 w-4" style={{ accentColor: "#C9A227" }} />
+                      <span className="font-body text-xs text-foreground">{f.placeholder || "فعال"}</span>
                     </label>
-                  ) : f.type === "date" ? (
-                    <input
-                      type="date"
-                      value={form[f.key] ? String(form[f.key]).slice(0, 10) : ""}
-                      onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
-                      className={inputCls}
-                    />
                   ) : f.type === "image" ? (
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
@@ -390,53 +336,20 @@ export default function AdminEntityPage({
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary transition-colors hover:bg-primary/10">
-                          {uploading || analyzing ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Upload className="h-4 w-4" />
-                          )}
-                          {uploading
-                            ? "در حال آپلود…"
-                            : analyzing
-                              ? "تحلیل پارچه…"
-                              : form[f.key]
-                                ? "تعویض تصویر"
-                                : "انتخاب تصویر"}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp,image/gif"
-                            className="hidden"
-                            disabled={uploading || analyzing}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              e.target.value = "";
-                              uploadImage(f.key, file);
-                            }}
-                          />
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary">
+                          {uploading || analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                          {uploading ? "آپلود…" : analyzing ? "تحلیل…" : form[f.key] ? "تعویض" : "انتخاب تصویر"}
+                          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" disabled={uploading || analyzing} onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; uploadImage(f.key, file); }} />
                         </label>
-                        {form[f.key] && autoAnalyzeFabric && (
-                          <button
-                            type="button"
-                            disabled={analyzing}
-                            onClick={() => applyFabricAnalysis(form[f.key])}
-                            className="inline-flex items-center gap-1 rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-primary hover:text-primary"
-                          >
-                            <Sparkles className="h-3.5 w-3.5" />
-                            تحلیل دوباره
-                          </button>
-                        )}
                         {form[f.key] && (
-                          <button
-                            type="button"
-                            onClick={() => setForm((s) => ({ ...s, [f.key]: "" }))}
-                            className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive"
-                          >
+                          <button type="button" onClick={() => setForm((s) => ({ ...s, [f.key]: "" }))} className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive">
                             حذف
                           </button>
                         )}
                       </div>
                     </div>
+                  ) : f.type === "list" || f.type === "sublist" ? (
+                    <input type="text" value={form[f.key] ?? ""} onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))} placeholder={f.placeholder} className={inputCls} />
                   ) : (
                     <input
                       type={f.type === "number" ? "number" : "text"}
@@ -445,10 +358,7 @@ export default function AdminEntityPage({
                         const val = e.target.value;
                         setForm((s) => {
                           const next = { ...s, [f.key]: val };
-                          // نام مدل = کد محصول
-                          if (f.key === "code" && (!s.name || s.name === s.code)) {
-                            next.name = val;
-                          }
+                          if (f.key === "code" && (!s.name || s.name === s.code)) next.name = val;
                           return next;
                         });
                       }}
@@ -457,9 +367,7 @@ export default function AdminEntityPage({
                     />
                   )}
 
-                  {f.help && (
-                    <p className="mt-1 font-body text-[10px] text-muted-foreground">{f.help}</p>
-                  )}
+                  {f.help && <p className="mt-1 font-body text-[10px] text-muted-foreground">{f.help}</p>}
                 </div>
               ))}
             </div>
@@ -473,11 +381,7 @@ export default function AdminEntityPage({
             {error && <p className="mt-4 font-body text-xs text-destructive">{error}</p>}
 
             <div className="mt-7 flex gap-3">
-              <button
-                type="submit"
-                disabled={saving || uploading || analyzing}
-                className="btn-gold flex-1 justify-center disabled:opacity-60"
-              >
+              <button type="submit" disabled={saving || uploading || analyzing} className="btn-gold flex-1 justify-center disabled:opacity-60">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
               </button>
               <button type="button" onClick={closeModal} className="btn-ghost-gold justify-center">
