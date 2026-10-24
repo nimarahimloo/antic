@@ -4,7 +4,6 @@ import VirtualWindow from "@/components/catalog/VirtualWindow";
 import CurtainPreview from "@/components/catalog/CurtainPreview";
 import { Loader2, Upload, X } from "lucide-react";
 import RenderTemplatesAdmin from "@/components/admin/RenderTemplatesAdmin";
-import InstallReferencesAdmin from "@/components/admin/InstallReferencesAdmin";
 import InstallReviewAdmin from "@/components/admin/InstallReviewAdmin";
 
 const DEFAULTS = {
@@ -78,7 +77,7 @@ export default function AdminWindowSettings() {
         const created = await base44.entities.VirtualWindowSetting.create(form);
         setRecord(created);
       }
-      setMessage("تنظیمات صحنه ذخیره شد (رنگ دیوار/فریم برای حالت تعاملی).");
+      setMessage("تنظیمات صحنه ذخیره شد.");
     } catch {
       setError("ذخیره ناموفق بود؛ دوباره تلاش کنید.");
     } finally {
@@ -97,14 +96,15 @@ export default function AdminWindowSettings() {
   return (
     <div>
       <h1 className="font-display text-xl font-black text-foreground">پنجرهٔ مجازی و قالب نصب</h1>
-      <p className="mt-1 font-body text-xs text-muted-foreground">
-        قالب‌های نصب از <strong>دسته‌بندی کاتالوگ</strong> می‌آیند. پیش‌نمایش زیر همان مسیر سایت (قالب + پارچه)
-        است؛ رنگ دیوار فقط برای حالت تعاملی WebGL.
+      <p className="mt-1 font-body text-xs leading-6 text-muted-foreground">
+        <strong>قالب اصلی = عکس سبز chroma آپلودشده</strong> برای هر دسته فنی (رومن، زبرا، پنل، کرکره،
+        …). بدون آپلود آن تصاویر، رندر مدل‌ها ضعیف می‌شود. بخش جداگانه «نمونه اجرای واقعی» حذف شد تا
+        دوباره‌کاری و تداخل نباشد.
       </p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-secondary/60 bg-card p-5">
-          <span className="eyebrow mb-3 block">پیش‌نمایش مسیر کاتالوگ (قالب نصب)</span>
+          <span className="eyebrow mb-3 block">پیش‌نمایش کاتالوگ (قالب + پارچه)</span>
           {sampleModel ? (
             <CurtainPreview fabric={sampleModel} />
           ) : (
@@ -134,9 +134,10 @@ export default function AdminWindowSettings() {
         </div>
       </div>
 
-      <InstallReferencesAdmin />
-      <InstallReviewAdmin />
+      {/* تنها منبع قالب نصب: آپلود chroma سبز */}
       <RenderTemplatesAdmin />
+
+      <InstallReviewAdmin />
 
       <form
         onSubmit={save}
@@ -144,7 +145,7 @@ export default function AdminWindowSettings() {
         noValidate
       >
         <p className="mb-4 text-xs text-muted-foreground">
-          تنظیمات زیر فقط روی رندر تعاملی WebGL اثر دارد؛ مسیر اصلی کاتالوگ از قالب chroma دسته است.
+          تنظیمات زیر فقط روی رندر تعاملی WebGL اثر دارد؛ مسیر اصلی کاتالوگ از قالب سبز آپلودشده است.
         </p>
         <div className="grid gap-5 sm:grid-cols-3">
           <ColorField label="رنگ دیوار" value={form.wall_color} onChange={(v) => set("wall_color", v)} />
