@@ -1,6 +1,6 @@
 /**
  * Install engine: chroma template + fabric map.
- * Flat styles use stable core UV + mirror-tiled fabric (hides seams on close-up photos).
+ * Color-preserving shade: fabric hue/sat stay close to original photo.
  */
 
 import fs from "fs";
@@ -108,7 +108,7 @@ function materialParams(material?: string, logStd?: number, style?: string) {
         : material === "sheer"
           ? 0.16
           : 0.26;
-  const contrast = Math.min(1.8, Math.max(0.6, target / Math.max(logStd ?? 0.12, 0.05)));
+  const contrast = Math.min(1.6, Math.max(0.7, target / Math.max(logStd ?? 0.12, 0.05)));
   const warp = styleWarpFactor(style);
   const flat = isFlatStyle(style);
 
@@ -117,43 +117,43 @@ function materialParams(material?: string, logStd?: number, style?: string) {
       return {
         id: 1,
         contrast,
-        sheen: 0.45,
-        detail: flat ? 0.2 : 0.22,
+        sheen: 0.4,
+        detail: flat ? 0.18 : 0.22,
         tile: 1.0,
         warp,
-        ao: flat ? 0.32 : 0.42,
+        ao: flat ? 0.22 : 0.36,
       };
     case "silk":
     case "satin":
       return {
         id: 2,
         contrast,
-        sheen: 0.5,
-        detail: flat ? 0.18 : 0.2,
+        sheen: 0.45,
+        detail: flat ? 0.16 : 0.2,
         tile: 1.0,
         warp,
-        ao: flat ? 0.26 : 0.3,
+        ao: flat ? 0.18 : 0.28,
       };
     case "sheer":
     case "voile":
       return {
         id: 3,
         contrast,
-        sheen: 0.1,
-        detail: 0.14,
+        sheen: 0.08,
+        detail: 0.12,
         tile: 1.0,
         warp: Math.min(warp, 0.01),
-        ao: 0.16,
+        ao: 0.12,
       };
     default:
       return {
         id: 0,
         contrast,
-        sheen: 0.06,
-        detail: flat ? 0.22 : 0.26,
+        sheen: 0.05,
+        detail: flat ? 0.18 : 0.24,
         tile: 1.0,
         warp,
-        ao: flat ? 0.3 : 0.38,
+        ao: flat ? 0.2 : 0.32,
       };
   }
 }
@@ -273,16 +273,11 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
   return entry;
 }
 
-/**
- * Mirror (reflect) tiling — when UV goes past the fabric edge, bounce back.
- * Hides seams on non-seamless close-up photos much better than hard wrap.
- */
 function mirrorCoord(t: number, size: number): number {
   if (size <= 1) return 0;
-  const period = size * 2 - 2; // reflect period
+  const period = size * 2 - 2;
   let m = t % period;
   if (m < 0) m += period;
-  if (m < 0) m = 0;
   if (m >= size) m = period - m;
   return Math.min(size - 1.001, Math.max(0, m));
 }
@@ -349,20 +344,15 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  let meanR = 0,
-    meanG = 0,
-    meanB = 0,
+  // Fabric mean luminance (linear) — used only for gentle midtone anchor
+  let meanLum = 0,
     nF = 0;
   for (let i = 0; i < fd.length; i += 4) {
     if (fd[i + 3] < 16) continue;
-    meanR += toLin(fd[i]);
-    meanG += toLin(fd[i + 1]);
-    meanB += toLin(fd[i + 2]);
+    meanLum += 0.2126 * toLin(fd[i]) + 0.7152 * toLin(fd[i + 1]) + 0.0722 * toLin(fd[i + 2]);
     nF++;
   }
-  meanR = nF ? meanR / nF : 0.4;
-  meanG = nF ? meanG / nF : 0.4;
-  meanB = nF ? meanB / nF : 0.4;
+  meanLum = nF ? meanLum / nF : 0.4;
 
   const w = tpl.w;
   const h = tpl.h;
@@ -375,7 +365,6 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const uvMaxY = flat ? tpl.coreMaxY : tpl.maxY;
 
   const gW = Math.max(1, uvMaxX - uvMinX);
-
   const tileX = gW * fabricScale;
   const tileY = tileX / aspect;
 
@@ -406,6 +395,8 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
 
       keySum += key;
       keyN++;
+
+      // Normalized shade from green channel (1 = average lit fabric)
       let s = toLin(pg) / tpl.meanLin;
 
       const iL = (y * w + Math.max(0, x - 1)) * 4;
@@ -418,8 +409,11 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       const slope = smoothstep(0.15, 0.9, Math.hypot(gx, gy));
       const blurS = (sh(iL) + sh(iR) + sh(iU) + sh(iD) + s) / 5;
       const micro = clamp01(s / Math.max(blurS, 0.02));
-      s *= Math.pow(Math.min(2, Math.max(0.5, micro)), mat.detail);
-      s = Math.pow(Math.max(s, 0), Math.min(mat.contrast, 1.05));
+      // Mild micro-detail — avoid crushing fabric color
+      s *= Math.pow(Math.min(1.8, Math.max(0.55, micro)), mat.detail * 0.85);
+      // Soft contrast curve around 1.0 so midtones stay faithful
+      const sCentered = s - 1;
+      s = 1 + sCentered * Math.min(mat.contrast, 0.95);
 
       const localX = x - uvMinX;
       const localY = y - uvMinY;
@@ -429,34 +423,45 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       const v = (localY / Math.max(tileY, 1)) * fi.height + (flat ? 0 : gy * warp * fi.height * 0.05);
       const [fr, fg, fb] = sampleFabMirror(fd, fi.width, fi.height, u, v);
 
-      const flr = toLin(fr),
-        flg = toLin(fg),
-        flb = toLin(fb);
-      const flatR = flr * 0.9 + meanR * 0.1;
-      const flatG = flg * 0.9 + meanG * 0.1;
-      const flatB = flb * 0.9 + meanB * 0.1;
+      // Keep fabric color almost pure — only apply lighting as multiply with soft floor
+      const flr = toLin(fr);
+      const flg = toLin(fg);
+      const flb = toLin(fb);
 
-      const ao = mat.ao != null ? 1 - (1 - smoothstep(0.25, 1.15, s)) * mat.ao * 0.7 : 1;
-      let cr = flatR * s * ao,
-        cg = flatG * s * ao,
-        cb = flatB * s * ao;
+      // Lighting: folds darken, highlights lift slightly — never wash toward gray
+      const light = Math.max(0.35, Math.min(1.55, s));
+      const aoAmt = mat.ao != null ? mat.ao * 0.55 : 0.2;
+      const ao = 1 - (1 - smoothstep(0.3, 1.1, s)) * aoAmt;
+
+      let cr = flr * light * ao;
+      let cg = flg * light * ao;
+      let cb = flb * light * ao;
+
+      // Gentle saturation boost so fabric doesn't look flat after multiply
+      const lum = 0.2126 * cr + 0.7152 * cg + 0.0722 * cb;
+      const satBoost = flat ? 1.08 : 1.04;
+      cr = lum + (cr - lum) * satBoost;
+      cg = lum + (cg - lum) * satBoost;
+      cb = lum + (cb - lum) * satBoost;
 
       if (mat.id === 1) {
-        const sv = s < 1 ? Math.pow(s, 1.2) : 1 + (s - 1) * 0.4;
-        const mul = sv * (1 + mat.sheen * slope * 0.4);
-        cr = flatR * mul;
-        cg = flatG * mul;
-        cb = flatB * mul;
+        // velvet: deeper shadows
+        const sv = s < 1 ? Math.pow(s, 1.15) : 1 + (s - 1) * 0.35;
+        const mul = sv * (1 + mat.sheen * slope * 0.3);
+        cr = flr * mul;
+        cg = flg * mul;
+        cb = flb * mul;
       } else if (mat.id === 2) {
-        const hl = mat.sheen * smoothstep(1.05, 1.7, s) * 0.4;
-        cr = flatR * s + hl * (0.4 * flatR + 0.6);
-        cg = flatG * s + hl * (0.4 * flatG + 0.6);
-        cb = flatB * s + hl * (0.4 * flatB + 0.6);
+        const hl = mat.sheen * smoothstep(1.05, 1.65, s) * 0.3;
+        cr = flr * light + hl * (0.35 * flr + 0.65);
+        cg = flg * light + hl * (0.35 * flg + 0.65);
+        cb = flb * light + hl * (0.35 * flb + 0.65);
       } else if (mat.id === 3) {
-        const light = Math.min(1.5, s);
-        cr = flatR * s * 0.55 + (0.4 * flatR + 0.6) * light * 0.45;
-        cg = flatG * s * 0.55 + (0.4 * flatG + 0.6) * 0.98 * light * 0.45;
-        cb = flatB * s * 0.55 + (0.4 * flatB + 0.6) * 0.94 * light * 0.45;
+        // sheer: more light pass-through
+        const lightS = Math.min(1.4, s);
+        cr = flr * s * 0.6 + (0.35 * flr + 0.65) * lightS * 0.4;
+        cg = flg * s * 0.6 + (0.35 * flg + 0.65) * 0.98 * lightS * 0.4;
+        cb = flb * s * 0.6 + (0.35 * flb + 0.65) * 0.94 * lightS * 0.4;
       }
 
       const desR = toLin(pr);
