@@ -38,37 +38,64 @@ export default function AdminModels() {
       label: "تکه پارچه (ورق کاتالوگ)",
       type: "image",
       required: true,
-      help: "فقط تکه پارچه واضح. بعد از ذخیره، نمونه نصب روی سرور از قالب همان دسته ساخته می‌شود.",
+      help: "عکس تکه پارچه را بگذار؛ جنس، بافت و رنگ تقریبی خودکار پر می‌شود. برای طرح‌دار کد رنگ لازم نیست.",
     },
     {
       key: "code",
       label: "کد محصول",
       required: true,
       placeholder: "کد روی ورق کاتالوگ",
+      help: "نام مدل هم به‌صورت پیش‌فرض همین کد می‌شود.",
     },
     {
       key: "name",
       label: "نام مدل",
       required: true,
-      placeholder: "معمولاً همان کد محصول",
+      placeholder: "همان کد محصول",
+      help: "پیش‌فرض = کد محصول؛ در صورت نیاز تغییر بده.",
     },
     {
       key: "category_slug",
       label: "دسته (سبک نصب)",
       required: true,
       type: "select",
-      help: "قالب chroma از همین slug دسته خوانده می‌شود.",
+      help: "قالب chroma از همین دسته خوانده می‌شود.",
     },
     {
       key: "subcategory",
       label: "زیردسته",
       type: subOptions.length ? "select" : "text",
+      help: "از زیردسته‌های همان دسته انتخاب کن.",
+    },
+    {
+      key: "fabric",
+      label: "نوع پارچه",
+      placeholder: "خودکار از عکس",
+      help: "پس از آپلود پر می‌شود؛ قابل ویرایش.",
     },
     {
       key: "material",
-      label: "جنس (اختیاری — فقط نور رندر)",
-      placeholder: "نخی، مخمل، ابریشم، تور",
-      help: "فقط سایه/برق را کمی عوض می‌کند؛ طرح از خود عکس است.",
+      label: "جنس (رندر نور)",
+      placeholder: "cotton / velvet / silk / sheer",
+      help: "انگلیسی برای موتور رندر؛ از عکس پیشنهاد می‌شود.",
+    },
+    {
+      key: "texture",
+      label: "بافت / طرح",
+      placeholder: "صاف، طرح‌دار، …",
+      help: "از عکس: صاف یا طرح‌دار.",
+    },
+    {
+      key: "color",
+      label: "رنگ (تقریبی)",
+      placeholder: "خودکار از عکس",
+      help: "برای طرح‌دار: «طرح‌دار · غالب …» — نه یک کد تک‌رنگ.",
+    },
+    {
+      key: "color_code",
+      label: "کد رنگ (فقط پارچه ساده)",
+      placeholder: "خالی بگذار اگر طرح‌دار است",
+      help: "اختیاری. برای پارچه طرح‌دار خالی بماند؛ طرح از خود عکس می‌آید.",
     },
     { key: "description", label: "یادداشت داخلی (اختیاری)", type: "textarea" },
   ];
@@ -97,6 +124,11 @@ export default function AdminModels() {
     { key: "category_slug", label: "دسته" },
     { key: "subcategory", label: "زیردسته" },
     {
+      key: "texture",
+      label: "بافت",
+      render: (v, r) => v || r.fabric || "—",
+    },
+    {
       key: "install_status",
       label: "نصب",
       render: (v, r) => {
@@ -117,6 +149,7 @@ export default function AdminModels() {
       entity="CurtainModel"
       fields={fields}
       columns={columns}
+      autoAnalyzeFabric
       options={{
         category_slug: categories.map((c) => ({ value: c.slug, label: c.name })),
         subcategory: subOptions,

@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Pencil, Trash2, X, Loader2, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Loader2, Upload, Sparkles } from "lucide-react";
 import { compressImage } from "@/lib/compressImage";
+import { analyzeFabric } from "@/components/catalog/photo/fabricAnalyzer";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -15,6 +16,8 @@ export default function AdminEntityPage({
   columns,
   options = {},
   sortBy = "-created_date",
+  /** پس از آپلود تصویر مدل، فیلدها را از تحلیل پارچه پر کن */
+  autoAnalyzeFabric = false,
 }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,8 +26,10 @@ export default function AdminEntityPage({
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState("");
   const [tableError, setTableError] = useState("");
+  const [hint, setHint] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -48,6 +53,7 @@ export default function AdminEntityPage({
       else initial[f.key] = "";
     });
     setError("");
+    setHint("");
     setForm(initial);
     setEditing({});
   }
@@ -65,6 +71,7 @@ export default function AdminEntityPage({
       else initial[f.key] = v ?? "";
     });
     setError("");
+    setHint("");
     setForm(initial);
     setEditing(record);
   }
@@ -72,6 +79,7 @@ export default function AdminEntityPage({
   function closeModal() {
     setEditing(null);
     setError("");
+    setHint("");
   }
 
   async function submit(e) {
@@ -108,6 +116,8 @@ export default function AdminEntityPage({
         payload[f.key] = String(v ?? "").trim() === "" ? undefined : v;
       }
     });
+    // نام مدل = کد محصول اگر خالی باشد
+    if (payload.code && !payload.name) payload.name = payload.code;
     setSaving(true);
     setError("");
     try {
@@ -133,16 +143,60 @@ export default function AdminEntityPage({
     }
   }
 
+  async function applyFabricAnalysis(url) {
+    if (!autoAnalyzeFabric || !url) return;
+    setAnalyzing(true);
+    try {
+      const a = await analyzeFabric(url);
+      if (!a) {
+        setHint("تحلیل تصویر ممکن نشد؛ فیلدها را دستی پر کنید.");
+        return;
+      }
+      setForm((f) => {
+        const next = { ...f };
+        // فقط فیلدهای خالی را پر کن تا ورودی دستی ادمین پاک نشود
+        if (a.material && !String(next.material || "").trim()) next.material = a.material;
+        if (a.fabric && !String(next.fabric || "").trim()) next.fabric = a.fabric;
+        if (a.texture && !String(next.texture || "").trim()) next.texture = a.texture;
+        if (a.color && !String(next.color || "").trim()) next.color = a.color;
+        // کد رنگ فقط برای پارچهٔ ساده؛ طرح‌دار عمداً خالی
+        if (a.colorHex && !a.isPatterned && !String(next.color_code || "").trim()) {
+          next.color_code = a.colorHex;
+        }
+        if (a.isPatterned) next.color_code = "";
+        // نام = کد اگر نام خالی است
+        if (next.code && !String(next.name || "").trim()) next.name = next.code;
+        return next;
+      });
+      setHint(
+        a.isPatterned
+          ? `تشخیص: ${a.fabric} · ${a.texture} · ${a.color} — برای طرح‌دار کد رنگ لازم نیست.`
+          : `تشخیص: ${a.fabric} · ${a.texture} · ${a.color}${a.colorHex ? ` (${a.colorHex})` : ""}`
+      );
+    } catch {
+      setHint("تحلیل تصویر ناموفق بود.");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   async function uploadImage(fieldKey, file) {
     if (!file) return;
     setUploading(true);
     setError("");
+    setHint("");
     try {
       const compressed = await compressImage(file);
       const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
       const url = res?.file_url || res?.url;
       if (!url) throw new Error("آپلود پاسخ معتبری نداد");
-      setForm((f) => ({ ...f, [fieldKey]: url }));
+      setForm((f) => ({
+        ...f,
+        [fieldKey]: url,
+      }));
+      if (fieldKey === "image" && autoAnalyzeFabric) {
+        await applyFabricAnalysis(url);
+      }
     } catch (err) {
       setError(err?.message || "آپلود تصویر ناموفق بود. فایل را بررسی کنید.");
     } finally {
@@ -337,17 +391,23 @@ export default function AdminEntityPage({
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary transition-colors hover:bg-primary/10">
-                          {uploading ? (
+                          {uploading || analyzing ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <Upload className="h-4 w-4" />
                           )}
-                          {uploading ? "در حال آپلود…" : form[f.key] ? "تعویض تصویر" : "انتخاب تصویر"}
+                          {uploading
+                            ? "در حال آپلود…"
+                            : analyzing
+                              ? "تحلیل پارچه…"
+                              : form[f.key]
+                                ? "تعویض تصویر"
+                                : "انتخاب تصویر"}
                           <input
                             type="file"
                             accept="image/jpeg,image/png,image/webp,image/gif"
                             className="hidden"
-                            disabled={uploading}
+                            disabled={uploading || analyzing}
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               e.target.value = "";
@@ -355,6 +415,17 @@ export default function AdminEntityPage({
                             }}
                           />
                         </label>
+                        {form[f.key] && autoAnalyzeFabric && (
+                          <button
+                            type="button"
+                            disabled={analyzing}
+                            onClick={() => applyFabricAnalysis(form[f.key])}
+                            className="inline-flex items-center gap-1 rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-primary hover:text-primary"
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            تحلیل دوباره
+                          </button>
+                        )}
                         {form[f.key] && (
                           <button
                             type="button"
@@ -370,7 +441,17 @@ export default function AdminEntityPage({
                     <input
                       type={f.type === "number" ? "number" : "text"}
                       value={form[f.key] ?? ""}
-                      onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm((s) => {
+                          const next = { ...s, [f.key]: val };
+                          // نام مدل = کد محصول
+                          if (f.key === "code" && (!s.name || s.name === s.code)) {
+                            next.name = val;
+                          }
+                          return next;
+                        });
+                      }}
                       placeholder={f.placeholder}
                       className={inputCls}
                     />
@@ -383,12 +464,18 @@ export default function AdminEntityPage({
               ))}
             </div>
 
+            {hint && (
+              <p className="mt-4 flex items-start gap-2 font-body text-xs text-primary">
+                <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {hint}
+              </p>
+            )}
             {error && <p className="mt-4 font-body text-xs text-destructive">{error}</p>}
 
             <div className="mt-7 flex gap-3">
               <button
                 type="submit"
-                disabled={saving || uploading}
+                disabled={saving || uploading || analyzing}
                 className="btn-gold flex-1 justify-center disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
