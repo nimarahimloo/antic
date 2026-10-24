@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Search, Phone, X } from "lucide-react";
 import CurtainPreview from "@/components/catalog/CurtainPreview";
 import CatalogCard from "@/components/catalog/CatalogCard";
+import ProjectCard from "@/components/ProjectCard";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { base44 } from "@/api/base44Client";
 
@@ -13,6 +14,7 @@ export default function InteractiveCatalog({ initialCategory }) {
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || "");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [gridItems, setGridItems] = useState([]);
+  const [projectFallback, setProjectFallback] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState(null);
   const [search, setSearch] = useState("");
@@ -36,6 +38,7 @@ export default function InteractiveCatalog({ initialCategory }) {
   useEffect(() => {
     if (!selectedCategory && !search.trim()) {
       setGridItems([]);
+      setProjectFallback([]);
       setLoading(false);
       return;
     }
@@ -51,8 +54,27 @@ export default function InteractiveCatalog({ initialCategory }) {
       limit: 80,
       search: q || undefined,
     })
-      .then((data) => setGridItems(Array.isArray(data) ? data : []))
-      .catch(() => setGridItems([]))
+      .then(async (data) => {
+        const models = Array.isArray(data) ? data : [];
+        setGridItems(models);
+        // اگر مدل کاتالوگ نبود → نمونه‌های اجرا (پروژه) همان دسته
+        if (!q && models.length === 0 && selectedCategory) {
+          try {
+            const pf = { category_slug: selectedCategory };
+            if (selectedSubcategory) pf.subcategory = selectedSubcategory;
+            const projs = await base44.entities.Project.filter(pf, "-created_date", 40);
+            setProjectFallback(Array.isArray(projs) ? projs : []);
+          } catch {
+            setProjectFallback([]);
+          }
+        } else {
+          setProjectFallback([]);
+        }
+      })
+      .catch(() => {
+        setGridItems([]);
+        setProjectFallback([]);
+      })
       .finally(() => setLoading(false));
   }, [selectedCategory, selectedSubcategory, search]);
 
@@ -89,7 +111,7 @@ export default function InteractiveCatalog({ initialCategory }) {
               پنجره مجازی · <span className="text-gold-gradient">پارچه واقعی</span>
             </h2>
             <p className="mt-2 max-w-lg font-body text-sm leading-7 text-muted-foreground">
-              مدل را انتخاب کنید؛ همان پارچه روی پنجره می‌نشیند. با کشیدن، پرده باز یا بالا می‌شود.
+              مدل را انتخاب کنید؛ اگر مدلی در دسته نباشد، نمونه‌های اجرا شده همان دسته نمایش داده می‌شود.
             </p>
           </div>
           <Link to="/#contact" className="btn-ghost-gold shrink-0">
@@ -118,7 +140,7 @@ export default function InteractiveCatalog({ initialCategory }) {
           )}
         </div>
 
-        {/* کارت کاور دسته‌ها — نه دکمه گرد */}
+        {/* کارت کاور دسته‌ها */}
         <div className="mb-8 flex gap-3 overflow-x-auto no-scrollbar pb-1" dir="rtl">
           {catsLoading && !CATEGORIES.length
             ? [...Array(5)].map((_, i) => (
@@ -222,30 +244,40 @@ export default function InteractiveCatalog({ initialCategory }) {
 
           <div className="lg:col-span-2">
             {!search.trim() && category?.subcategories?.length > 0 && (
-              <div className="mb-4 flex flex-wrap gap-2">
+              <div className="mb-4 flex gap-2 overflow-x-auto no-scrollbar pb-1" dir="rtl">
                 <button
                   type="button"
                   onClick={() => setSelectedSubcategory("")}
-                  className={`rounded-full border px-4 py-1.5 font-body text-xs transition-colors ${
+                  className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border transition-all ${
                     !selectedSubcategory
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-secondary/60 text-muted-foreground hover:border-primary/50"
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-secondary/60 hover:border-primary/50"
                   }`}
                 >
-                  همه
+                  <div className="flex h-full items-center justify-center bg-secondary/40 px-1">
+                    <span className="font-display text-[10px] font-bold text-foreground">همه</span>
+                  </div>
                 </button>
                 {category.subcategories.map((sub) => (
                   <button
                     type="button"
                     key={sub.slug}
                     onClick={() => setSelectedSubcategory(sub.slug)}
-                    className={`rounded-full border px-4 py-1.5 font-body text-xs transition-colors ${
+                    className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border transition-all ${
                       selectedSubcategory === sub.slug
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-secondary/60 text-muted-foreground hover:border-primary/50"
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-secondary/60 hover:border-primary/50"
                     }`}
                   >
-                    {sub.name}
+                    {category.image ? (
+                      <img src={category.image} alt="" className="h-full w-full object-cover opacity-70" />
+                    ) : (
+                      <div className="h-full w-full bg-secondary/40" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
+                    <span className="absolute inset-x-0 bottom-1 px-1 text-center font-display text-[10px] font-bold leading-tight text-foreground">
+                      {sub.name}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -253,10 +285,18 @@ export default function InteractiveCatalog({ initialCategory }) {
 
             <div className="mb-3 flex items-center justify-between">
               <span className="font-display text-xs font-bold text-foreground">
-                {search.trim() ? "نتیجهٔ جستجو" : "انتخاب پارچه از کاتالوگ"}
+                {search.trim()
+                  ? "نتیجهٔ جستجو"
+                  : gridItems.length
+                    ? "انتخاب پارچه از کاتالوگ"
+                    : "نمونه‌های اجرا شده این دسته"}
               </span>
               <span className="font-body text-[11px] text-muted-foreground">
-                {loading ? "…" : `${gridItems.length} مدل`}
+                {loading
+                  ? "…"
+                  : gridItems.length
+                    ? `${gridItems.length} مدل`
+                    : `${projectFallback.length} نمونه`}
               </span>
             </div>
 
@@ -267,13 +307,7 @@ export default function InteractiveCatalog({ initialCategory }) {
                     <div key={i} className="aspect-[4/5] animate-pulse rounded-xl bg-secondary/40" />
                   ))}
                 </div>
-              ) : gridItems.length === 0 ? (
-                <div className="p-8 text-center">
-                  <p className="font-body text-sm text-muted-foreground">
-                    {search.trim() ? "نتیجه‌ای پیدا نشد" : "هنوز مدلی در این دسته ثبت نشده است"}
-                  </p>
-                </div>
-              ) : (
+              ) : gridItems.length > 0 ? (
                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                   {gridItems.map((m) => (
                     <CatalogCard
@@ -283,6 +317,29 @@ export default function InteractiveCatalog({ initialCategory }) {
                       onClick={() => setSelectedModel(m)}
                     />
                   ))}
+                </div>
+              ) : projectFallback.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {projectFallback.map((p) => (
+                    <ProjectCard key={p.id} project={p} />
+                  ))}
+                  <Link
+                    to={`/projects/category/${selectedCategory}`}
+                    className="col-span-full mt-1 rounded-xl border border-primary/40 bg-primary/5 py-3 text-center font-body text-xs font-bold text-primary"
+                  >
+                    مشاهده همه نمونه‌های این دسته ←
+                  </Link>
+                </div>
+              ) : (
+                <div className="p-8 text-center">
+                  <p className="font-body text-sm text-muted-foreground">
+                    {search.trim()
+                      ? "نتیجه‌ای پیدا نشد"
+                      : "هنوز مدل یا نمونه‌اجرایی در این دسته ثبت نشده است"}
+                  </p>
+                  <Link to="/projects" className="mt-3 inline-block font-body text-xs text-primary underline">
+                    رفتن به نمونه‌های اجرا شده
+                  </Link>
                 </div>
               )}
             </div>
