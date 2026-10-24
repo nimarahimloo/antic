@@ -1,8 +1,6 @@
 /**
  * Install engine: chroma template + fabric map.
- * UV is mapped to a stable core of the GREEN region.
- * Flat styles (shade/roman/roller) use orthographic UV with percentile bbox
- * so geometric patterns do not stretch under slight perspective.
+ * Flat styles use stable core UV + tiled fabric (close-up photos scale down naturally).
  */
 
 import fs from "fs";
@@ -93,7 +91,6 @@ type TemplateCache = {
   maxX: number;
   minY: number;
   maxY: number;
-  /** Stable core rectangle (percentile) — used for flat-style UV */
   coreMinX: number;
   coreMaxX: number;
   coreMinY: number;
@@ -121,10 +118,10 @@ function materialParams(material?: string, logStd?: number, style?: string) {
         id: 1,
         contrast,
         sheen: 0.45,
-        detail: flat ? 0.14 : 0.22,
+        detail: flat ? 0.2 : 0.22,
         tile: 1.0,
         warp,
-        ao: flat ? 0.24 : 0.42,
+        ao: flat ? 0.32 : 0.42,
       };
     case "silk":
     case "satin":
@@ -132,10 +129,10 @@ function materialParams(material?: string, logStd?: number, style?: string) {
         id: 2,
         contrast,
         sheen: 0.5,
-        detail: flat ? 0.12 : 0.2,
+        detail: flat ? 0.18 : 0.2,
         tile: 1.0,
         warp,
-        ao: flat ? 0.2 : 0.3,
+        ao: flat ? 0.26 : 0.3,
       };
     case "sheer":
     case "voile":
@@ -143,20 +140,20 @@ function materialParams(material?: string, logStd?: number, style?: string) {
         id: 3,
         contrast,
         sheen: 0.1,
-        detail: 0.1,
+        detail: 0.14,
         tile: 1.0,
         warp: Math.min(warp, 0.01),
-        ao: 0.14,
+        ao: 0.16,
       };
     default:
       return {
         id: 0,
         contrast,
         sheen: 0.06,
-        detail: flat ? 0.15 : 0.26,
+        detail: flat ? 0.22 : 0.26,
         tile: 1.0,
         warp,
-        ao: flat ? 0.22 : 0.38,
+        ao: flat ? 0.3 : 0.38,
       };
   }
 }
@@ -243,7 +240,6 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
     maxY = info.height - 1;
   }
 
-  // Percentile core — ignores extreme pixels caused by perspective / soft edges
   xs.sort((a, b) => a - b);
   ys.sort((a, b) => a - b);
   const coreMinX = Math.floor(percentile(xs, 0.08));
@@ -277,13 +273,23 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
   return entry;
 }
 
-function sampleFab(fd: Buffer, fw: number, fh: number, u: number, v: number): [number, number, number] {
-  const x = Math.min(fw - 1.001, Math.max(0, u));
-  const y = Math.min(fh - 1.001, Math.max(0, v));
+/** Seamless tile sampling (modulo) — required when fabricScale < 1 */
+function sampleFabTiled(
+  fd: Buffer,
+  fw: number,
+  fh: number,
+  u: number,
+  v: number
+): [number, number, number] {
+  let x = u % fw;
+  if (x < 0) x += fw;
+  let y = v % fh;
+  if (y < 0) y += fh;
+  // soft edge blend near tile boundary to reduce seam
   const x0 = x | 0;
   const y0 = y | 0;
-  const x1 = Math.min(fw - 1, x0 + 1);
-  const y1 = Math.min(fh - 1, y0 + 1);
+  const x1 = (x0 + 1) % fw;
+  const y1 = (y0 + 1) % fh;
   const fx = x - x0;
   const fy = y - y0;
   const i00 = (y0 * fw + x0) * 4;
@@ -315,9 +321,10 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const mat = materialParams(input.material, tpl.logStd, input.style);
   const flat = isFlatStyle(input.style);
 
+  // Allow small scale (close-up fabric photos)
   const fabricScale = Math.min(
-    1.12,
-    Math.max(0.92, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
+    1.15,
+    Math.max(0.35, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
   );
 
   const fabricBuf = await loadBuffer(input.fabricPathOrUrl);
@@ -353,17 +360,15 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const td = tpl.data;
   const out = Buffer.alloc(w * h * 4);
 
-  // Flat styles: use percentile core rectangle (stable, less perspective)
-  // Non-flat: full green bbox
   const uvMinX = flat ? tpl.coreMinX : tpl.minX;
   const uvMaxX = flat ? tpl.coreMaxX : tpl.maxX;
   const uvMinY = flat ? tpl.coreMinY : tpl.minY;
   const uvMaxY = flat ? tpl.coreMaxY : tpl.maxY;
 
   const gW = Math.max(1, uvMaxX - uvMinX);
-  const gH = Math.max(1, uvMaxY - uvMinY);
 
-  // One fabric panel across the stable width; height follows fabric aspect strictly
+  // tileX = how many pixels of green = one full fabric width
+  // smaller fabricScale → more repeats → smaller pattern on curtain
   const tileX = gW * fabricScale;
   const tileY = tileX / aspect;
 
@@ -409,36 +414,34 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       s *= Math.pow(Math.min(2, Math.max(0.5, micro)), mat.detail);
       s = Math.pow(Math.max(s, 0), Math.min(mat.contrast, 1.05));
 
-      // UV relative to stable core
       const localX = x - uvMinX;
       const localY = y - uvMinY;
       const warp = mat.warp ?? 0.025;
 
-      // Flat: pure orthographic, zero gradient warp
       const u = (localX / tileX) * fi.width + (flat ? 0 : gx * warp * fi.width * 0.08);
       const v = (localY / Math.max(tileY, 1)) * fi.height + (flat ? 0 : gy * warp * fi.height * 0.05);
-      const [fr, fg, fb] = sampleFab(fd, fi.width, fi.height, u, v);
+      const [fr, fg, fb] = sampleFabTiled(fd, fi.width, fi.height, u, v);
 
       const flr = toLin(fr),
         flg = toLin(fg),
         flb = toLin(fb);
-      const flatR = flr * 0.92 + meanR * 0.08;
-      const flatG = flg * 0.92 + meanG * 0.08;
-      const flatB = flb * 0.92 + meanB * 0.08;
+      const flatR = flr * 0.9 + meanR * 0.1;
+      const flatG = flg * 0.9 + meanG * 0.1;
+      const flatB = flb * 0.9 + meanB * 0.1;
 
-      const ao = mat.ao != null ? 1 - (1 - smoothstep(0.25, 1.15, s)) * mat.ao * 0.65 : 1;
+      const ao = mat.ao != null ? 1 - (1 - smoothstep(0.25, 1.15, s)) * mat.ao * 0.7 : 1;
       let cr = flatR * s * ao,
         cg = flatG * s * ao,
         cb = flatB * s * ao;
 
       if (mat.id === 1) {
         const sv = s < 1 ? Math.pow(s, 1.2) : 1 + (s - 1) * 0.4;
-        const mul = sv * (1 + mat.sheen * slope * 0.35);
+        const mul = sv * (1 + mat.sheen * slope * 0.4);
         cr = flatR * mul;
         cg = flatG * mul;
         cb = flatB * mul;
       } else if (mat.id === 2) {
-        const hl = mat.sheen * smoothstep(1.05, 1.7, s) * 0.35;
+        const hl = mat.sheen * smoothstep(1.05, 1.7, s) * 0.4;
         cr = flatR * s + hl * (0.4 * flatR + 0.6);
         cg = flatG * s + hl * (0.4 * flatG + 0.6);
         cb = flatB * s + hl * (0.4 * flatB + 0.6);
