@@ -9,7 +9,6 @@ const NAV = [
   { label: "فروشگاه", to: "/shop" },
   { label: "درباره ما", to: "/about" },
   { label: "تماس", to: "/contact" },
-  { label: "مشاور طراحی", to: "/consultant" },
 ];
 
 export default function Header() {
