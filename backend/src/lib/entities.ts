@@ -11,6 +11,11 @@ export const ENTITY_MAP = {
     publicRead: true,
     publicCreate: false,
   },
+  PortfolioCategory: {
+    model: prisma.portfolioCategory,
+    publicRead: true,
+    publicCreate: false,
+  },
   Project: {
     model: prisma.project,
     publicRead: true,
@@ -63,9 +68,7 @@ const SORTABLE: Record<string, true> = {
   code: true,
   slug: true,
   categorySlug: true,
-  spaceType: true,
   status: true,
-  featured: true,
   style: true,
   email: true,
 };
@@ -78,7 +81,6 @@ export function parseSort(sortBy?: string): Record<string, "asc" | "desc"> {
     created_date: "createdAt",
     updated_date: "updatedAt",
     category_slug: "categorySlug",
-    space_type: "spaceType",
     cover_image: "coverImage",
     full_name: "fullName",
     order: "order",
@@ -91,14 +93,12 @@ export function parseSort(sortBy?: string): Record<string, "asc" | "desc"> {
 export function parseFilter(filter: Record<string, unknown> = {}) {
   const map: Record<string, string> = {
     category_slug: "categorySlug",
-    space_type: "spaceType",
     install_status: "installStatus",
     curtain_model_id: "curtainModelId",
   };
   const where: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(filter)) {
     if (v === undefined || v === null || v === "") continue;
-    // reject nested operators for safety (no $gt injection via filter JSON)
     if (typeof v === "object") continue;
     where[map[k] || k] = v;
   }
