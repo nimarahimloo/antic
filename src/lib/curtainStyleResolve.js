@@ -1,8 +1,10 @@
 /**
  * Shared catalog style resolution — one source for site + admin.
  *
- * styleFabricScale = سهم عرض پنجره که یک تصویر پارچه می‌پوشاند.
- * نزدیک ۱ = تقریباً یک‌بار پهن می‌شود (بدون تکرار کارتونی).
+ * Priority:
+ * 1) fabric.mechanism / fabric.curtain_style explicit
+ * 2) categoryMechanisms map (from CurtainCategory.mechanism in DB)
+ * 3) heuristic from slug / name
  */
 
 export const MECHANISM_KEYS = [
@@ -62,14 +64,39 @@ export function styleFabricScale(style) {
   }
 }
 
-export function resolveStyle(fabric) {
+function normalizeMechanism(value) {
+  if (!value || typeof value !== "string") return null;
+  const v = value.toLowerCase().trim();
+  return MECHANISM_KEYS.includes(v) ? v : null;
+}
+
+/**
+ * @param {object|null} fabric
+ * @param {Record<string,string>|null} [categoryMechanisms] slug → mechanism از API دسته‌ها
+ */
+export function resolveStyle(fabric, categoryMechanisms = null) {
   if (!fabric) return "drape";
+
+  const explicit =
+    normalizeMechanism(fabric.mechanism) ||
+    normalizeMechanism(fabric.curtain_style) ||
+    normalizeMechanism(fabric.curtainStyle);
+  if (explicit) return explicit;
+
   const cat = String(fabric.category_slug || fabric.categorySlug || "")
     .toLowerCase()
     .trim();
   const sub = String(fabric.subcategory || "")
     .toLowerCase()
     .trim();
+
+  if (categoryMechanisms && typeof categoryMechanisms === "object") {
+    const fromCat =
+      normalizeMechanism(categoryMechanisms[cat]) ||
+      normalizeMechanism(categoryMechanisms[sub]);
+    if (fromCat) return fromCat;
+  }
+
   const name = String(fabric.name || "").toLowerCase();
   const code = String(fabric.code || "").toLowerCase();
   const hay = `${cat} ${sub} ${name} ${code}`;
@@ -114,9 +141,9 @@ export function resolveStyle(fabric) {
   return "drape";
 }
 
-export function pickTemplateUrl(fabric, templatesByKey) {
+export function pickTemplateUrl(fabric, templatesByKey, categoryMechanisms = null) {
   if (!templatesByKey || typeof templatesByKey !== "object") return null;
-  const style = resolveStyle(fabric);
+  const style = resolveStyle(fabric, categoryMechanisms);
   const cat = String(fabric?.category_slug || fabric?.categorySlug || "")
     .toLowerCase()
     .trim();
