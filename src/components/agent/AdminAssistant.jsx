@@ -2,15 +2,16 @@ import { useLocation } from "react-router-dom";
 import FloatingBot from "@/components/agent/FloatingBot";
 
 const STARTERS_BY_PATH = {
-  "/admin": ["خلاصه وضعیت سایت؟", "الان باید چیکار کنم؟"],
-  "/admin/models": ["چطور مدل پارچه اضافه کنم؟", "برچسب روی عکس پارچه چی بشه؟"],
-  "/admin/window": ["برای رومن قالب بساز", "قالب chroma یعنی چی؟"],
-  "/admin/categories": ["دسته رومن چطور تنظیم بشه؟"],
-  "/admin/projects": ["متن معرفی پروژه بنویس"],
-  "/admin/products": ["توضیح محصول فروشگاهی بنویس"],
-  "/admin/orders": ["سفارش‌های باز چی‌ان؟"],
-  "/admin/requests": ["درخواست‌های مشاوره جدید؟"],
-  "/admin/settings": ["تنظیمات ضروری چی‌ان؟"],
+  "/admin": ["خلاصه وضعیت", "لیست مدل‌ها", "درخواست‌های مشاوره"],
+  "/admin/models": ["لیست مدل‌ها", "چطور مدل اضافه کنم؟"],
+  "/admin/window": ["برای رومن قالب بساز", "راهنمای chroma"],
+  "/admin/categories": ["لیست دسته‌ها", "دسته جدید نام: زبرا شناسه: zebra"],
+  "/admin/projects": ["راهنمای نمونه اجرا"],
+  "/admin/portfolio-categories": ["دسته نمونه‌های اجرا"],
+  "/admin/products": ["محصولات فروشگاه"],
+  "/admin/orders": ["آخرین سفارش‌ها"],
+  "/admin/requests": ["درخواست‌های مشاوره"],
+  "/admin/settings": ["تنظیمات ضروری"],
 };
 
 function startersFor(path) {
@@ -18,16 +19,17 @@ function startersFor(path) {
   for (const [k, v] of Object.entries(STARTERS_BY_PATH)) {
     if (path.startsWith(k) && k !== "/admin") return v;
   }
-  return ["کمک در این صفحه", "راهنمای پنل ادمین"];
+  return ["خلاصه وضعیت", "لیست مدل‌ها"];
 }
 
 function labelFor(path) {
   const map = {
     "/admin": "داشبورد",
     "/admin/models": "مدل‌های پرده",
-    "/admin/window": "پنجره مجازی / قالب",
-    "/admin/categories": "دسته‌ها",
-    "/admin/projects": "پروژه‌ها",
+    "/admin/window": "پنجره مجازی",
+    "/admin/categories": "دسته‌بندی کاتالوگ",
+    "/admin/portfolio-categories": "دسته نمونه‌ها",
+    "/admin/projects": "نمونه‌های اجرا",
     "/admin/products": "محصولات",
     "/admin/orders": "سفارش‌ها",
     "/admin/requests": "درخواست مشاوره",
@@ -50,10 +52,11 @@ export default function AdminAssistant() {
       agentName="admin_assistant"
       storageKey={`antic_bot_admin_${pathname.split("/")[2] || "root"}`}
       title="دستیار ادمین آنتیک"
-      subtitle={`الان: ${labelFor(pathname)}`}
+      subtitle={`الان: ${labelFor(pathname)} · خواندن و نوشتن DB`}
       context={context}
       starters={startersFor(pathname)}
       accentClass="bg-foreground text-background"
+      allowImage
     />
   );
 }
