@@ -127,27 +127,26 @@ export function isFlatStyle(style?: string): boolean {
 
 /**
  * Scale factor: how many times the fabric photo spans the green width.
- * Fabric photos are close-ups → need smaller number so pattern looks natural on full curtain.
- * ~0.55–0.7 for flat styles (close-up geometric / textured)
- * ~0.85–0.95 for draped styles
+ * Close-up fabric photos need < 1 so pattern looks natural on full curtain.
+ * Higher = fewer repeats (less visible seams). 0.68 ≈ 1.5 panels across.
  */
 export function styleTileFactor(style?: string) {
-  if (isFlatStyle(style)) return 0.58;
+  if (isFlatStyle(style)) return 0.68;
   switch (style) {
     case "zebra":
-      return 0.72;
-    case "panel":
       return 0.75;
+    case "panel":
+      return 0.78;
     case "pleated-manual":
     case "pleated-chain":
     case "pleated-sheer":
-      return 0.7;
+      return 0.72;
     case "wave":
-      return 0.85;
+      return 0.88;
     case "drape":
-      return 0.9;
+      return 0.92;
     default:
-      return 0.75;
+      return 0.78;
   }
 }
 

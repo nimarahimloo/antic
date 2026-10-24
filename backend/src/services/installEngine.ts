@@ -1,6 +1,7 @@
 /**
  * Install engine: chroma template + fabric map.
- * Color-preserving shade: fabric hue/sat stay close to original photo.
+ * Edge UV clamped so left/right soft chroma does not break fabric.
+ * Mirror-tile + color-preserving shade.
  */
 
 import fs from "fs";
@@ -344,29 +345,24 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  // Fabric mean luminance (linear) — used only for gentle midtone anchor
-  let meanLum = 0,
-    nF = 0;
-  for (let i = 0; i < fd.length; i += 4) {
-    if (fd[i + 3] < 16) continue;
-    meanLum += 0.2126 * toLin(fd[i]) + 0.7152 * toLin(fd[i + 1]) + 0.0722 * toLin(fd[i + 2]);
-    nF++;
-  }
-  meanLum = nF ? meanLum / nF : 0.4;
-
   const w = tpl.w;
   const h = tpl.h;
   const td = tpl.data;
   const out = Buffer.alloc(w * h * 4);
 
-  const uvMinX = flat ? tpl.coreMinX : tpl.minX;
-  const uvMaxX = flat ? tpl.coreMaxX : tpl.maxX;
-  const uvMinY = flat ? tpl.coreMinY : tpl.minY;
-  const uvMaxY = flat ? tpl.coreMaxY : tpl.maxY;
+  // Full green bbox for UV origin (includes soft edges) — prevents left/right break
+  // Core width only for tile sizing (stable pattern scale)
+  const uvOriginX = tpl.minX;
+  const uvOriginY = tpl.minY;
+  const gW = Math.max(1, (flat ? tpl.coreMaxX - tpl.coreMinX : tpl.maxX - tpl.minX));
+  const gH = Math.max(1, (flat ? tpl.coreMaxY - tpl.coreMinY : tpl.maxY - tpl.minY));
 
-  const gW = Math.max(1, uvMaxX - uvMinX);
   const tileX = gW * fabricScale;
   const tileY = tileX / aspect;
+
+  // Span of full green region (for clamping local coords on soft edges)
+  const fullW = Math.max(1, tpl.maxX - tpl.minX);
+  const fullH = Math.max(1, tpl.maxY - tpl.minY);
 
   let keySum = 0;
   let keyN = 0;
@@ -396,7 +392,6 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       keySum += key;
       keyN++;
 
-      // Normalized shade from green channel (1 = average lit fabric)
       let s = toLin(pg) / tpl.meanLin;
 
       const iL = (y * w + Math.max(0, x - 1)) * 4;
@@ -409,26 +404,25 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       const slope = smoothstep(0.15, 0.9, Math.hypot(gx, gy));
       const blurS = (sh(iL) + sh(iR) + sh(iU) + sh(iD) + s) / 5;
       const micro = clamp01(s / Math.max(blurS, 0.02));
-      // Mild micro-detail — avoid crushing fabric color
       s *= Math.pow(Math.min(1.8, Math.max(0.55, micro)), mat.detail * 0.85);
-      // Soft contrast curve around 1.0 so midtones stay faithful
       const sCentered = s - 1;
       s = 1 + sCentered * Math.min(mat.contrast, 0.95);
 
-      const localX = x - uvMinX;
-      const localY = y - uvMinY;
-      const warp = mat.warp ?? 0.025;
+      // Clamp local UV so soft chroma edges outside core never go negative / explode
+      let localX = x - uvOriginX;
+      let localY = y - uvOriginY;
+      localX = Math.max(0, Math.min(fullW, localX));
+      localY = Math.max(0, Math.min(fullH, localY));
 
+      const warp = mat.warp ?? 0.025;
       const u = (localX / tileX) * fi.width + (flat ? 0 : gx * warp * fi.width * 0.08);
       const v = (localY / Math.max(tileY, 1)) * fi.height + (flat ? 0 : gy * warp * fi.height * 0.05);
       const [fr, fg, fb] = sampleFabMirror(fd, fi.width, fi.height, u, v);
 
-      // Keep fabric color almost pure — only apply lighting as multiply with soft floor
       const flr = toLin(fr);
       const flg = toLin(fg);
       const flb = toLin(fb);
 
-      // Lighting: folds darken, highlights lift slightly — never wash toward gray
       const light = Math.max(0.35, Math.min(1.55, s));
       const aoAmt = mat.ao != null ? mat.ao * 0.55 : 0.2;
       const ao = 1 - (1 - smoothstep(0.3, 1.1, s)) * aoAmt;
@@ -437,7 +431,6 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       let cg = flg * light * ao;
       let cb = flb * light * ao;
 
-      // Gentle saturation boost so fabric doesn't look flat after multiply
       const lum = 0.2126 * cr + 0.7152 * cg + 0.0722 * cb;
       const satBoost = flat ? 1.08 : 1.04;
       cr = lum + (cr - lum) * satBoost;
@@ -445,7 +438,6 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       cb = lum + (cb - lum) * satBoost;
 
       if (mat.id === 1) {
-        // velvet: deeper shadows
         const sv = s < 1 ? Math.pow(s, 1.15) : 1 + (s - 1) * 0.35;
         const mul = sv * (1 + mat.sheen * slope * 0.3);
         cr = flr * mul;
@@ -457,7 +449,6 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
         cg = flg * light + hl * (0.35 * flg + 0.65);
         cb = flb * light + hl * (0.35 * flb + 0.65);
       } else if (mat.id === 3) {
-        // sheer: more light pass-through
         const lightS = Math.min(1.4, s);
         cr = flr * s * 0.6 + (0.35 * flr + 0.65) * lightS * 0.4;
         cg = flg * s * 0.6 + (0.35 * flg + 0.65) * 0.98 * lightS * 0.4;
