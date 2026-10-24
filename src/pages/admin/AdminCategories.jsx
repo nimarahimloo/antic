@@ -1,6 +1,12 @@
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
+import { MECHANISM_KEYS, MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
 
 export default function AdminCategories() {
+  const mechanismOptions = [
+    { value: "", label: "خودکار (از شناسه)" },
+    ...MECHANISM_KEYS.map((k) => ({ value: k, label: MECHANISM_LABELS[k] || k })),
+  ];
+
   const fields = [
     { key: "name", label: "نام دسته", required: true, placeholder: "مثلاً: زبرا" },
     {
@@ -9,6 +15,13 @@ export default function AdminCategories() {
       required: true,
       placeholder: "مثلاً: zebra",
       help: "همان کلید قالب نصب و فیلتر کاتالوگ است. بعد از ذخیره، قالب chroma این دسته خودکار ساخته می‌شود.",
+    },
+    {
+      key: "mechanism",
+      label: "سبک رندر پنجره",
+      type: "select",
+      options: mechanismOptions,
+      help: "اگر خالی باشد از روی شناسه حدس زده می‌شود. برای دسته‌های جدید حتماً تنظیم کنید.",
     },
     { key: "order", label: "ترتیب نمایش", type: "number", placeholder: "مثلاً: 1" },
     { key: "image", label: "تصویر", type: "image" },
@@ -35,6 +48,11 @@ export default function AdminCategories() {
       render: (v) => <span className="font-display font-bold text-foreground">{v}</span>,
     },
     { key: "slug", label: "شناسه" },
+    {
+      key: "mechanism",
+      label: "رندر",
+      render: (v) => (v ? MECHANISM_LABELS[v] || v : "خودکار"),
+    },
     { key: "order", label: "ترتیب" },
     {
       key: "subcategories",
