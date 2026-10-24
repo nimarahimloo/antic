@@ -1,9 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { renderInstallImage, styleFromModel, guessMaterial } from "./installEngine.js";
-import { renderFromProductPhoto } from "./productRetexture.js";
 import path from "path";
-import fs from "fs";
-import sharp from "sharp";
 
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 
@@ -36,59 +33,14 @@ export function getQueueState() {
 
 type ResolvedTemplate = {
   image: string;
-  source: "render_template" | "install_reference";
+  source: "render_template";
   key: string;
-  mode: "chroma" | "hybrid";
+  mode: "chroma";
 };
 
-function localPathFromPublic(publicPath: string): string | null {
-  if (!publicPath) return null;
-  if (publicPath.startsWith("/uploads/")) {
-    return path.join(path.resolve(uploadDir), publicPath.replace(/^\/uploads\//, ""));
-  }
-  if (publicPath.startsWith("uploads/")) {
-    return path.join(path.resolve(uploadDir), publicPath.replace(/^uploads\//, ""));
-  }
-  return null;
-}
-
-/** عکس‌هایی که عمدتاً سبز chroma هستند نباید به‌عنوان «مرجع واقعی» استفاده شوند */
-async function isMostlyGreenChroma(publicPath: string): Promise<boolean> {
-  try {
-    const local = localPathFromPublic(publicPath);
-    let buf: Buffer;
-    if (local && fs.existsSync(local)) {
-      buf = await fs.promises.readFile(local);
-    } else if (/^https?:\/\//i.test(publicPath)) {
-      const res = await fetch(publicPath);
-      if (!res.ok) return false;
-      buf = Buffer.from(await res.arrayBuffer());
-    } else {
-      return false;
-    }
-    const { data, info } = await sharp(buf)
-      .resize(64, 64, { fit: "inside" })
-      .removeAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    let greenish = 0;
-    const n = info.width * info.height;
-    for (let i = 0; i < data.length; i += 3) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      if (g > 90 && g > r * 1.25 && g > b * 1.25) greenish++;
-    }
-    return greenish / n > 0.45;
-  } catch {
-    return false;
-  }
-}
-
 /**
- * اولویت صحیح:
- *  1) InstallReference واقعی (نه سبز خالص) → hybrid
- *  2) RenderTemplate سبز → chroma
+ * فقط RenderTemplate (قالب سبز آپلودشده توسط ادمین).
+ * InstallReference دیگر در مسیر رندر دخالت نمی‌کند (تداخل / دوباره‌کاری).
  */
 async function resolveTemplateCandidates(opts: {
   categorySlug?: string | null;
@@ -101,32 +53,6 @@ async function resolveTemplateCandidates(opts: {
   const out: ResolvedTemplate[] = [];
   const seen = new Set<string>();
 
-  // 1) Real product photos first
-  for (const k of unique) {
-    const refs = await prisma.installReference.findMany({
-      where: { style: k },
-      orderBy: { updatedAt: "desc" },
-      take: 4,
-    });
-    for (const ref of refs) {
-      if (!ref?.image) continue;
-      if (await isMostlyGreenChroma(ref.image)) {
-        console.warn("[render] skip green InstallReference as real photo", k, ref.id);
-        continue;
-      }
-      const id = `ref:${k}:${ref.image}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      out.push({
-        image: ref.image,
-        source: "install_reference",
-        key: k,
-        mode: "hybrid",
-      });
-    }
-  }
-
-  // 2) Green chroma templates
   for (const k of unique) {
     const tpl = await prisma.renderTemplate.findFirst({
       where: { style: k },
@@ -145,36 +71,28 @@ async function resolveTemplateCandidates(opts: {
       }
     }
   }
-
   return out;
 }
 
 export async function listCategoryTemplateCoverage() {
-  const [categories, templates, refs] = await Promise.all([
+  const [categories, templates] = await Promise.all([
     prisma.curtainCategory.findMany({ orderBy: { order: "asc" } }),
     prisma.renderTemplate.findMany({ select: { style: true, image: true, updatedAt: true } }),
-    prisma.installReference.findMany({ select: { style: true, image: true, note: true } }),
   ]);
   const tplBy = new Map(templates.map((t) => [t.style.toLowerCase(), t]));
-  const refsBy = new Map<string, (typeof refs)[0]>();
-  for (const r of refs) {
-    const k = r.style.toLowerCase();
-    if (!refsBy.has(k)) refsBy.set(k, r);
-  }
 
   return categories.map((c) => {
     const slug = c.slug.toLowerCase();
     const tpl = tplBy.get(slug);
-    const ref = refsBy.get(slug);
     return {
       id: c.id,
       name: c.name,
       slug: c.slug,
       hasChromaTemplate: Boolean(tpl?.image),
-      hasRealReference: Boolean(ref?.image),
+      hasRealReference: false,
       templateImage: tpl?.image || null,
-      referenceImage: ref?.image || null,
-      referenceNote: ref?.note || null,
+      referenceImage: null,
+      referenceNote: null,
     };
   });
 }
@@ -204,8 +122,8 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
   const candidates = await resolveTemplateCandidates({ categorySlug, style });
   if (!candidates.length) {
     throw new Error(
-      `برای دسته «${categorySlug || "—"}» قالب سبز یا عکس مرجع واقعی نیست. ` +
-        `در «نمونه‌های اجرای واقعی» عکس محصول آپلود کنید یا قالب سبز بسازید.`
+      `برای دسته «${categorySlug || style}» قالب سبز آپلود نشده. ` +
+        `در بخش قالب سبز (chroma) یک عکس با ناحیه پارچه سبز آپلود کنید.`
     );
   }
 
@@ -217,30 +135,20 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
   let lastErr: unknown;
   for (const resolved of candidates) {
     try {
-      const result =
-        resolved.mode === "chroma"
-          ? await renderInstallImage({
-              templatePathOrUrl: resolved.image,
-              fabricPathOrUrl: model.image,
-              outDir: path.resolve(uploadDir),
-              material,
-              style,
-            })
-          : await renderFromProductPhoto({
-              photoPathOrUrl: resolved.image,
-              fabricPathOrUrl: model.image,
-              outDir: path.resolve(uploadDir),
-              style,
-              material,
-            });
+      const result = await renderInstallImage({
+        templatePathOrUrl: resolved.image,
+        fabricPathOrUrl: model.image,
+        outDir: path.resolve(uploadDir),
+        material,
+        style,
+      });
 
       const threshold = autoApproveThreshold();
       const autoOk = result.qualityScore >= threshold;
       const status = autoOk ? "approved" : "pending";
-      const label = resolved.mode === "chroma" ? "قالب سبز" : "عکس مرجع واقعی";
       const review = autoOk
-        ? `${label} · امتیاز ${result.qualityScore}/10 · تأیید خودکار · ${resolved.source} · key=${resolved.key}`
-        : `${label} · امتیاز ${result.qualityScore}/10 · پوشش ${Math.round(result.coverage * 100)}٪ · ${resolved.source}`;
+        ? `قالب سبز · امتیاز ${result.qualityScore}/10 · تأیید خودکار · ${resolved.key}`
+        : `قالب سبز · امتیاز ${result.qualityScore}/10 · پوشش ${Math.round(result.coverage * 100)}٪ · ${resolved.key}`;
 
       await prisma.curtainModel.update({
         where: { id: modelId },
@@ -267,7 +175,7 @@ export async function renderOneModel(modelId: string, opts?: { regenerate?: bool
       };
     } catch (e) {
       lastErr = e;
-      console.warn("[render] candidate failed", resolved.mode, resolved.key, e);
+      console.warn("[render] candidate failed", resolved.key, e);
     }
   }
 
