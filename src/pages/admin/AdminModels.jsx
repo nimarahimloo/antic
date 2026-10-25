@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import FabricSwatch from "@/components/catalog/FabricSwatch";
 import { api } from "@/api/client";
-import { getRootCategories, getSubOptionsForParent, rootSelectOptions } from "@/lib/categoryTree";
+import { getRootCategories, rootSelectOptions } from "@/lib/categoryTree";
 
 export default function AdminModels() {
   const [categories, setCategories] = useState([]);
@@ -21,18 +21,9 @@ export default function AdminModels() {
     { key: "name", label: "نام (اختیاری)", placeholder: "خالی = همان کد" },
     {
       key: "category_slug",
-      label: "دسته مادر",
+      label: "دسته",
       required: true,
       type: "select",
-      clearFields: ["subcategory"],
-      help: "فقط دسته مادر — زیردسته را جدا انتخاب کنید",
-    },
-    {
-      key: "subcategory",
-      label: "زیردسته",
-      type: "select",
-      help: "بعد از انتخاب دسته مادر پر می‌شود",
-      getOptions: (form) => getSubOptionsForParent(categories, form.category_slug),
     },
     { key: "description", label: "یادداشت (اختیاری)", type: "textarea" },
   ];
@@ -56,11 +47,7 @@ export default function AdminModels() {
       label: "کد",
       render: (v, r) => <span className="font-display font-bold text-primary">{v || r.name}</span>,
     },
-    {
-      key: "category_slug",
-      label: "دسته",
-      render: (v, r) => (r.subcategory ? `${v} / ${r.subcategory}` : v || "—"),
-    },
+    { key: "category_slug", label: "دسته" },
     {
       key: "install_status",
       label: "نصب",
