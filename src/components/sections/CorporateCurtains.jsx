@@ -29,13 +29,13 @@ export default function CorporateCurtains() {
       <div className="mx-auto max-w-7xl px-5 lg:px-10">
         <div className="mb-14 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <span className="eyebrow mb-4 block">کاتالوگ · سیستم‌های پرده</span>
+            <span className="eyebrow mb-4 block">سیستم‌های پرده</span>
             <h2 className="font-display text-3xl font-bold leading-tight text-foreground lg:text-4xl">
-              سیستم‌هایی با <span className="text-gold-gradient">دقت معماری</span>
+              سیستم‌های <span className="text-gold-gradient">کاربردی</span>
             </h2>
           </div>
           <p className="max-w-md font-body text-sm leading-7 text-muted-foreground">
-            بر اساس `mechanism` و زیردسته‌های ثبت‌شده در پنل ادمین — بدون لیست ثابت نام.
+            مناسب فضاهای اداری و پروژه‌های بزرگ — از کاتالوگ مدل مرتبط را ببینید.
           </p>
         </div>
 
@@ -55,52 +55,36 @@ export default function CorporateCurtains() {
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-secondary/40">
-                    <span className="font-display text-lg font-bold text-muted-foreground">{item.name}</span>
+                    <span className="font-display text-sm text-muted-foreground">{item.name}</span>
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-card via-card/10 to-transparent" />
               </div>
-              <div className="p-7">
-                <h3 className="font-display text-xl font-bold text-foreground">{item.name}</h3>
+              <div className="p-5">
+                <h3 className="font-display text-lg font-bold text-foreground">{item.name}</h3>
                 {item.description && (
-                  <p className="mt-3 font-body text-sm leading-7 text-muted-foreground">{item.description}</p>
+                  <p className="mt-2 line-clamp-2 font-body text-xs leading-6 text-muted-foreground">
+                    {item.description}
+                  </p>
                 )}
-                {item.subcategories?.length > 0 && (
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {item.subcategories.slice(0, 4).map((t) => (
-                      <span
-                        key={t.slug || t.name}
-                        className="rounded-full border border-secondary/70 px-3 py-1 font-body text-[11px] text-muted-foreground"
-                      >
-                        {t.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-                  <Link
-                    to={`/catalog?category=${item.slug}`}
-                    className="btn-ghost-gold flex-1 justify-center"
-                  >
-                    کاتالوگ
-                  </Link>
-                  <a href="tel:02112345678" className="btn-ghost-gold flex-1 justify-center">
-                    <Phone className="h-4 w-4" /> مشاوره
-                  </a>
-                </div>
+                <Link
+                  to={`/catalog?category=${item.slug}`}
+                  className="mt-4 inline-flex items-center gap-2 font-display text-xs font-bold text-primary"
+                >
+                  مشاهده در کاتالوگ
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                </Link>
               </div>
             </article>
           ))}
         </div>
 
-        <div className="mt-12 flex items-center justify-center gap-3 text-center">
-          <Link
-            to="/catalog"
-            className="font-body text-sm text-muted-foreground transition-colors hover:text-primary"
-          >
-            مشاهده کامل کاتالوگ
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
+          <a href="tel:02112345678" className="btn-gold">
+            <Phone className="h-4 w-4" /> مشاوره پروژه
+          </a>
+          <Link to="/catalog" className="btn-ghost-gold">
+            کاتالوگ کامل
           </Link>
-          <ArrowLeft className="h-4 w-4 text-primary" />
         </div>
       </div>
     </section>
