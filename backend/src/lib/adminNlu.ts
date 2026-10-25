@@ -48,7 +48,7 @@ const FIELD_ALIASES: Record<string, string> = {
   اسلاگ: "slug",
   slug: "slug",
   دسته: "category",
-  دسته‌بندی: "category",
+  "دسته‌بندی": "category",
   دستهبندی: "category",
   category: "category",
   زیردسته: "subcategory",
@@ -81,11 +81,8 @@ const FIELD_ALIASES: Record<string, string> = {
   یادداشت: "note",
 };
 
-/** استخراج فیلد از key:value و الگوهای محاوره‌ای */
 export function parseFields(text: string): Record<string, string> {
   const out: Record<string, string> = {};
-
-  // نام: X  |  نام = X  |  name: X
   const re =
     /(?:^|[\s,،\n])([\u0600-\u06FFa-zA-Z_][\u0600-\u06FFa-zA-Z0-9_]*)\s*[:：=]\s*([^\n,،]+)/g;
   let m: RegExpExecArray | null;
@@ -95,7 +92,6 @@ export function parseFields(text: string): Record<string, string> {
     if (key && val) out[key] = val;
   }
 
-  // نامش X باشه / کدش Y است / قیمتش را بگذار 2000
   const colloquial: Array<[RegExp, string]> = [
     [/نام(?:ش|شو)?\s*(?:را|رو)?\s*(?:بگذار|بکن|کن|باشه|است|=|:)?\s*[«"]?([^\n,،»"]+)/i, "name"],
     [/عنوان(?:ش|شو)?\s*(?:را|رو)?\s*(?:بگذار|بکن|کن|باشه|=|:)?\s*[«"]?([^\n,،»"]+)/i, "title"],
@@ -111,7 +107,6 @@ export function parseFields(text: string): Record<string, string> {
     if (mm?.[1] && !out[field]) out[field] = mm[1].trim();
   }
 
-  // وضعیت‌های فارسی کوتاه
   if (!out.status) {
     const st = normalize(text).match(
       /\b(جدید|انجام|بسته|درحال|پرداخت|ارسال|لغو|new|done|closed|processing|pending|paid|shipped|cancelled)\b/
@@ -134,16 +129,6 @@ export function parseFields(text: string): Record<string, string> {
   return out;
 }
 
-function scoreKeywords(t: string, groups: string[][]): number {
-  let best = 0;
-  for (const g of groups) {
-    let s = 0;
-    for (const k of g) if (t.includes(normalize(k))) s += 1;
-    if (s > best) best = s;
-  }
-  return best;
-}
-
 export function detectAction(t: string): { action: Action | null; score: number } {
   const scores: Record<Action, number> = {
     delete: 0,
@@ -154,28 +139,35 @@ export function detectAction(t: string): { action: Action | null; score: number 
     search: 0,
     help: 0,
   };
-
   const add = (a: Action, n: number) => {
     scores[a] += n;
   };
 
-  if (/حذف|پاک\s*کن|پاکش|بنداز\s*دور|از\s*بین\s*ببر|delete|remove|drop\b/.test(t)) add("delete", 3);
-  if (/حذفش|پاکش\s*کن|دیلیت/.test(t)) add("delete", 2);
+  if (/حذف|پاک\s*کن|پاکش|بنداز\s*دور|از\s*بین\s*ببر|دیلیت|پاک\s*کنید|بکش\s*کن|بزن\s*بیرون|نداشته\s*باش|delete|remove|drop\b/.test(t))
+    add("delete", 3);
+  if (/حذفش|پاکش\s*کن|دیلیت|برش\s*دار|ببر\s*دور/.test(t)) add("delete", 2);
+  if (/رو\s+پاک|را\s+پاک|رو\s+حذف|را\s+حذف/.test(t)) add("delete", 3);
 
-  if (/افزودن|اضافه|بساز|بسازید|ثبت\s*کن|ایجاد|create|add\b|new\b|insert/.test(t)) add("create", 3);
+  if (/افزودن|اضافه|بساز|بسازید|ثبت\s*کن|ایجاد|بذار\s*تو\s*سیستم|وارد\s*کن|create|add\b|new\b|insert/.test(t))
+    add("create", 3);
   if (/یه\s+.+(بساز|اضافه|ثبت)/.test(t)) add("create", 2);
   if (/میخوام\s+.+(اضافه|بسازم|ثبت)/.test(t)) add("create", 2);
+  if (/دارم\s+.+(جدید|تازه)/.test(t) && /مدل|دسته|محصول|پروژه/.test(t)) add("create", 2);
+  if (/بزن\s+تو\s+(سایت|دیتابیس|سیستم)/.test(t)) add("create", 2);
 
-  if (/ویرایش|بروز|آپدیت|تغییر|عوض\s*کن|rename|update|edit|set\b|modify/.test(t)) add("update", 3);
-  if (/بکن|بگذار|بذار|کن/.test(t) && /قیمت|رنگ|نام|وضعیت|کد/.test(t)) add("update", 2);
+  if (/ویرایش|بروز|آپدیت|تغییر|عوض\s*کن|عوضش|درستش\s*کن|اصلاح|rename|update|edit|set\b|modify/.test(t))
+    add("update", 3);
+  if (/بکن|بگذار|بذار|کن\b/.test(t) && /قیمت|رنگ|نام|وضعیت|کد|عنوان|توضیح/.test(t)) add("update", 2);
+  if (/رو\s+بکن|را\s+بکن|بشه\s+|بشود\s+/.test(t) && /قیمت|رنگ|نام|وضعیت/.test(t)) add("update", 2);
+  if (/از\s+.+\s+به\s+/.test(t)) add("update", 2);
 
-  if (/لیست|فهرست|نشان\s*بده|نشون\s*بده|بیار|list|show|display|همه\s*ی/.test(t)) add("list", 2);
-  if (/چی\s*داریم|چه\s*.+هایی|ببینم/.test(t)) add("list", 1);
+  if (/لیست|فهرست|نشان\s*بده|نشون\s*بده|بیار|بده\s*ببینم|list|show|display|همه\s*ی/.test(t))
+    add("list", 2);
+  if (/چی\s*داریم|چه\s*.+هایی|ببینم|چیا\s*داریم|چی\s*هست/.test(t)) add("list", 2);
+  if (/همه\s*(مدل|دسته|محصول|سفارش|درخواست|پروژه)/.test(t)) add("list", 2);
 
   if (/تعداد|چندتا|چند\s*تا|count|how\s*many/.test(t)) add("count", 3);
-
   if (/جستجو|پیدا\s*کن|search|find\b/.test(t)) add("search", 2);
-
   if (/راهنما|چطور|چگونه|کمک|help|دستورات/.test(t)) add("help", 2);
 
   let best: Action | null = null;
@@ -198,34 +190,26 @@ export function detectEntity(t: string, pathHint?: string): { entity: EntityKind
 
   if (/مدل|curtain\s*model|پارچه.?مدل|کاتالوگ.?مدل/.test(t)) bump("model", 3);
   if (/\bmodel\b/.test(t)) bump("model", 2);
-
   if (/نمونه\s*اجرا|پروژه|project\b|نمونه.?کار/.test(t)) bump("project", 3);
-  if (/portfolio\s*item/.test(t)) bump("project", 2);
-
   if (/محصول|product\b|فروشگاه.?آیتم/.test(t)) bump("product", 3);
-
   if (/دسته\s*فروشگاه|shop\s*categor|اکسسوری.?دسته/.test(t)) bump("shop_category", 4);
-  if (/دسته\s*کاتالوگ|curtain\s*categor/.test(t)) bump("category", 3);
-  if (/\bدسته\b|دسته‌بندی|category/.test(t) && !scores.shop_category) bump("category", 2);
-
+  if (/دسته|categor|کاتالوگ.?دسته/.test(t) && !/فروشگاه/.test(t)) bump("category", 2);
   if (/سفارش|order\b/.test(t)) bump("order", 3);
-  if (/درخواست|مشاوره|consultation|request\b|اینباکس/.test(t)) bump("request", 3);
-
+  if (/درخواست|مشاوره|request\b/.test(t)) bump("request", 3);
   if (/قالب|template|chroma/.test(t)) bump("template", 3);
   if (/مرجع\s*نصب|install\s*ref/.test(t)) bump("install_ref", 3);
   if (/طراحی\s*ذخیره|saved\s*design/.test(t)) bump("saved_design", 3);
   if (/پنجره\s*مجازی|window\s*setting/.test(t)) bump("window", 3);
 
-  // سرنخ از مسیر ادمین
   if (pathHint) {
-    if (pathHint.includes("models")) bump("model", 1);
-    if (pathHint.includes("categories") && !pathHint.includes("portfolio")) bump("category", 1);
+    if (pathHint.includes("models")) bump("model", 2);
+    if (pathHint.includes("categories") && !pathHint.includes("portfolio")) bump("category", 2);
     if (pathHint.includes("portfolio")) bump("category", 1);
-    if (pathHint.includes("projects")) bump("project", 1);
-    if (pathHint.includes("products")) bump("product", 1);
-    if (pathHint.includes("orders")) bump("order", 1);
-    if (pathHint.includes("requests")) bump("request", 1);
-    if (pathHint.includes("window")) bump("template", 1);
+    if (pathHint.includes("projects")) bump("project", 2);
+    if (pathHint.includes("products")) bump("product", 2);
+    if (pathHint.includes("orders")) bump("order", 2);
+    if (pathHint.includes("requests")) bump("request", 2);
+    if (pathHint.includes("window")) bump("template", 2);
   }
 
   let best: EntityKind | null = null;
@@ -242,41 +226,39 @@ export function detectEntity(t: string, pathHint?: string): { entity: EntityKind
 
 const STOP = new Set(
   normalize(
-    "را رو رااز به با که از در برای یه یک این اون راحذف کن پاک بساز اضافه ثبت ویرایش تغییر عوض لیست نشان بده تعداد مدل دسته محصول سفارش درخواست پروژه نمونه اجرا پرده لطفا خواهشا میخوام می‌خوام بکن بگذار بذار باشه است هستشو اش"
+    "را رو به با که از در برای یه یک این اون حذف کن پاک بساز اضافه ثبت ویرایش تغییر عوض لیست نشان بده تعداد مدل دسته محصول سفارش درخواست پروژه نمونه اجرا پرده لطفا خواهشا میخوام می‌خوام بکن بگذار بذار باشه است هست"
   ).split(" ")
 );
 
-/** هدف (کد/نام/id) از باقی‌مانده جمله */
 export function extractTarget(text: string, fields: Record<string, string>): string | null {
   if (fields.code) return fields.code;
   if (fields.slug) return fields.slug;
   if (fields.name) return fields.name;
   if (fields.title) return fields.title;
 
-  // cuid
   const cuid = text.match(/\b(c[a-z0-9]{20,})\b/i);
   if (cuid) return cuid[1];
 
-  // CODE-123
   const code = text.match(/\b([A-Za-z]{1,6}-?\d{2,6})\b/);
   if (code) return code[1];
 
-  // بعد از فعل حذف/ویرایش
   const after = text.match(
     /(?:حذف|پاک|ویرایش|تغییر|عوض|delete|remove|update|edit)\s+(?:مدل|دسته|محصول|سفارش|درخواست|پروژه|نمونه)?\s*[«"]?([\u0600-\u06FFa-zA-Z0-9_-]{2,})/i
   );
   if (after?.[1] && !STOP.has(normalize(after[1]))) return after[1];
 
-  // «X را حذف کن»
+  const objVerb = text.match(
+    /([A-Za-z0-9\u0600-\u06FF_-]{2,40})\s*(?:رو|را)\s*(?:پاک|حذف|عوض|ویرایش|بکن|بگذار|بذار)/i
+  );
+  if (objVerb?.[1] && !STOP.has(normalize(objVerb[1]))) return objVerb[1];
+
   const obj = text.match(/[«"]([^»"]{2,40})[»"]/);
   if (obj) return obj[1].trim();
 
-  // آخرین توکن معنادار
   const tokens = normalize(text)
     .split(/[\s,،.؟!]+/)
     .filter((w) => w.length >= 2 && !STOP.has(w));
   if (tokens.length) {
-    // ترجیح توکن شبیه کد
     const codeLike = tokens.find((w) => /[a-z].*\d|\d.*[a-z]/.test(w));
     if (codeLike) return codeLike;
     return tokens[tokens.length - 1];
@@ -300,19 +282,23 @@ export function parseAdminCommand(
   const { entity, score: eScore } = detectEntity(t, opts?.path);
   const target = extractTarget(raw, fields);
 
-  // اگر فقط فیلد و هدف باشد بدون فعل → update فرضی
   let finalAction = action;
   if (!finalAction && target && (fields.price || fields.color || fields.status || fields.name || fields.title)) {
     finalAction = "update";
   }
-  // «مدل‌ها» تنها → list
   if (!finalAction && entity && /ها\b|ها$/.test(t)) finalAction = "list";
 
-  const confidence = Math.min(1, (aScore + eScore) / 6);
+  let finalEntity = entity;
+  if (!finalEntity && finalAction && opts?.path) {
+    const { entity: pathEnt, score: ps } = detectEntity("", opts.path);
+    if (ps >= 1) finalEntity = pathEnt;
+  }
+
+  const confidence = Math.min(1, ((finalAction ? 2 : 0) + (finalEntity ? 2 : 0) + aScore + eScore) / 8);
 
   return {
     action: finalAction,
-    entity,
+    entity: finalEntity,
     target,
     fields,
     raw,
