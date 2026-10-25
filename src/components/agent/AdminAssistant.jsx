@@ -26,13 +26,13 @@ function labelFor(path) {
   const map = {
     "/admin": "داشبورد",
     "/admin/models": "مدل‌های پرده",
-    "/admin/window": "پنجره مجازی",
-    "/admin/categories": "دسته‌بندی کاتالوگ",
+    "/admin/window": "قالب نصب",
+    "/admin/categories": "دسته‌بندی",
     "/admin/portfolio-categories": "دسته نمونه‌ها",
     "/admin/projects": "نمونه‌های اجرا",
-    "/admin/products": "محصولات",
+    "/admin/products": "فروشگاه",
     "/admin/orders": "سفارش‌ها",
-    "/admin/requests": "درخواست مشاوره",
+    "/admin/requests": "درخواست‌ها",
     "/admin/settings": "تنظیمات",
   };
   return map[path] || path;
@@ -40,9 +40,10 @@ function labelFor(path) {
 
 export default function AdminAssistant() {
   const { pathname } = useLocation();
+  const page = labelFor(pathname);
   const context = {
     path: pathname,
-    page: labelFor(pathname),
+    page,
     role: "admin",
   };
 
@@ -50,9 +51,9 @@ export default function AdminAssistant() {
     <FloatingBot
       mode="admin"
       agentName="admin_assistant"
-      storageKey={`antic_bot_admin_v2_${pathname.split("/")[2] || "root"}`}
-      title="دستیار ادمین آنتیک"
-      subtitle={`الان: ${labelFor(pathname)} · CRUD کامل DB`}
+      storageKey={`antic_bot_admin_v3_${pathname.split("/")[2] || "root"}`}
+      title="دستیار ادمین"
+      subtitle={`${page} · آنلاین`}
       context={context}
       starters={startersFor(pathname)}
       accentClass="bg-foreground text-background"
