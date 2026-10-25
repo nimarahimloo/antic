@@ -25,7 +25,7 @@ const MENU = [
   { to: "/admin/projects", label: "نمونه‌های اجرا", icon: FolderKanban },
   { to: "/admin/products", label: "فروشگاه (اکسسوری)", icon: ShoppingBag },
   { to: "/admin/orders", label: "سفارش‌ها", icon: Package },
-  { to: "/admin/window", label: "پنجره مجازی / قالب", icon: AppWindow },
+  { to: "/admin/window", label: "قالب نصب", icon: AppWindow },
   { to: "/admin/settings", label: "تنظیمات", icon: Settings },
 ];
 
