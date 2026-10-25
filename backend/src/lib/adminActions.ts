@@ -1,5 +1,6 @@
 /**
  * اجرای CRUD ادمین با تشخیص آزاد جمله (adminNlu).
+ * حذف/افزودن/ویرایش فقط بعد از پیش‌نمایش و تایید ادمین.
  */
 import { prisma } from "./prisma.js";
 import {
@@ -31,6 +32,44 @@ export type AdminActionResult = {
 
 function pack(text: string, blocks?: AdminBlock[], meta?: Record<string, unknown>): AdminActionResult {
   return { text, blocks, meta };
+}
+
+type PendingMutation = {
+  action: Action;
+  entity: EntityKind;
+  target: string | null;
+  fields: Record<string, string>;
+  resolvedId?: string;
+  resolvedLabel?: string;
+  createdAt: number;
+};
+
+const pendingMutations = new Map<string, PendingMutation>();
+
+function confirmButtons(): AdminBlock {
+  return {
+    type: "quick_replies",
+    items: [
+      { label: "✅ تایید اجرا", message: "تایید" },
+      { label: "✕ انصراف", message: "انصراف" },
+    ],
+  };
+}
+
+function fieldLines(fields: Record<string, string>): string {
+  const keys = Object.keys(fields);
+  if (!keys.length) return "• (بدون فیلد اضافه)";
+  return keys.map((k) => `• **${k}**: ${fields[k]}`).join("\n");
+}
+
+function isConfirmText(s: string) {
+  const n = s.trim().toLowerCase().replace(/[یي]/g, "ی");
+  return /^(تایید|تاید|تائید|confirm|yes|آره|باشه)$/i.test(n) || n === "تایید کن" || n === "اجرا کن";
+}
+
+function isCancelText(s: string) {
+  const n = s.trim().toLowerCase().replace(/[یي]/g, "ی");
+  return /^(انصراف|لغو|رد|cancel|no|نه)$/i.test(n);
 }
 
 function slugify(s: string) {
@@ -147,8 +186,42 @@ async function resolveByIdOrName(
 
 export async function executeAdminCommand(
   userText: string,
-  options?: { imageUrl?: string; path?: string }
+  options?: { imageUrl?: string; path?: string; conversationId?: string }
 ): Promise<AdminActionResult | null> {
+  const conversationId = options?.conversationId || "default";
+
+  if (isConfirmText(userText)) {
+    const pending = pendingMutations.get(conversationId);
+    if (!pending) {
+      return pack("درخواستی در انتظار تایید نیست. دستور جدید بده.");
+    }
+    if (Date.now() - pending.createdAt > 5 * 60 * 1000) {
+      pendingMutations.delete(conversationId);
+      return pack("زمان تایید تمام شد. دوباره دستور را بفرست.");
+    }
+    try {
+      const result = await runMutation(pending);
+      pendingMutations.delete(conversationId);
+      return result;
+    } catch (e) {
+      pendingMutations.delete(conversationId);
+      const msg = e instanceof Error ? e.message : "خطا";
+      return pack(`❌ اجرا ناموفق: ${msg}`);
+    }
+  }
+  if (isCancelText(userText)) {
+    if (pendingMutations.has(conversationId)) {
+      pendingMutations.delete(conversationId);
+      return pack("انصراف ثبت شد — تغییری اعمال نشد.", [
+        {
+          type: "quick_replies",
+          items: [{ label: "خلاصه وضعیت", message: "خلاصه وضعیت" }],
+        },
+      ]);
+    }
+    return pack("درخواستی برای انصراف نبود.");
+  }
+
   const parsed = parseAdminCommand(userText, {
     imageUrl: options?.imageUrl,
     path: options?.path,
@@ -159,19 +232,15 @@ export async function executeAdminCommand(
   const fields = { ...parsed.fields };
   const target = parsed.target;
 
-  // بدون هیچ سرنخی
   if (!action && !entity) return null;
 
   if (action === "help") {
     return pack(
       `می‌توانی آزاد حرف بزنی — مثال‌ها:\n` +
-        `• «مدل ZB-001 رو پاک کن»\n` +
+        `• «مدل ZB-001 رو پاک کن» → پیش‌نمایش → تایید\n` +
         `• «یه مدل جدید با کد TEST و نام تست و دسته zebra بساز»\n` +
         `• «قیمت محصول قلاب رو بکن 200000»\n` +
-        `• «وضعیت درخواست احمد را انجام کن»\n` +
-        `• «لیست سفارش‌ها رو بیار»\n` +
-        `• «چند تا مدل داریم؟»\n` +
-        `فیلدها را می‌توانی با «نام: …» یا «نامش … باشه» بگویی.`
+        `حذف / افزودن / ویرایش فقط بعد از دکمه **تایید اجرا** اعمال می‌شود.`
     );
   }
 
@@ -211,34 +280,56 @@ export async function executeAdminCommand(
     return null;
   }
 
-  // اگر فقط entity گفته شد بدون action → list
   if (!action) action = "list";
 
   if (action === "delete") {
     if (!target) return pack(`برای حذف ${labelEntity(entity)} نام، کد یا id را بگو.`);
     const found = await resolveByIdOrName(entity, target);
     if (!found) return pack(`${labelEntity(entity)} با «${target}» پیدا نشد.`);
-    await deleteEntity(entity, found.id);
-    return pack(`✅ **${found.label}** (${labelEntity(entity)}) حذف شد.`, [
-      { type: "link_buttons", items: adminLink(entity) },
-    ]);
+    pendingMutations.set(conversationId, {
+      action: "delete",
+      entity,
+      target,
+      fields: {},
+      resolvedId: found.id,
+      resolvedLabel: found.label,
+      createdAt: Date.now(),
+    });
+    return pack(
+      `⚠️ **پیش‌نمایش حذف**\n` +
+        `نوع: **${labelEntity(entity)}**\n` +
+        `مورد: **${found.label}**\n` +
+        `شناسه: \`${found.id}\`\n\n` +
+        `این عملیات بعد از تایید اجرا می‌شود و قابل بازگشت نیست.\n` +
+        `**حتماً روی «تایید اجرا» یا «انصراف» کلیک کن.**`,
+      [confirmButtons(), { type: "link_buttons", items: adminLink(entity) }],
+      { pending: true, action: "delete" }
+    );
   }
 
   if (action === "create") {
-    // اگر فیلد name/title خالی و target هست
     if (!fields.name && !fields.title && target && !/^(مدل|دسته|محصول)$/.test(target)) {
       if (entity === "project") fields.title = fields.title || target;
       else fields.name = fields.name || target;
     }
-    try {
-      const created = await createEntity(entity, fields);
-      return pack(`✅ ${labelEntity(entity)} **${created.label}** ساخته شد.\n\`${created.id}\``, [
-        { type: "link_buttons", items: adminLink(entity) },
-      ]);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "خطا";
-      return pack(`❌ ایجاد ناموفق: ${msg}\n\n${createHelp(entity)}`);
-    }
+    const previewName = fields.name || fields.title || fields.code || "(بدون نام)";
+    pendingMutations.set(conversationId, {
+      action: "create",
+      entity,
+      target,
+      fields: { ...fields },
+      createdAt: Date.now(),
+    });
+    return pack(
+      `📝 **پیش‌نمایش افزودن ${labelEntity(entity)}**\n` +
+        `خروجی تقریبی بعد از تایید:\n` +
+        `• عنوان/نام: **${previewName}**\n` +
+        `${fieldLines(fields)}\n\n` +
+        `${createHelp(entity)}\n\n` +
+        `اگر درست است **تایید اجرا** را بزن؛ وگرنه **انصراف**.`,
+      [confirmButtons()],
+      { pending: true, action: "create" }
+    );
   }
 
   if (action === "update") {
@@ -252,20 +343,55 @@ export async function executeAdminCommand(
         `**${found.label}** پیدا شد. بگو چه فیلدی عوض شود — مثلاً «رنگش کرم باشه» یا «قیمت: 200000».`
       );
     }
-    try {
-      const updated = await updateEntity(entity, found.id, fields);
-      return pack(`✅ **${updated.label}** به‌روزرسانی شد.`, [
-        { type: "link_buttons", items: adminLink(entity) },
-      ]);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "خطا";
-      return pack(`❌ ویرایش ناموفق: ${msg}`);
-    }
+    pendingMutations.set(conversationId, {
+      action: "update",
+      entity,
+      target,
+      fields: { ...fields },
+      resolvedId: found.id,
+      resolvedLabel: found.label,
+      createdAt: Date.now(),
+    });
+    return pack(
+      `✏️ **پیش‌نمایش ویرایش**\n` +
+        `نوع: **${labelEntity(entity)}**\n` +
+        `مورد فعلی: **${found.label}**\n` +
+        `تغییرات درخواستی:\n${fieldLines(fields)}\n\n` +
+        `بعد از تایید این مقادیر اعمال می‌شود.\n` +
+        `**روی تایید یا انصراف کلیک کن.**`,
+      [confirmButtons(), { type: "link_buttons", items: adminLink(entity) }],
+      { pending: true, action: "update" }
+    );
   }
 
   if (action === "list") return listEntity(entity, target);
 
   return null;
+}
+
+async function runMutation(pending: PendingMutation): Promise<AdminActionResult> {
+  const { action, entity, fields } = pending;
+  if (action === "delete") {
+    if (!pending.resolvedId) throw new Error("مورد یافت نشد");
+    await deleteEntity(entity, pending.resolvedId);
+    return pack(`✅ **${pending.resolvedLabel}** (${labelEntity(entity)}) حذف شد.`, [
+      { type: "link_buttons", items: adminLink(entity) },
+    ]);
+  }
+  if (action === "create") {
+    const created = await createEntity(entity, fields);
+    return pack(`✅ ${labelEntity(entity)} **${created.label}** ساخته شد.\n\`${created.id}\``, [
+      { type: "link_buttons", items: adminLink(entity) },
+    ]);
+  }
+  if (action === "update") {
+    if (!pending.resolvedId) throw new Error("مورد یافت نشد");
+    const updated = await updateEntity(entity, pending.resolvedId, fields);
+    return pack(`✅ **${updated.label}** به‌روزرسانی شد.`, [
+      { type: "link_buttons", items: adminLink(entity) },
+    ]);
+  }
+  throw new Error("عملیات پشتیبانی نشده");
 }
 
 function labelAction(a: Action) {
@@ -538,8 +664,7 @@ async function createEntity(
           description: f.description || null,
           price: f.price ? Number(f.price) : 0,
           image: f.image || null,
-          stock: f.stock ? Number(f.stock) : 100,
-          visible: f.visible !== "false",
+          visible: true,
         },
       });
       return { id: row.id, label: row.name };
@@ -553,47 +678,13 @@ async function createEntity(
           slug,
           description: f.description || null,
           image: f.image || null,
-          order: f.order ? Number(f.order) : 0,
+          order: f.order ? Number(f.order) : 99,
         },
       });
       return { id: row.id, label: row.name };
     }
-    case "template": {
-      const style = f.style || f.slug || "roman";
-      if (!f.image) throw new Error("تصویر قالب لازم است");
-      const row = await prisma.renderTemplate.create({ data: { style, image: f.image } });
-      return { id: row.id, label: row.style };
-    }
-    case "install_ref": {
-      if (!f.image) throw new Error("تصویر لازم است");
-      const row = await prisma.installReference.create({
-        data: { style: f.style || "roman", image: f.image, note: f.description || null },
-      });
-      return { id: row.id, label: row.style };
-    }
-    case "saved_design": {
-      if (!f.image) throw new Error("تصویر لازم است");
-      const row = await prisma.savedDesign.create({
-        data: { title: f.title || f.name || "طرح", image: f.image },
-      });
-      return { id: row.id, label: row.title };
-    }
-    case "order":
-    case "request":
-      throw new Error("ایجاد سفارش/درخواست از چت پشتیبانی نمی‌شود");
-    case "window": {
-      const row = await prisma.virtualWindowSetting.create({
-        data: {
-          wallColor: f.wallColor || null,
-          frameColor: f.frameColor || null,
-          railColor: f.railColor || null,
-          viewImage: f.image || null,
-        },
-      });
-      return { id: row.id, label: "تنظیم پنجره" };
-    }
     default:
-      throw new Error("ایجاد پشتیبانی نشده");
+      throw new Error("ایجاد پشتیبانی نشده یا فیلد ناقص");
   }
 }
 
@@ -614,9 +705,8 @@ async function updateEntity(
       if (f.description) data.description = f.description;
       if (f.image) data.image = f.image;
       if (f.material) data.material = f.material;
-      if (Object.keys(data).length === 0) throw new Error("فیلدی برای ویرایش نبود");
       const row = await prisma.curtainModel.update({ where: { id }, data });
-      return { id: row.id, label: row.name };
+      return { id: row.id, label: row.name || row.code };
     }
     case "category": {
       const data: Record<string, unknown> = {};
@@ -626,7 +716,6 @@ async function updateEntity(
       if (f.image) data.image = f.image;
       if (f.order) data.order = Number(f.order);
       if (f.mechanism) data.mechanism = f.mechanism;
-      if (f.subcategories) data.subcategories = f.subcategories;
       const row = await prisma.curtainCategory.update({ where: { id }, data });
       return { id: row.id, label: row.name };
     }
@@ -647,8 +736,6 @@ async function updateEntity(
       if (f.description) data.description = f.description;
       if (f.price) data.price = Number(f.price);
       if (f.image) data.image = f.image;
-      if (f.stock) data.stock = Number(f.stock);
-      if (f.visible) data.visible = f.visible !== "false";
       const row = await prisma.product.update({ where: { id }, data });
       return { id: row.id, label: row.name };
     }
