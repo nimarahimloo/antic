@@ -3,9 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowRight, Phone, CheckCircle2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import CurtainPreview from "@/components/catalog/CurtainPreview";
-import FabricSwatch from "@/components/catalog/FabricSwatch";
 
-/** جزئیات مدل — همان install_image ادمین، بدون پیش‌نمایش کارتونی جدا */
 export default function CurtainDetail() {
   const { id } = useParams();
   const [model, setModel] = useState(null);
@@ -34,10 +32,10 @@ export default function CurtainDetail() {
     );
   }
 
-  if (notFound) {
+  if (notFound || !model) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-24 text-center">
-        <h1 className="font-display text-2xl font-black text-foreground">محصول پیدا نشد</h1>
+        <h1 className="font-display text-2xl font-black text-foreground">مدل پیدا نشد</h1>
         <Link to="/catalog" className="btn-gold mt-6">
           بازگشت به کاتالوگ
         </Link>
@@ -59,7 +57,7 @@ export default function CurtainDetail() {
             کاتالوگ
           </Link>
           <ArrowRight className="h-3 w-3" />
-          <span className="text-foreground">{model.code}</span>
+          <span className="text-foreground">{model.code || model.name}</span>
         </nav>
       </div>
 
@@ -67,43 +65,23 @@ export default function CurtainDetail() {
         <div className="grid gap-10 lg:grid-cols-2 lg:gap-14">
           <div>
             <CurtainPreview fabric={model} publicMode />
-
             {hasInstall && (
               <div className="mt-3 flex items-center gap-2 text-[11px] text-primary">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                همان نمونه نصب تولیدشده در پنل ادمین
+                نمای نصب این مدل
               </div>
             )}
-
-            <div className="mt-6 rounded-2xl border border-secondary/60 bg-card p-4">
-              <p className="mb-3 font-display text-xs font-bold text-foreground">تکهٔ پارچه از کاتالوگ</p>
-              <div className="overflow-hidden rounded-xl">
-                <FabricSwatch fabric={model} className="aspect-[4/3] w-full" />
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-body text-[10px]">
-                {model.color_code && (
-                  <span className="flex items-center gap-1.5 text-foreground">
-                    <span
-                      className="h-3 w-3 rounded border border-secondary/40"
-                      style={{ backgroundColor: model.color_code }}
-                    />
-                    {model.color || model.color_code}
-                  </span>
-                )}
-                {model.fabric && <span className="text-muted-foreground">{model.fabric}</span>}
-                {model.texture && <span className="text-muted-foreground">{model.texture}</span>}
-                {model.material && <span className="text-muted-foreground">{model.material}</span>}
-              </div>
-            </div>
           </div>
 
           <div>
             <div className="rounded-3xl border border-secondary/60 bg-card p-6 lg:p-8">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-display text-sm font-bold text-primary">{model.code}</p>
+                  {model.code && (
+                    <p className="font-display text-sm font-bold text-primary">{model.code}</p>
+                  )}
                   <h1 className="mt-1 font-display text-2xl font-black leading-snug text-foreground">
-                    {model.name}
+                    {model.name || model.code}
                   </h1>
                 </div>
                 {model.color_code && (
@@ -119,9 +97,8 @@ export default function CurtainDetail() {
                 {model.fabric && <Spec label="نوع پارچه" value={model.fabric} />}
                 {model.color && <Spec label="رنگ" value={model.color} />}
                 {model.texture && <Spec label="بافت" value={model.texture} />}
-                {model.material && <Spec label="ترکیب جنس" value={model.material} />}
-                {model.category_slug && <Spec label="دسته / سازوکار" value={model.category_slug} />}
-                {model.subcategory && <Spec label="زیر‌دسته" value={model.subcategory} />}
+                {model.material && <Spec label="جنس" value={model.material} />}
+                {model.category_slug && <Spec label="دسته" value={model.category_slug} />}
               </div>
 
               {model.description && (
