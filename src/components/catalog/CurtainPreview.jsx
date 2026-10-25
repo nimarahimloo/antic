@@ -1,9 +1,4 @@
-/**
- * پیش‌نمایش کاتالوگ — فقط عکس واقعی:
- * ۱) install_image (نمونه نصب از قالب سبز)
- * ۲) وگرنه عکس پارچه مدل
- * WebGL / پنجره مجازی حذف شد.
- */
+/** Catalog preview: install photo, else fabric image. */
 import { mediaUrl } from "@/lib/mediaUrl";
 
 function RoomShell({ children }) {
@@ -24,7 +19,7 @@ export default function CurtainPreview({ fabric, publicMode = false }) {
     <div id="curtain-render-preview">
       {!publicMode && (
         <p className="mb-2 font-display text-xs font-bold text-primary">
-          {isInstall ? "نمونه نصب" : fabricSrc ? "عکس پارچه" : "بدون تصویر"}
+          {isInstall ? "نمای نصب" : fabricSrc ? "نمونه پارچه" : "بدون تصویر"}
         </p>
       )}
       <RoomShell>
@@ -32,23 +27,25 @@ export default function CurtainPreview({ fabric, publicMode = false }) {
           <div className="aspect-[3/4] sm:aspect-[4/5]">
             <img
               src={src}
-              alt={fabric?.code || fabric?.name || "پرده"}
+              alt={fabric?.name || fabric?.code || "پرده"}
               className="h-full w-full object-contain bg-[#d4c4b0]"
             />
           </div>
         ) : (
           <div className="flex aspect-[4/3] items-center justify-center">
-            <p className="font-body text-xs text-muted-foreground">تصویری برای نمایش نیست</p>
+            <p className="font-body text-xs text-muted-foreground">تصویری برای نمایش موجود نیست</p>
           </div>
         )}
       </RoomShell>
-      <p className="mt-2 text-center text-[10px] leading-5 text-muted-foreground">
-        {isInstall
-          ? "نمونه نصب از قالب سبز و عکس پارچه"
-          : fabricSrc
-            ? "هنوز نمونه نصب ساخته نشده — قالب سبز را آپلود و رندر را اجرا کنید"
-            : "مدل بدون تصویر"}
-      </p>
+      {!publicMode && (
+        <p className="mt-2 text-center text-[10px] leading-5 text-muted-foreground">
+          {isInstall
+            ? "نمای نصب این مدل"
+            : fabricSrc
+              ? "نمونه پارچه — نمای نصب به‌زودی"
+              : ""}
+        </p>
+      )}
     </div>
   );
 }
