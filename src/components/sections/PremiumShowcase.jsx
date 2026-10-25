@@ -17,10 +17,10 @@ export default function PremiumShowcase() {
         <div className="mb-12 text-center">
           <span className="eyebrow mb-4 block">انتخاب‌های ویژه</span>
           <h2 className="font-display text-3xl font-black leading-tight text-foreground lg:text-5xl">
-            مجموعه‌های <span className="text-gold-gradient">خاص</span>
+            مجموعه‌های <span className="text-gold-gradient">منتخب</span>
           </h2>
           <p className="mx-auto mt-5 max-w-xl font-body text-sm leading-7 text-muted-foreground">
-            منبع واحد: `CurtainCategory` در پنل ادمین.
+            چند دسته پرطرفدار برای شروع انتخاب — هر مجموعه را باز کنید و مدل‌ها را ببینید.
           </p>
         </div>
 
