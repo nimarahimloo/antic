@@ -7,25 +7,25 @@ const SLIDES = [
   {
     space: "پذیرایی",
     title: "فضای پذیرایی",
-    subtitle: "پرده‌های لوکس برای لحظات خاصِ زندگی",
+    subtitle: "پرده‌های شیک برای فضای پذیرایی",
     image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/2be489b62_generated_image.png",
   },
   {
     space: "آشپزخانه",
     title: "آشپزخانه",
-    subtitle: "نور و زیبایی در قلب خانه",
+    subtitle: "کنترل نور و هماهنگی با دکوراسیون آشپزخانه",
     image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/e29f4aed1_generated_image.png",
   },
   {
     space: "اتاق خواب",
     title: "اتاق خواب",
-    subtitle: "آرامش و شکوه در هر صبح",
+    subtitle: "حریم خصوصی و آرامش برای اتاق خواب",
     image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/58350d5ba_generated_image.png",
   },
   {
     space: "فضاهای ویژه",
     title: "فضاهای ویژه",
-    subtitle: "طراحی منحصر به فرد برای فضاهای خاص",
+    subtitle: "راهکار اختصاصی برای فضاهای خاص",
     image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/7480c6599_generated_image.png",
   },
 ];
@@ -61,7 +61,7 @@ export default function HeroSlider() {
           transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
           className="absolute inset-0"
         >
-          <img src={slide.image} alt={`پرده لوکس برای ${slide.title}`} className="h-full w-full object-cover" />
+          <img src={slide.image} alt={`پرده برای ${slide.title}`} className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/45 to-background/20" />
           <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/60" />
         </motion.div>
@@ -98,27 +98,33 @@ export default function HeroSlider() {
       </motion.div>
 
       <button
+        type="button"
         onClick={() => paginate(-1)}
-        className="absolute right-5 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-primary/30 bg-background/30 text-primary backdrop-blur-md transition-all hover:bg-primary hover:text-primary-foreground"
+        className="absolute right-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-secondary/60 bg-background/70 text-foreground backdrop-blur md:right-8"
         aria-label="اسلاید قبلی"
       >
         <ChevronRight className="h-5 w-5" />
       </button>
       <button
+        type="button"
         onClick={() => paginate(1)}
-        className="absolute left-5 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-primary/30 bg-background/30 text-primary backdrop-blur-md transition-all hover:bg-primary hover:text-primary-foreground"
+        className="absolute left-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-secondary/60 bg-background/70 text-foreground backdrop-blur md:left-8"
         aria-label="اسلاید بعدی"
       >
         <ChevronLeft className="h-5 w-5" />
       </button>
 
-      <div className="absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 gap-3">
+      <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 gap-2">
         {SLIDES.map((_, i) => (
           <button
             key={i}
-            onClick={() => { setDirection(i > index ? 1 : -1); setIndex(i); }}
-            className={`h-1.5 rounded-full transition-all duration-500 ${
-              i === index ? "w-10 bg-primary" : "w-1.5 bg-foreground/30 hover:bg-foreground/50"
+            type="button"
+            onClick={() => {
+              setDirection(i > index ? 1 : -1);
+              setIndex(i);
+            }}
+            className={`h-1.5 rounded-full transition-all ${
+              i === index ? "w-8 bg-primary" : "w-2 bg-secondary"
             }`}
             aria-label={`اسلاید ${i + 1}`}
           />
