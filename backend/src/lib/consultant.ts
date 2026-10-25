@@ -206,13 +206,12 @@ export async function buildConsultantReply(userText: string, history: ChatMessag
   const t = expandText(userText);
   const intent = detectIntent(userText);
   const data = await loadAll();
-  const { categories, models, projects, products, modelCount, projectCount, productCount } = data;
+  const { categories, models, projects, modelCount } = data;
   const fullContext = `${historyBlob(history)} ${userText}`;
   const hints = detectHints(fullContext);
   const preferred = [...new Set(hints.flatMap((h) => h.slugs).filter(Boolean))];
   const terms = extractTerms(userText);
   const colors = COLOR_WORDS.filter((c) => t.includes(normalize(c)));
-  const tip = hints.map((h) => h.tip).filter(Boolean)[0];
 
   const contactBlocks = (): RichBlock[] => [
     {
@@ -235,9 +234,9 @@ export async function buildConsultantReply(userText: string, history: ChatMessag
     return pack(
       voice(
         tone,
-        `سلام 🌿 من مشاور پرده آنتیک‌ام — ${modelCount} مدل در کاتالوگ دارم.\nاتاق و نور را بگو تا پیشنهاد بدهم؛ در پایان مسیر، برای قیمت و بازدید از تماس اقدام می‌کنی.`,
+        `سلام — مشاور پرده آنتیک‌ام. ${modelCount} مدل در کاتالوگ دارم.\nاتاق و نور را بگو تا پیشنهاد بدهم؛ در پایان برای قیمت از تماس اقدام کن.`,
         `سلام. مشاور طراحی پرده آنتیک هستم. نوع فضا را بفرمایید.`,
-        `سلام! بگو کدوم اتاقه تا برات مدل پیدا کنم 💚`
+        `سلام! بگو کدوم اتاقه تا برات مدل پیدا کنم.`
       ),
       [
         {
@@ -253,68 +252,52 @@ export async function buildConsultantReply(userText: string, history: ChatMessag
   }
 
   if (intent === "thanks") {
-    return pack(
-      voice(tone, "خواهش می‌کنم. هر وقت آماده بودی از تماس برای بازدید هماهنگ کن.", "موفق باشید.", "مرسی از تو 😄 برو تماس اگر آماده بودی!")
-    );
+    return pack(voice(tone, "خواهش می‌کنم. برای بازدید از تماس هماهنگ کن.", "موفق باشید.", "مرسی — برو تماس اگر آماده بودی."));
   }
 
   if (intent === "price" || intent === "install" || intent === "contact") {
     return pack(
       voice(
         tone,
-        "قیمت و زمان نصب بعد از ابعاد پنجره و مدل مشخص می‌شود.\n\n**قدم بعدی:** از صفحه تماس نام، شماره و ابعاد تقریبی را بفرست تا کارشناس برای بازدید یا برآورد با تو هماهنگ کند.",
-        "لطفاً از صفحه تماس اقدام فرمایید تا برآورد و هماهنگی بازدید انجام شود.",
-        "برای قیمت و نصب باید ابعاد داشته باشیم — برو تماس، شماره و ابعادت رو بذار تا زنگ بزنن."
+        "قیمت و زمان نصب بعد از ابعاد و مدل مشخص می‌شود.\n\n**قدم بعدی:** از صفحه تماس نام، شماره و ابعاد تقریبی را بفرست.",
+        "لطفاً از صفحه تماس اقدام فرمایید.",
+        "برای قیمت ابعاد لازم است — برو تماس، شماره و ابعادت رو بذار."
       ),
       contactBlocks()
     );
   }
 
   if (intent === "help") {
-    return pack(
-      "کمکت می‌کنم مدل مناسب را پیدا کنی؛ بعد برای قیمت و نصب از **تماس** اقدام می‌کنی.\nبگو: اتاق کجاست و نور را بیشتر می‌خواهی یا کمتر؟",
-      contactBlocks()
-    );
+    return pack("بگو اتاق کجاست و نور را بیشتر می‌خواهی یا کمتر — بعد مدل می‌دهم و مسیر تماس را باز می‌کنم.", contactBlocks());
   }
 
   if (intent === "categories" || intent === "catalog") {
     const names = categories.slice(0, 12).map((c) => `• **${c.name}**`).join("\n");
-    return pack(
-      `دسته‌های کاتالوگ:\n${names || "—"}\n\nیکی را بگو تا مدل پیشنهاد بدهم؛ برای سفارش نهایی از تماس اقدام کن.`,
-      [
-        { type: "link_buttons", items: [{ label: "کاتالوگ", href: "/catalog" }, { label: "تماس", href: "/contact" }] },
-        { type: "quick_replies", items: categories.slice(0, 4).map((c) => ({ label: c.name, message: `مدل‌های ${c.name}` })) },
-      ]
-    );
+    return pack(`دسته‌های کاتالوگ:\n${names || "—"}\n\nیکی را بگو تا مدل پیشنهاد بدهم.`, [
+      { type: "link_buttons", items: [{ label: "کاتالوگ", href: "/catalog" }, { label: "تماس", href: "/contact" }] },
+    ]);
   }
 
   if (intent === "shop") {
-    return pack(
-      "فروشگاه فقط اکسسوری است. خود پرده از کاتالوگ و سپس تماس برای اندازه‌گیری.",
-      [{ type: "link_buttons", items: [{ label: "فروشگاه", href: "/shop" }, { label: "تماس", href: "/contact" }] }]
-    );
+    return pack("فروشگاه فقط اکسسوری است. پرده از کاتالوگ و سپس تماس.", [
+      { type: "link_buttons", items: [{ label: "فروشگاه", href: "/shop" }, { label: "تماس", href: "/contact" }] },
+    ]);
   }
 
   if (intent === "projects") {
     const top = projects.slice(0, 4);
     const lines = top.map((p, i) => `${i + 1}. **${p.title}**`).join("\n") || "—";
-    return pack(`نمونه‌های اجرا:\n${lines}\n\nمدل نزدیک سلیقه‌ات را بگو تا مسیر تماس را باز کنم.`, [
+    return pack(`نمونه‌های اجرا:\n${lines}`, [
       { type: "link_buttons", items: [{ label: "نمونه‌ها", href: "/projects" }, { label: "تماس", href: "/contact" }] },
     ]);
   }
 
   if (intent === "about") {
-    return pack(
-      `پرده آنتیک مشاوره، دوخت و نصب انجام می‌دهد — ${modelCount} مدل در کاتالوگ.\nبرای شروع پروژه از تماس اقدام کن.`,
-      contactBlocks()
-    );
+    return pack(`پرده آنتیک مشاوره، دوخت و نصب — ${modelCount} مدل. برای شروع از تماس اقدام کن.`, contactBlocks());
   }
 
   if (intent === "compare") {
-    return pack(
-      "شید: جمع‌شونده و ساده · زبرا: نوار شفاف/مات · رومن: ظاهر رسمی.\nبگو فضا روشن می‌خواهی یا تاریک تا مدل پیشنهاد بدهم؛ بعد برای قیمت از تماس اقدام کن.",
-      contactBlocks()
-    );
+    return pack("شید: جمع‌شونده · زبرا: نوار شفاف/مات · رومن: رسمی.\nبگو فضا روشن یا تاریک تا مدل بدهم.", contactBlocks());
   }
 
   for (const c of categories) {
@@ -332,38 +315,30 @@ export async function buildConsultantReply(userText: string, history: ChatMessag
   });
   if (codeHit) {
     return pack(
-      `مدل **${codeHit.name || codeHit.code}** را پیدا کردم.\n\nاگر می‌پسندی، از **تماس** ابعاد را بفرست تا قیمت و بازدید هماهنگ شود.`,
+      `مدل **${codeHit.name || codeHit.code}** را پیدا کردم.\nاگر می‌پسندی از **تماس** ابعاد را بفرست.`,
       [modelCards([codeHit]), ...contactBlocks()]
     );
   }
 
   if (scored.length === 0) {
     return pack(
-      voice(
-        tone,
-        "بگو اتاق کجاست و نور را بیشتر می‌خواهی یا کمتر — بعد مدل می‌دهم و مسیر تماس را باز می‌کنم.",
-        "لطفاً نوع فضا را مشخص کنید.",
-        "بگو اتاق و نورش چیه تا بریم سر مدل 😊"
-      ),
+      voice(tone, "بگو اتاق کجاست و نور را بیشتر یا کمتر می‌خواهی.", "لطفاً نوع فضا را مشخص کنید.", "بگو اتاق و نورش چیه."),
       contactBlocks()
     );
   }
 
   const top = scored.slice(0, 5).map((x) => x.m);
-  const intro =
-    tip ||
-    voice(tone, "طبق حرف‌هات این مدل‌ها نزدیک‌ترند:", "پیشنهادها:", "اینا به نظر نزدیک‌ترن:");
-  const teach = "\n\nیکی را انتخاب کن؛ برای قیمت و نصب قطعی باید با مجموعه هماهنگ شوی.";
+  const intro = voice(tone, "طبق حرف‌هات این مدل‌ها نزدیک‌ترند:", "پیشنهادها:", "اینا نزدیک‌ترن:");
   const close =
     "\n\n" +
     voice(
       tone,
-      "اگر یکی نزدیک سلیقه‌ات است، **از صفحه تماس** ابعاد تقریبی و شماره را بفرست تا کارشناس برای بازدید و قیمت با تو هماهنگ کند.",
-      "از صفحه تماس اقدام فرمایید تا هماهنگی انجام شود.",
-      "پسندیدی؟ برو تماس، ابعاد و شماره‌ت رو بذار تا تیم زنگ بزنه."
+      "اگر یکی نزدیک سلیقه‌ات است، از **صفحه تماس** ابعاد و شماره را بفرست تا بازدید و قیمت هماهنگ شود.",
+      "از صفحه تماس اقدام فرمایید.",
+      "پسندیدی؟ برو تماس، ابعاد و شماره‌ت رو بذار."
     );
 
-  return pack(`${intro}${teach}${close}`, [
+  return pack(`${intro}${close}`, [
     modelCards(top),
     {
       type: "quick_replies",
@@ -388,7 +363,7 @@ export async function buildAdminAssistantReply(
   userText: string,
   history: ChatMessage[] = [],
   context: AssistantContext = {},
-  options?: { imageUrl?: string }
+  options?: { imageUrl?: string; conversationId?: string }
 ): Promise<AssistantResult> {
   return buildAdminReply(userText, history, context, options);
 }
@@ -398,7 +373,7 @@ export async function buildAssistantReply(
   userText: string,
   history: ChatMessage[] = [],
   context: AssistantContext = {},
-  options?: { imageUrl?: string }
+  options?: { imageUrl?: string; conversationId?: string }
 ): Promise<AssistantResult> {
   if (agentName === "admin_assistant") {
     return buildAdminAssistantReply(userText, history, context, options);
