@@ -63,18 +63,34 @@ export async function buildAdminAssistantReply(
   userText: string,
   history: ChatMessage[] = [],
   context: AssistantContext = {},
-  options?: { imageUrl?: string }
+  options?: { imageUrl?: string; conversationId?: string }
 ): Promise<AssistantResult> {
   const t = normalize(userText);
   const path = context.path || "";
   const page = context.page || path || "پنل";
+  const execOpts = {
+    imageUrl: options?.imageUrl,
+    path,
+    conversationId: options?.conversationId,
+  };
+
+  // تایید / انصراف را مستقیم بفرست
+  const bare = userText.trim();
+  if (/^(تایید|تاید|تائید|انصراف|لغو|رد|confirm|cancel|آره|باشه|نه)$/i.test(bare)) {
+    const executed = await executeAdminCommand(bare, execOpts);
+    if (executed) {
+      return {
+        text: executed.text,
+        blocks: executed.blocks as RichBlock[] | undefined,
+        meta: executed.meta,
+      };
+    }
+  }
+
   const variants = expandVariants(userText, history, path);
 
   for (const variant of variants) {
-    const executed = await executeAdminCommand(variant, {
-      imageUrl: options?.imageUrl,
-      path,
-    });
+    const executed = await executeAdminCommand(variant, execOpts);
     if (executed) {
       return {
         text: executed.text,
@@ -87,10 +103,7 @@ export async function buildAdminAssistantReply(
   if (options?.imageUrl && /بگذار|بذار|عکس|تصویر|کاور/.test(t)) {
     const histTarget = lastTargetFromHistory(history);
     if (histTarget) {
-      const executed = await executeAdminCommand(`ویرایش مدل ${histTarget}`, {
-        imageUrl: options.imageUrl,
-        path,
-      });
+      const executed = await executeAdminCommand(`ویرایش مدل ${histTarget}`, execOpts);
       if (executed) {
         return {
           text: executed.text,
@@ -111,7 +124,7 @@ export async function buildAdminAssistantReply(
 
   if (/وضعیت|خلاصه|داشبورد|چیکار|آمار/.test(t) || (path === "/admin" && t.length < 24)) {
     return pack(
-      `وضعیت فعلی:\n• مدل: **${modelCount}** · دسته: **${catCount}**\n• محصول: **${productCount}** · سفارش: **${orderCount}** · درخواست: **${reqCount}**\n\nهر جور راحت هستی دستور بده.\nمثال: «ZB-001 رو پاک کن» · «قیمت قلاب بشه ۲۰۰۰۰۰» · «مدل‌ها چی داریم»`,
+      `وضعیت فعلی:\n• مدل: **${modelCount}** · دسته: **${catCount}**\n• محصول: **${productCount}** · سفارش: **${orderCount}** · درخواست: **${reqCount}**\n\nحذف/افزودن/ویرایش بعد از **پیش‌نمایش و تایید** انجام می‌شود.`,
       [
         {
           type: "quick_replies",
@@ -127,7 +140,7 @@ export async function buildAdminAssistantReply(
 
   if (GREETING_RE.test(t)) {
     return pack(
-      `سلام — الان روی **${page}** هستی.\nحذف، اضافه، ویرایش، لیست و تعداد را با هر لحنی بگو.`,
+      `سلام — الان روی **${page}** هستی.\nدستور بده؛ برای تغییر داده، اول پیش‌نمایش می‌بینید بعد تایید.`,
       [
         {
           type: "quick_replies",
@@ -142,12 +155,12 @@ export async function buildAdminAssistantReply(
 
   if (/راهنما|دستورات|چطور|کمک/.test(t)) {
     return pack(
-      `می‌توانی بگویی:\n• «مدل ZB-001 را حذف کن»\n• «یه مدل با کد NEW-1 بساز دسته shade»\n• «قیمت محصول قلاب بشه ۱۵۰۰۰۰»\n• «سفارش‌ها را لیست کن»\n• «اینو پاک کن» (اگر قبلش مدل را گفته باشی)`
+      `مثال:\n• «مدل ZB-001 را حذف کن» → پیش‌نمایش → **تایید اجرا**\n• «یه مدل با کد NEW-1 بساز دسته shade» → پیش‌نمایش فیلدها → تایید\n• «قیمت محصول قلاب بشه ۱۵۰۰۰۰» → پیش‌نمایش ویرایش → تایید\n\nبدون کلیک روی تایید، هیچ حذف/افزودن/ویرایشی انجام نمی‌شود.`
     );
   }
 
   return pack(
-    `دستور را کامل متوجه نشدم.\nروی **${page}** هستم — بگو چه کاری روی کدام مورد (کد یا نام).\nمثال: «مدل TEST-1 را حذف کن».`,
+    `دستور را کامل متوجه نشدم.\nروی **${page}** هستم — بگو چه کاری روی کدام مورد.\nمثال: «مدل TEST-1 را حذف کن».`,
     [
       {
         type: "quick_replies",
