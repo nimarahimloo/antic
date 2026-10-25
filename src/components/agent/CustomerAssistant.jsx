@@ -14,9 +14,9 @@ export default function CustomerAssistant() {
     <FloatingBot
       mode="customer"
       agentName="design_consultant"
-      storageKey="antic_bot_customer_v5"
+      storageKey="antic_bot_customer_v6"
       title="دستیار آنتیک"
-      subtitle="آنلاین · پاسخ‌گو"
+      subtitle="آنلاین · آماده پاسخ"
       starters={STARTERS}
       accentClass="bg-primary text-primary-foreground"
     />
