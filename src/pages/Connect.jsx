@@ -12,12 +12,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function StepItem({ n, children }) {
   return (
@@ -53,10 +48,7 @@ function ClientPanel({ steps, note }) {
 export default function Connect() {
   const [copied, setCopied] = useState(false);
 
-  const serverUrl = useMemo(
-    () => new URL("/api/mcp", window.location.origin).toString(),
-    []
-  );
+  const serverUrl = useMemo(() => new URL("/api/mcp", window.location.origin).toString(), []);
 
   const copyUrl = async () => {
     try {
@@ -70,23 +62,20 @@ export default function Connect() {
 
   return (
     <div className="bg-background">
-      {/* Hero */}
       <section className="border-b border-secondary/50 bg-card/40">
         <div className="mx-auto max-w-7xl px-5 py-16 lg:px-10 lg:py-20">
-          <span className="eyebrow mb-4 block">اتصال به دستیار هوش مصنوعی</span>
+          <span className="eyebrow mb-4 block">اتصال فنی</span>
           <h1 className="font-display text-3xl font-bold text-foreground lg:text-5xl">
-            اتصال <span className="text-gold-gradient">دستیار هوش مصنوعی</span> به پرده آنتیک
+            اتصال سرور MCP به کلاینت‌های پشتیبان
           </h1>
           <p className="mt-5 max-w-2xl font-body text-sm leading-7 text-muted-foreground">
-            با اتصال سرور MCP این برنامه به دستیارهای هوش مصنوعی مانند Claude، ChatGPT و Cursor،
-            می‌توانید داده‌های کاتالوگ، پروژه‌ها و مدل‌های پرده را مستقیماً در گفت‌وگوی خود جستجو و مشاهده کنید.
-            کافی است آدرس سرور را در کلاینت مورد نظر وارد کنید.
+            با افزودن آدرس سرور MCP این سایت به کلاینت‌هایی مانند Claude، ChatGPT یا Cursor می‌توانید
+            داده‌های عمومی کاتالوگ و نمونه‌کارها را در همان محیط جستجو کنید.
           </p>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-5 py-14 lg:px-10 lg:py-20">
-        {/* URL card */}
         <div className="mb-12 rounded-2xl border border-secondary/60 bg-card/50 p-6 lg:p-8">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-full border border-primary/50 text-primary">
@@ -94,13 +83,14 @@ export default function Connect() {
             </span>
             <div>
               <h2 className="font-display text-lg font-bold text-foreground">آدرس سرور MCP</h2>
-              <p className="font-body text-xs text-muted-foreground">
-                این آدرس را کپی کرده و در کلاینت هوش مصنوعی خود وارد کنید.
-              </p>
+              <p className="font-body text-xs text-muted-foreground">این آدرس را در کلاینت مورد نظر وارد کنید.</p>
             </div>
           </div>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <code className="flex-1 overflow-x-auto rounded-xl border border-secondary/70 bg-background px-4 py-3 font-mono text-xs text-primary" dir="ltr">
+            <code
+              className="flex-1 overflow-x-auto rounded-xl border border-secondary/70 bg-background px-4 py-3 font-mono text-xs text-primary"
+              dir="ltr"
+            >
               {serverUrl}
             </code>
             <Button
@@ -121,20 +111,14 @@ export default function Connect() {
           </div>
           <p className="mt-4 flex items-start gap-2 font-body text-xs leading-6 text-muted-foreground">
             <Sparkles className="mt-0.5 h-4 w-4 flex-none text-primary" />
-            <span>
-              این سرور در حالت عمومی (فقط خواندنی) فعال است؛ نیازی به ورود ندارد.
-              دستیار فقط می‌تواند داده‌های عمومی کاتالوگ و پروژه‌ها را بخواند.
-            </span>
+            <span>دسترسی عمومی و فقط‌خواندنی است؛ ورود لازم نیست.</span>
           </p>
         </div>
 
-        {/* Client tabs */}
         <div className="mb-8">
-          <h2 className="font-display text-2xl font-bold text-foreground">
-            راهنمای اتصال برای هر کلاینت
-          </h2>
+          <h2 className="font-display text-2xl font-bold text-foreground">راهنمای اتصال</h2>
           <p className="mt-2 font-body text-sm text-muted-foreground">
-            یکی از کلاینت‌های زیر را انتخاب کنید و مراحل را دنبال کنید.
+            کلاینت مورد نظر را انتخاب کنید و مراحل را دنبال کنید.
           </p>
         </div>
 
@@ -169,53 +153,51 @@ export default function Connect() {
           <TabsContent value="claude" className="mt-6">
             <ClientPanel
               steps={[
-                <>در منوی پروفایل بالا را روی <strong>Settings</strong> کلیک کنید.</>,
-                <>به بخش <strong>Connectors</strong> بروید و <strong>“Add custom connector”</strong> را انتخاب کنید.</>,
-                <>یک نام دلخواه برای کانکتور وارد کنید (مثلاً «پرده آنتیک»).</>,
-                <>آدرس سرور MCP را که کپی کردید در فیلد URL قرار دهید و <strong>Add</strong> را بزنید.</>,
+                <>در Settings به بخش <strong>Connectors</strong> بروید.</>,
+                <><strong>Add custom connector</strong> را انتخاب کنید.</>,
+                <>نام دلخواه و آدرس سرور MCP را وارد کنید.</>,
+                <><strong>Add</strong> را بزنید.</>,
               ]}
-              note="پس از هر بار انتشار تغییرات در برنامه، کانکتور را در Claude بازنشانی کنید تا فهرست ابزارهای جدید بارگذاری شود."
+              note="پس از به‌روزرسانی سایت، کانکتور را یک‌بار بازنشانی کنید."
             />
           </TabsContent>
 
           <TabsContent value="chatgpt" className="mt-6">
             <ClientPanel
               steps={[
-                <>در ChatGPT به بخش <strong>Apps</strong> بروید و <strong>Developer mode</strong> را فعال کنید (هشدار ریسک را تأیید کنید).</>,
-                <><strong>“Create app”</strong> را انتخاب کنید و نامی برای آن وارد کنید.</>,
-                <>آدرس سرور MCP را در فیلد URL قرار دهید و <strong>Create</strong> را بزنید.</>,
-                <>از داخل نوار composing چت، اپلیکیشن ساخته‌شده را فعال کنید و سپس درخواست خود را بنویسید.</>,
+                <>Developer mode را در Apps فعال کنید.</>,
+                <>Create app را بزنید و نام وارد کنید.</>,
+                <>آدرس سرور MCP را در URL بگذارید.</>,
+                <>اپ را در چت فعال کنید.</>,
               ]}
-              note="پس از هر بار انتشار تغییرات در برنامه، اپلیکیشن را در ChatGPT بازنشانی کنید تا فهرست ابزارهای جدید بارگذاری شود."
+              note="پس از به‌روزرسانی سایت، اپ را بازنشانی کنید."
             />
           </TabsContent>
 
           <TabsContent value="cursor" className="mt-6">
             <ClientPanel
               steps={[
-                <>به بخش <strong>Customize</strong> بروید و تب <strong>MCPs</strong> را باز کنید.</>,
-                <><strong>“New MCP Server”</strong> را انتخاب کنید؛ این کار فایل <code className="text-primary" dir="ltr">mcp.json</code> را باز می‌کند.</>,
-                <>یک ورودی جدید اضافه کنید که فیلد <code className="text-primary" dir="ltr">url</code> آن برابر آدرس سرور MCP شما باشد.</>,
-                <>فایل را ذخیره کنید و کلاینت را روشن (toggle on) کنید.</>,
+                <>به Customize و تب MCPs بروید.</>,
+                <>New MCP Server را انتخاب کنید.</>,
+                <>آدرس سرور را در فیلد url قرار دهید و ذخیره کنید.</>,
+                <>کلاینت را روشن کنید.</>,
               ]}
-              note="پس از هر بار انتشار تغییرات در برنامه، کلاینت را در Cursor بازنشانی کنید تا فهرست ابزارهای جدید بارگذاری شود."
+              note="پس از به‌روزرسانی سایت، MCP را یک‌بار reload کنید."
             />
           </TabsContent>
 
           <TabsContent value="custom" className="mt-6">
             <ClientPanel
               steps={[
-                <>آدرس سرور MCP را کپی کنید.</>,
-                <>در کلاینت دلخواه خود، آن را به‌عنوان یک سرور <strong>streamable HTTP MCP</strong> اضافه کنید.</>,
-                <>نام و آدرس سرور کافی است؛ تنظیمات پیشرفته نیاز نیست.</>,
-                <>کلاینت را بازنشانی (reload) کنید تا فهرست ابزارها بارگذاری شود.</>,
+                <>آدرس سرور را کپی کنید.</>,
+                <>به‌عنوان streamable HTTP MCP اضافه کنید.</>,
+                <>کلاینت را reload کنید.</>,
               ]}
-              note="پس از هر بار انتشار تغییرات در برنامه، کلاینت خود را بازنشانی کنید تا فهرست ابزارهای جدید بارگذاری شود."
+              note="پس از به‌روزرسانی سایت، کلاینت را بازنشانی کنید."
             />
           </TabsContent>
         </Tabs>
 
-        {/* Back link */}
         <div className="mt-14">
           <Link to="/" className="btn-ghost-gold">
             <ArrowLeft className="h-4 w-4" /> بازگشت به خانه
