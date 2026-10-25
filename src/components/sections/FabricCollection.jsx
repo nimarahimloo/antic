@@ -1,76 +1,68 @@
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
-import { useCurtainCategories, pickSecondaryCategories } from "@/hooks/useCurtainCategories";
-
-const FA_DIGITS = ["۰۱", "۰۲", "۰۳", "۰۴", "۰۵", "۰۶", "۰۷", "۰۸"];
+import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 
 export default function FabricCollection() {
   const { categories, loading } = useCurtainCategories();
-  const items = pickSecondaryCategories(categories, 8);
-
-  if (loading && !items.length) return null;
-  if (!items.length) return null;
+  const items = (categories || []).slice(0, 8);
 
   return (
-    <section className="relative overflow-hidden bg-background py-24 lg:py-32">
-      <div className="pointer-events-none absolute top-1/3 -right-24 h-96 w-96 rounded-full bg-primary/6 blur-[140px]" />
-      <div className="relative mx-auto max-w-7xl px-5 lg:px-10">
-        <div className="mb-14 text-center">
-          <span className="eyebrow mb-4 block">کالکشن‌ها</span>
-          <h2 className="font-display text-3xl font-black leading-tight text-foreground lg:text-5xl">
-            ادامهٔ <span className="text-gold-gradient">دسته‌بندی</span>
+    <section className="border-t border-secondary/40 bg-card/30 py-20 lg:py-28">
+      <div className="mx-auto max-w-7xl px-5 lg:px-10">
+        <div className="mb-10 max-w-2xl">
+          <span className="eyebrow mb-3 block">انواع پرده</span>
+          <h2 className="font-display text-3xl font-black text-foreground lg:text-4xl">
+            مجموعه‌ای برای هر فضا
           </h2>
-          <div className="mx-auto mt-6 h-px w-24 bg-primary/60" />
-          <p className="mx-auto mt-6 max-w-xl font-body text-sm leading-7 text-muted-foreground">
-            همان منبع `CurtainCategory` — با افزودن یا حذف دسته در ادمین به‌روز می‌شود.
+          <p className="mt-4 font-body text-sm leading-8 text-muted-foreground">
+            از شید و زبرا تا رومن و پرده‌های کلاسیک — دسته‌ای را انتخاب کنید که با نور و سبک
+            دکوراسیون شما هماهنگ است.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
-          {items.map((fabric, i) => (
-            <motion.div
-              key={fabric.slug}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-60px" }}
-              transition={{ duration: 0.6, delay: i * 0.06, ease: [0.16, 1, 0.3, 1] }}
-            >
+        {loading ? (
+          <p className="font-body text-sm text-muted-foreground">در حال بارگذاری…</p>
+        ) : items.length === 0 ? (
+          <p className="font-body text-sm text-muted-foreground">به‌زودی دسته‌ها در این بخش نمایش داده می‌شوند.</p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {items.map((fabric) => (
               <Link
+                key={fabric.slug}
                 to={`/catalog?category=${fabric.slug}`}
-                className="group flex h-full flex-col overflow-hidden rounded-3xl border border-secondary/60 bg-card transition-all duration-500 hover:border-primary"
+                className="group overflow-hidden rounded-2xl border border-secondary/60 bg-card transition hover:border-primary/40"
               >
-                <div className="relative aspect-[4/5] overflow-hidden">
+                <div className="aspect-[4/3] overflow-hidden bg-secondary/30">
                   {fabric.image ? (
                     <img
                       src={fabric.image}
                       alt={fabric.name}
-                      className="h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-105"
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center bg-secondary/40">
-                      <span className="font-display text-lg font-bold text-muted-foreground">{fabric.name}</span>
+                    <div className="flex h-full items-center justify-center font-display text-sm text-muted-foreground">
+                      {fabric.name}
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
-                  <span className="absolute right-3 top-3 font-display text-2xl font-black text-primary/70">
-                    {FA_DIGITS[i] || String(i + 1).padStart(2, "0")}
-                  </span>
                 </div>
-                <div className="flex flex-1 flex-col p-5">
-                  <h3 className="font-display text-xl font-black text-foreground lg:text-2xl">{fabric.name}</h3>
-                  <div className="mt-3 h-px w-10 bg-primary" />
+                <div className="p-4">
+                  <h3 className="font-display text-base font-bold text-foreground">{fabric.name}</h3>
                   {fabric.description && (
-                    <p className="mt-3 font-body text-xs leading-6 text-muted-foreground">{fabric.description}</p>
+                    <p className="mt-1 line-clamp-2 font-body text-xs leading-6 text-muted-foreground">
+                      {fabric.description}
+                    </p>
                   )}
-                  <span className="mt-4 inline-flex items-center gap-2 font-display text-xs font-bold text-primary">
-                    مشاهده کالکشن
-                    <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-                  </span>
                 </div>
               </Link>
-            </motion.div>
-          ))}
+            ))}
+          </div>
+        )}
+
+        <div className="mt-10 text-center">
+          <Link to="/catalog" className="inline-flex items-center gap-2 font-body text-sm text-primary hover:underline">
+            مشاهده کامل کاتالوگ
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
         </div>
       </div>
     </section>
