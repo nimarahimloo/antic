@@ -1,19 +1,25 @@
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
-import { ExternalLink } from "lucide-react";
+import { Bot, Check, Copy, ExternalLink, User } from "lucide-react";
 
 function InternalLink({ href, children }) {
   if (!href) return <span>{children}</span>;
   if (href.startsWith("http") || href.startsWith("//")) {
     return (
-      <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-primary underline-offset-2 hover:underline">
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-0.5 font-semibold text-primary underline-offset-2 hover:underline"
+      >
         {children}
         <ExternalLink className="h-3 w-3" />
       </a>
     );
   }
   return (
-    <Link to={href} className="text-primary underline-offset-2 hover:underline">
+    <Link to={href} className="font-semibold text-primary underline-offset-2 hover:underline">
       {children}
     </Link>
   );
@@ -27,7 +33,7 @@ function ModelCards({ items }) {
         <Link
           key={it.id || it.href}
           to={it.href || "#"}
-          className="group overflow-hidden rounded-xl border border-secondary/60 bg-background transition hover:border-primary/50 hover:shadow-md"
+          className="group overflow-hidden rounded-xl border border-secondary/60 bg-background/80 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
         >
           <div className="aspect-[4/3] overflow-hidden bg-secondary/30">
             {it.image ? (
@@ -38,7 +44,9 @@ function ModelCards({ items }) {
                 loading="lazy"
               />
             ) : (
-              <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">بدون تصویر</div>
+              <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">
+                بدون تصویر
+              </div>
             )}
           </div>
           <div className="p-2">
@@ -59,7 +67,7 @@ function LinkButtons({ items }) {
     <div className="mt-2.5 flex flex-wrap gap-1.5">
       {items.map((it, i) => {
         const inner = (
-          <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/5 px-3 py-1.5 font-body text-[11px] font-bold text-primary transition hover:bg-primary/15">
+          <span className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/5 px-3 py-1.5 font-body text-[11px] font-bold text-primary transition hover:bg-primary/15 active:scale-95">
             {it.label}
           </span>
         );
@@ -83,13 +91,13 @@ function LinkButtons({ items }) {
 function QuickReplies({ items, onPick }) {
   if (!items?.length || !onPick) return null;
   return (
-    <div className="mt-2 flex flex-wrap justify-end gap-1.5">
+    <div className="mt-2 flex flex-wrap gap-1.5">
       {items.map((item, i) => (
         <button
           key={i}
           type="button"
           onClick={() => onPick(item.message || item.label)}
-          className="rounded-full border border-primary/50 bg-card px-3 py-1.5 font-body text-[11px] font-bold text-primary shadow-sm transition hover:bg-primary hover:text-primary-foreground active:scale-95"
+          className="rounded-full border border-primary/45 bg-card px-3 py-1.5 font-body text-[11px] font-bold text-primary shadow-sm transition hover:bg-primary hover:text-primary-foreground active:scale-95"
         >
           {item.label}
         </button>
@@ -98,22 +106,20 @@ function QuickReplies({ items, onPick }) {
   );
 }
 
-function Blocks({ blocks, onQuickReply }) {
+function Blocks({ blocks, onQuickReply, onlyQuick }) {
   if (!blocks?.length) return null;
-  const cards = blocks.filter((b) => b.type === "model_cards");
-  const links = blocks.filter((b) => b.type === "link_buttons");
-  const quick = blocks.filter((b) => b.type === "quick_replies");
+  const list = onlyQuick
+    ? blocks.filter((b) => b.type === "quick_replies")
+    : blocks.filter((b) => b.type !== "quick_replies");
   return (
     <div>
-      {cards.map((b, i) => (
-        <ModelCards key={`c-${i}`} items={b.items} />
-      ))}
-      {links.map((b, i) => (
-        <LinkButtons key={`l-${i}`} items={b.items} />
-      ))}
-      {quick.map((b, i) => (
-        <QuickReplies key={`q-${i}`} items={b.items} onPick={onQuickReply} />
-      ))}
+      {list.map((b, i) => {
+        if (b.type === "model_cards") return <ModelCards key={`c-${i}`} items={b.items} />;
+        if (b.type === "link_buttons") return <LinkButtons key={`l-${i}`} items={b.items} />;
+        if (b.type === "quick_replies")
+          return <QuickReplies key={`q-${i}`} items={b.items} onPick={onQuickReply} />;
+        return null;
+      })}
     </div>
   );
 }
@@ -131,11 +137,43 @@ function MarkdownBody({ content }) {
   );
 }
 
-/** Typing dots — shown while bot is "thinking" */
-export function TypingIndicator() {
+function CopyBtn({ text }) {
+  const [ok, setOk] = useState(false);
+  if (!text) return null;
   return (
-    <div className="flex justify-start">
-      <div className="flex items-center gap-1 rounded-[18px] rounded-br-md border border-secondary/50 bg-card px-4 py-3 shadow-sm">
+    <button
+      type="button"
+      title="کپی متن"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setOk(true);
+          setTimeout(() => setOk(false), 1200);
+        } catch {
+          /* ignore */
+        }
+      }}
+      className="rounded-md p-1 text-muted-foreground/70 opacity-0 transition hover:bg-secondary/60 hover:text-foreground group-hover:opacity-100"
+    >
+      {ok ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
+    </button>
+  );
+}
+
+/** Typing dots while bot thinks */
+export function TypingIndicator({ mode = "customer" }) {
+  return (
+    <div className="flex items-end gap-2">
+      <div
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+          mode === "admin"
+            ? "bg-foreground text-background"
+            : "bg-primary/15 text-primary"
+        }`}
+      >
+        <Bot className="h-3.5 w-3.5" />
+      </div>
+      <div className="flex items-center gap-1.5 rounded-2xl rounded-br-md border border-secondary/50 bg-card px-4 py-3 shadow-sm">
         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:-0.3s]" />
         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:-0.15s]" />
         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70" />
@@ -144,13 +182,13 @@ export function TypingIndicator() {
   );
 }
 
-export default function MessageBubble({ message, onQuickReply }) {
+export default function MessageBubble({ message, onQuickReply, mode = "customer" }) {
   const isUser = message.role === "user";
 
   if (isUser) {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[85%] space-y-1.5">
+      <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-end gap-2 duration-300">
+        <div className="max-w-[85%] space-y-1">
           {message.attachments?.length > 0 && (
             <div className="flex flex-wrap justify-end gap-1.5">
               {message.attachments.map((a, i) =>
@@ -166,7 +204,7 @@ export default function MessageBubble({ message, onQuickReply }) {
             </div>
           )}
           {message.content && (
-            <div className="rounded-[18px] rounded-bl-md bg-primary px-3.5 py-2.5 font-body text-[13px] leading-7 text-primary-foreground shadow-md shadow-primary/10">
+            <div className="relative rounded-2xl rounded-bl-md bg-primary px-3.5 py-2.5 font-body text-[13px] leading-7 text-primary-foreground shadow-md shadow-primary/10">
               {message.content}
             </div>
           )}
@@ -174,25 +212,31 @@ export default function MessageBubble({ message, onQuickReply }) {
             <p className="text-left font-body text-[9px] text-muted-foreground">در حال ارسال…</p>
           )}
         </div>
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
+          <User className="h-3.5 w-3.5" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex justify-start">
-      <div className="w-full max-w-[90%]">
-        <div className="rounded-[18px] rounded-br-md border border-secondary/50 bg-card px-3.5 py-3 shadow-sm">
+    <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end gap-2 duration-300">
+      <div
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+          mode === "admin" ? "bg-foreground text-background" : "bg-primary/15 text-primary"
+        }`}
+      >
+        <Bot className="h-3.5 w-3.5" />
+      </div>
+      <div className="w-full max-w-[88%]">
+        <div className="relative rounded-2xl rounded-br-md border border-secondary/50 bg-card px-3.5 py-3 shadow-sm">
+          <div className="absolute left-2 top-2">
+            <CopyBtn text={message.content} />
+          </div>
           {message.content && <MarkdownBody content={message.content} />}
-          <Blocks
-            blocks={(message.blocks || []).filter((b) => b.type !== "quick_replies")}
-            onQuickReply={onQuickReply}
-          />
+          <Blocks blocks={message.blocks} onQuickReply={onQuickReply} onlyQuick={false} />
         </div>
-        {/* chips outside bubble — like Telegram bot keyboards */}
-        <Blocks
-          blocks={(message.blocks || []).filter((b) => b.type === "quick_replies")}
-          onQuickReply={onQuickReply}
-        />
+        <Blocks blocks={message.blocks} onQuickReply={onQuickReply} onlyQuick />
       </div>
     </div>
   );
