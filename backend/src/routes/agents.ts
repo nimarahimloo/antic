@@ -30,7 +30,7 @@ function welcome(agent: string): ChatMessage {
     return {
       role: "assistant",
       content:
-        "سلام — دستیار ادمین آنتیک.\nمی‌توانم روی دیتابیس **افزودن، ویرایش، حذف و لیست** انجام دهم:\nمدل · دسته کاتالوگ · دسته نمونه · نمونه اجرا · محصول · دسته فروشگاه · سفارش · درخواست.\n\nمثال: «حذف مدل ZB-001» یا «افزودن محصول نام: قلاب قیمت: 120000»",
+        "سلام — دستیار ادمین آنتیک.\nحذف، افزودن و ویرایش **فقط بعد از پیش‌نمایش و دکمه تایید** اجرا می‌شود.\n\nمثال: «حذف مدل ZB-001» → پیش‌نمایش → تایید",
       blocks: [
         {
           type: "quick_replies",
@@ -160,7 +160,7 @@ router.post("/conversations/:id/messages", optionalAuth, async (req: AuthedReque
         body.content,
         history,
         ctx,
-        { imageUrl }
+        { imageUrl, conversationId: conv.id }
       );
 
       conv.messages.push({
