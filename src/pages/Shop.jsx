@@ -14,12 +14,13 @@ export default function Shop() {
     <div className="bg-background">
       <section className="border-b border-secondary/50 bg-card/40">
         <div className="mx-auto max-w-7xl px-5 py-16 lg:px-10 lg:py-20">
-          <span className="eyebrow mb-4 block">فروشگاه · اکسسوری پرده</span>
+          <span className="eyebrow mb-4 block">فروشگاه اکسسوری</span>
           <h1 className="font-display text-3xl font-bold leading-tight text-foreground lg:text-5xl">
-            اکسسوری <span className="text-gold-gradient">لوکس</span> پرده
+            اکسسوری پرده
           </h1>
           <p className="mt-5 max-w-xl font-body text-sm leading-7 text-muted-foreground">
-            حلقه، نوار نگهدارنده، فینیس و اکسسوری — قابل خرید مستقیم. برای پرده‌های شرکتی و پارچه، با ما تماس بگیرید.
+            حلقه، ریل، نگهدارنده و دیگر یراق‌آلات پرده — خرید مستقیم از فروشگاه. برای سفارش پرده و
+            پارچه از کاتالوگ یا صفحه تماس اقدام کنید.
           </p>
         </div>
       </section>
@@ -74,7 +75,7 @@ export default function Shop() {
                 type="search"
                 value={s.filters.search ?? ""}
                 onChange={(e) => s.setFilters({ search: e.target.value || undefined })}
-                placeholder="جستجوی اکسسوری…"
+                placeholder="جستجو…"
                 className="w-full rounded-full border border-secondary/70 bg-card py-2.5 pr-10 pl-4 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary sm:w-72"
               />
             </div>
@@ -108,8 +109,8 @@ export default function Shop() {
           <ProductGrid
             products={s.products}
             loading={s.loading}
-            emptyMessage={s.error ? "" : "هنوز محصولی ثبت نشده است."}
-            emptyHint={s.error ? "" : "به‌زودی محصولات اکسسوری اضافه می‌شوند."}
+            emptyMessage={s.error ? "" : "در حال حاضر محصولی برای نمایش نیست."}
+            emptyHint={s.error ? "" : "محصولات جدید به‌زودی اضافه می‌شوند."}
           />
         )}
 
@@ -121,7 +122,7 @@ export default function Shop() {
               disabled={s.loadingMore}
               className="btn-ghost-gold disabled:opacity-50"
             >
-              {s.loadingMore ? "در حال بارگذاری…" : "بیشتر"}
+              {s.loadingMore ? "در حال بارگذاری…" : "مشاهده بیشتر"}
             </button>
           </div>
         )}
