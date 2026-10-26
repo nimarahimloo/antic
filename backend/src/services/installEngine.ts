@@ -1,6 +1,6 @@
 /**
  * Install engine
- * - Smaller fabric scale for close-up photos (finer pattern)
+ * - Smaller fabric scale for close-up photos (finer pattern / yarn detail)
  * - Mirror tile (hides hard seams better than wrap on non-seamless photos)
  * - Edge UV clamped (no left-side break)
  * - Color-preserving shade
@@ -125,7 +125,7 @@ function materialParams(material?: string, logStd?: number, style?: string) {
     case "voile":
       return { id: 3, contrast, sheen: 0.06, detail: 0.1, tile: 1, warp: Math.min(warp, 0.008), ao: 0.1 };
     default:
-      return { id: 0, contrast, sheen: 0.04, detail: flat ? 0.16 : 0.22, tile: 1, warp, ao: flat ? 0.16 : 0.28 };
+      return { id: 0, contrast, sheen: 0.04, detail: flat ? 0.2 : 0.32, tile: 1, warp, ao: flat ? 0.16 : 0.26 };
   }
 }
 
@@ -243,7 +243,6 @@ async function decodeTemplate(src: string, maxWidth: number): Promise<TemplateCa
 /** Mirror tile — reflects at edges so non-seamless close-ups don't hard-seam */
 function mirrorCoord(t: number, size: number): number {
   if (size <= 1) return 0;
-  // Inset 1.5% so photo border pixels (often dirty) rarely hit
   const inset = size * 0.015;
   const usable = size - 2 * inset;
   if (usable <= 1) return size / 2;
@@ -287,36 +286,65 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
   const mat = materialParams(input.material, tpl.logStd, input.style);
   const flat = isFlatStyle(input.style);
 
-  const fabricScale = Math.min(
-    1.05,
-    Math.max(0.4, input.fabricScale ?? mat.tile * styleTileFactor(input.style))
-  );
-
   const fabricBuf = await loadBuffer(input.fabricPathOrUrl);
   const fabMeta = await sharp(fabricBuf).metadata();
-  const aspect = (fabMeta.width || 1) / (fabMeta.height || 1);
+  const srcW = fabMeta.width || 1024;
+  const srcH = fabMeta.height || 1024;
+  const aspect = srcW / Math.max(1, srcH);
 
-  const fabW = Math.max(768, Math.min(1800, Math.round(tpl.w * 1.2)));
-  const fabH = Math.max(384, Math.min(1800, Math.round(fabW / aspect)));
+  // بافر پارچه با رزولوشن بالاتر تا نخ و بافت از بین نرود
+  const fabW = Math.max(1024, Math.min(2400, Math.max(srcW, Math.round(tpl.w * 1.6))));
+  const fabH = Math.max(512, Math.min(2400, Math.round(fabW / aspect)));
 
   const { data: fd, info: fi } = await sharp(fabricBuf)
-    .resize(fabW, fabH, { fit: "cover", kernel: sharp.kernel.lanczos3 })
+    .resize(fabW, fabH, {
+      fit: "cover",
+      kernel: sharp.kernel.lanczos3,
+      withoutEnlargement: srcW >= fabW,
+    })
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
+
+  // تخمین جزئیات: واریانس محلی بالا = پارچه کلوزآپ با نخ/طرح ریز → تایل ریزتر
+  let detailBoost = 1;
+  {
+    let sum = 0;
+    let sum2 = 0;
+    let n = 0;
+    const step = Math.max(4, Math.floor(Math.min(fi.width, fi.height) / 64));
+    for (let y = 0; y < fi.height; y += step) {
+      for (let x = 0; x < fi.width; x += step) {
+        const i = (y * fi.width + x) * 4;
+        const lum = 0.2126 * fd[i] + 0.7152 * fd[i + 1] + 0.0722 * fd[i + 2];
+        sum += lum;
+        sum2 += lum * lum;
+        n++;
+      }
+    }
+    if (n > 8) {
+      const mean = sum / n;
+      const variance = Math.max(0, sum2 / n - mean * mean);
+      const std = Math.sqrt(variance);
+      if (std > 28) detailBoost = 0.72;
+      else if (std > 18) detailBoost = 0.82;
+      else if (std > 12) detailBoost = 0.9;
+    }
+  }
+
+  const baseScale = mat.tile * styleTileFactor(input.style) * detailBoost;
+  const fabricScale = Math.min(0.95, Math.max(0.28, input.fabricScale ?? baseScale));
 
   const w = tpl.w;
   const h = tpl.h;
   const td = tpl.data;
   const out = Buffer.alloc(w * h * 4);
 
-  // Full green bbox — continuous UV, no left-edge break
   const gMinX = tpl.minX;
   const gMinY = tpl.minY;
   const gW = Math.max(1, tpl.maxX - tpl.minX);
   const gH = Math.max(1, tpl.maxY - tpl.minY);
 
-  // Tile size from core width (stable pattern scale)
   const coreW = Math.max(1, tpl.coreMaxX - tpl.coreMinX);
   const tileX = coreW * fabricScale;
   const tileY = tileX / aspect;
@@ -364,14 +392,14 @@ export async function renderInstallImage(input: RenderInput): Promise<RenderResu
       s *= Math.pow(Math.min(1.7, Math.max(0.6, micro)), mat.detail * 0.8);
       s = 1 + (s - 1) * Math.min(mat.contrast, 0.9);
 
-      // Clamp local to green region — soft edges outside core stay continuous
       let localX = x - gMinX;
       let localY = y - gMinY;
       localX = Math.max(0, Math.min(gW, localX));
       localY = Math.max(0, Math.min(gH, localY));
 
-      const u = (localX / tileX) * fi.width + (flat ? 0 : gx * mat.warp * fi.width * 0.06);
-      const v = (localY / Math.max(tileY, 1)) * fi.height + (flat ? 0 : gy * mat.warp * fi.height * 0.04);
+      // warp خیلی کم تا طرح و نخ پارچه روی چین‌ها کش نیاید
+      const u = (localX / tileX) * fi.width + (flat ? 0 : gx * mat.warp * fi.width * 0.025);
+      const v = (localY / Math.max(tileY, 1)) * fi.height + (flat ? 0 : gy * mat.warp * fi.height * 0.018);
 
       const [fr, fg, fb] = sampleFabMirror(fd, fi.width, fi.height, u, v);
 
