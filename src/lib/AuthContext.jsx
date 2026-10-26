@@ -4,6 +4,21 @@ import { api, clearToken, setToken } from "@/api/client";
 const AuthContext = createContext();
 const TOKEN_KEY = "antic_access_token";
 
+function consumeAccessTokenFromUrl() {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get("access_token");
+    if (token) {
+      window.localStorage.setItem(TOKEN_KEY, token);
+      url.searchParams.delete("access_token");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 function hasStoredToken() {
   if (typeof window === "undefined") return false;
   return !!window.localStorage.getItem(TOKEN_KEY);
@@ -19,6 +34,7 @@ export const AuthProvider = ({ children }) => {
   const [appPublicSettings, setAppPublicSettings] = useState(null);
 
   useEffect(() => {
+    consumeAccessTokenFromUrl();
     checkAppState();
   }, []);
 
@@ -51,7 +67,6 @@ export const AuthProvider = ({ children }) => {
   const checkUserAuth = async () => {
     try {
       setIsLoadingAuth(true);
-      // Avoid noisy 401 for anonymous visitors
       if (!hasStoredToken()) {
         setUser(null);
         setIsAuthenticated(false);
