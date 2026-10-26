@@ -18,3 +18,187 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+model CurtainModel {
+  id             String   @id @default(cuid())
+  code           String
+  name           String
+  categorySlug   String
+  subcategory    String?
+  fabric         String?
+  color          String?
+  colorCode      String?
+  material       String?
+  texture        String?
+  image          String?
+  installImage   String?
+  installStatus  String?
+  installScore   Float?
+  installReview  String?
+  installPending String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([categorySlug])
+  @@index([code])
+}
+
+model CurtainCategory {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  image         String?
+  order         Int      @default(0)
+  mechanism     String?
+  subcategories String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// دسته‌بندی نمونه‌های اجرا شده — جدا از CurtainCategory
+model PortfolioCategory {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  image         String?
+  order         Int      @default(0)
+  subcategories String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// نمونه کار اجرا شده — فقط عنوان، توضیح، کاور، گالری + لینک دسته
+model Project {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  coverImage   String?
+  images       String?
+  categorySlug String   @default("")
+  subcategory  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([categorySlug])
+}
+
+model ConsultationRequest {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  city      String?
+  spaceType String?
+  message   String?
+  reference String?
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model RenderTemplate {
+  id        String   @id @default(cuid())
+  style     String
+  image     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([style])
+}
+
+model InstallReference {
+  id        String   @id @default(cuid())
+  style     String
+  image     String
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([style])
+}
+
+model SavedDesign {
+  id               String   @id @default(cuid())
+  title            String
+  image            String
+  curtainStyle     String?
+  curtainModelId   String?
+  curtainModelCode String?
+  color            String?
+  designerName     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model VirtualWindowSetting {
+  id         String   @id @default(cuid())
+  wallColor  String?
+  frameColor String?
+  railColor  String?
+  viewImage  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  name           String
+  slug           String   @unique
+  description    String?
+  price          Float    @default(0)
+  compareAtPrice Float?
+  currency       String   @default("IRR")
+  image          String?
+  gallery        String?
+  categoryId     String?
+  visible        Boolean  @default(true)
+  inStock        Boolean  @default(true)
+  stock          Int      @default(100)
+  ribbon         String?
+  optionsJson    String?
+  variantsJson   String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([visible])
+}
+
+model ShopCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  image       String?
+  visible     Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  status          String   @default("pending")
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  customerAddress String?
+  itemsJson       String
+  amountToman     Int
+  amountRial      Int
+  authority       String?  @unique
+  refId           String?
+  gateway         String   @default("zarinpal")
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@index([customerPhone])
+}
