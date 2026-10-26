@@ -4,7 +4,7 @@ import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { SITE_PHONE_HREF, SITE_PHONE_DISPLAY, SITE_EMAIL } from "@/lib/siteContact";
 
 export default function Footer() {
-  const { categories } = useCurtainCategories();
+  const { categories } = useCurtainCategories({ catalogOnly: true });
   const topCats = (categories || []).slice(0, 6);
 
   return (
