@@ -38,11 +38,11 @@ export default function AdminProducts() {
     setLoading(true);
     Promise.all([
       fetch(`${API}/catalog/admin/products`, { headers: authHeaders() }).then((r) => r.json()),
-      fetch(`${API}/catalog/categories`).then((r) => r.json()),
+      base44.entities.CurtainCategory.list("order", 500).catch(() => []),
     ])
-      .then(([products, catRes]) => {
+      .then(([products, categories]) => {
         setRows(Array.isArray(products) ? products : []);
-        setCats(catRes.categories || []);
+        setCats(Array.isArray(categories) ? categories : []);
       })
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
@@ -62,7 +62,10 @@ export default function AdminProducts() {
     setForm({
       name: p.name || "",
       description: (p.plainDescription || "").replace(/<[^>]+>/g, ""),
-      price: p.actualPriceRange?.minValue?.amount || "",
+      price:
+        p.actualPriceRange?.minValue?.amount && Number(p.actualPriceRange.minValue.amount) > 0
+          ? p.actualPriceRange.minValue.amount
+          : "",
       compareAtPrice: p.compareAtPriceRange?.minValue?.amount || "",
       image: p.media?.main?.image?.url || "",
       categoryId: p.mainCategoryId || "",
@@ -101,7 +104,7 @@ export default function AdminProducts() {
     const body = {
       name: form.name,
       description: form.description ? `<p>${form.description}</p>` : "",
-      price: Number(form.price) || 0,
+      price: form.price === "" || form.price == null ? 0 : Number(form.price) || 0,
       compareAtPrice: form.compareAtPrice ? Number(form.compareAtPrice) : null,
       image: form.image || null,
       categoryId: form.categoryId || null,
@@ -129,21 +132,25 @@ export default function AdminProducts() {
 
   async function remove(p) {
     if (!window.confirm(`حذف «${p.name}»؟`)) return;
-    await fetch(`${API}/catalog/admin/products/${p.id}`, {
-      method: "DELETE",
-      headers: authHeaders(),
-    });
-    load();
+    try {
+      await fetch(`${API}/catalog/admin/products/${p.id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      load();
+    } catch {
+      setError("حذف ناموفق بود");
+    }
   }
 
   const input =
-    "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm outline-none focus:border-primary";
+    "w-full rounded-xl border border-secondary bg-background px-3 py-2 font-body text-sm text-foreground outline-none focus:border-primary";
 
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-xl font-black">محصولات اکسسوری</h1>
+          <h1 className="font-display text-xl font-black">محصولات فروشگاه</h1>
           <p className="mt-1 font-body text-xs text-muted-foreground">
             {loading ? "…" : `${rows.length} محصول`}
           </p>
@@ -153,54 +160,76 @@ export default function AdminProducts() {
         </button>
       </div>
 
+      {error && !editing && <p className="mb-4 text-xs text-destructive">{error}</p>}
+
       <div className="overflow-hidden rounded-2xl border border-secondary/60 bg-card">
-        <table className="w-full min-w-[640px]">
-          <thead>
-            <tr className="border-b border-secondary/60">
-              <th className="px-4 py-3 text-right font-body text-xs text-muted-foreground">نام</th>
-              <th className="px-4 py-3 text-right font-body text-xs text-muted-foreground">قیمت</th>
-              <th className="px-4 py-3 text-right font-body text-xs text-muted-foreground">وضعیت</th>
-              <th className="px-4 py-3 text-left font-body text-xs text-muted-foreground">عملیات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={4} className="py-16 text-center">
-                  <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px]">
+            <thead>
+              <tr className="border-b border-secondary/60">
+                <th className="px-4 py-3 text-right font-body text-xs text-muted-foreground">تصویر</th>
+                <th className="px-4 py-3 text-right font-body text-xs text-muted-foreground">نام</th>
+                <th className="px-4 py-3 text-right font-body text-xs text-muted-foreground">قیمت</th>
+                <th className="px-4 py-3 text-left font-body text-xs text-muted-foreground">عملیات</th>
               </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="py-16 text-center font-body text-sm text-muted-foreground">
-                  محصولی نیست.
-                </td>
-              </tr>
-            ) : (
-              rows.map((p) => (
-                <tr key={p.id} className="border-b border-secondary/40 last:border-0">
-                  <td className="px-4 py-3 font-body text-xs">{p.name}</td>
-                  <td className="px-4 py-3 font-body text-xs">
-                    {p.actualPriceRange?.minValue?.formattedAmount}
-                  </td>
-                  <td className="px-4 py-3 font-body text-xs">
-                    {p.inventory?.availabilityStatus === "IN_STOCK" ? "موجود" : "ناموجود"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => openEdit(p)} className="rounded-lg border border-secondary/70 p-2">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button type="button" onClick={() => remove(p)} className="rounded-lg border border-secondary/70 p-2">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-16">
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                    محصولی نیست.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((p) => {
+                  const img = p.media?.main?.image?.url;
+                  const priceAmt = Number(p.actualPriceRange?.minValue?.amount);
+                  const priceLabel =
+                    Number.isFinite(priceAmt) && priceAmt > 0
+                      ? p.actualPriceRange?.minValue?.formattedAmount
+                      : "تماس بگیرید";
+                  return (
+                    <tr key={p.id} className="border-b border-secondary/40 last:border-0">
+                      <td className="px-4 py-3">
+                        {img ? (
+                          <img src={img} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-display text-sm font-bold">{p.name}</td>
+                      <td className="px-4 py-3 font-body text-xs text-muted-foreground">{priceLabel}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEdit(p)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-secondary/70 text-muted-foreground hover:border-primary hover:text-primary"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => remove(p)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-secondary/70 text-muted-foreground hover:border-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {editing !== null && (
@@ -208,18 +237,17 @@ export default function AdminProducts() {
           <form
             onSubmit={save}
             onClick={(e) => e.stopPropagation()}
-            className="mx-auto my-8 max-w-lg rounded-3xl border border-secondary/60 bg-card p-6"
-            noValidate
+            className="mx-auto my-8 w-full max-w-lg rounded-3xl border border-secondary/60 bg-card p-6"
           >
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-5 flex items-center justify-between">
               <h3 className="font-display text-lg font-black">
-                {editing?.id ? "ویرایش محصول" : "محصول جدید"}
+                {editing?.id ? "ویرایش محصول" : "افزودن محصول"}
               </h3>
-              <button type="button" onClick={() => setEditing(null)}>
-                <X className="h-4 w-4" />
+              <button type="button" onClick={() => setEditing(null)} className="text-muted-foreground">
+                <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="grid gap-4">
+            <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">نام *</label>
                 <input
@@ -230,13 +258,16 @@ export default function AdminProducts() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-muted-foreground">قیمت (تومان)</label>
+                  <label className="mb-1 block text-xs text-muted-foreground">قیمت (تومان) — اختیاری</label>
                   <input
                     className={input}
                     type="number"
+                    min="0"
+                    placeholder="خالی = تماس بگیرید"
                     value={form.price}
                     onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
                   />
+                  <p className="mt-1 text-[10px] text-muted-foreground">بدون قیمت → دکمه «تماس بگیرید»</p>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground">قیمت قبل</label>
@@ -276,7 +307,7 @@ export default function AdminProducts() {
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">دسته اکسسوری</label>
+                <label className="mb-1 block text-xs text-muted-foreground">دسته</label>
                 <select
                   className={input}
                   value={form.categoryId}
@@ -317,15 +348,15 @@ export default function AdminProducts() {
                   موجود
                 </label>
               </div>
-            </div>
-            {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
-            <div className="mt-6 flex gap-3">
-              <button type="submit" disabled={saving || uploading} className="btn-gold flex-1 justify-center">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
-              </button>
-              <button type="button" onClick={() => setEditing(null)} className="btn-ghost-gold">
-                انصراف
-              </button>
+              {error && <p className="text-xs text-destructive">{error}</p>}
+              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={saving || uploading} className="btn-gold flex-1 justify-center">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
+                </button>
+                <button type="button" onClick={() => setEditing(null)} className="btn-ghost-gold">
+                  انصراف
+                </button>
+              </div>
             </div>
           </form>
         </div>
