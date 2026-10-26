@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LayoutDashboard, LogIn } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
 
 const NAV = [
   { label: "خانه", to: "/" },
@@ -15,6 +16,8 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const { user, isAuthenticated } = useAuth();
+  const isAdmin = Boolean(isAuthenticated && user?.role === "admin");
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -62,11 +65,30 @@ export default function Header() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className="hidden items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground sm:inline-flex"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" />
+              پنل مدیریت
+            </Link>
+          )}
+          {!isAuthenticated && (
+            <Link
+              to="/login"
+              className="hidden items-center gap-1.5 rounded-full border border-secondary px-3 py-1.5 font-body text-xs text-foreground/80 transition-colors hover:border-primary hover:text-primary sm:inline-flex"
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              ورود
+            </Link>
+          )}
           <button
             className="flex h-10 w-10 items-center justify-center rounded-full border border-secondary text-foreground md:hidden"
             onClick={() => setOpen((v) => !v)}
             aria-label="منو"
+            type="button"
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -74,17 +96,23 @@ export default function Header() {
       </div>
 
       {open && (
-        <div className="border-t border-secondary/60 bg-background/95 backdrop-blur-xl md:hidden">
-          <nav className="mx-auto flex max-w-7xl flex-col px-5 py-4">
+        <div className="border-t border-secondary/60 bg-background/95 px-5 py-4 backdrop-blur-xl md:hidden">
+          <nav className="flex flex-col gap-3">
             {NAV.map((item) => (
-              <Link
-                key={item.label}
-                to={item.to}
-                className="border-b border-secondary/40 py-3 font-body text-sm text-foreground/85"
-              >
+              <Link key={item.label} to={item.to} className="font-body text-sm text-foreground">
                 {item.label}
               </Link>
             ))}
+            {isAdmin && (
+              <Link to="/admin" className="font-display text-sm font-bold text-primary">
+                پنل مدیریت
+              </Link>
+            )}
+            {!isAuthenticated && (
+              <Link to="/login" className="font-body text-sm text-primary">
+                ورود / ثبت‌نام
+              </Link>
+            )}
           </nav>
         </div>
       )}
