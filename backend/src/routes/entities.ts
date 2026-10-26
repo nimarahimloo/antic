@@ -47,9 +47,9 @@ function searchWhere(entity: string, search: string): Record<string, unknown> | 
   };
 }
 
-/** After category write → ensure chroma template for that slug */
+/** After category write → ensure chroma only if missing (never clobber admin upload) */
 function afterCategoryWrite(row: { slug?: string | null }) {
-  if (row?.slug) ensureCategoryTemplateBackground(row.slug, true);
+  if (row?.slug) ensureCategoryTemplateBackground(row.slug, false);
 }
 
 /** After model write with fabric image → queue install render (async) */
@@ -59,7 +59,6 @@ function afterModelWrite(row: {
   installImage?: string | null;
 }) {
   if (!row?.id || !row.image) return;
-  // regenerate when image present so catalog stays in sync
   renderOneModel(row.id, { regenerate: true }).catch((e) =>
     console.warn("[auto-render]", row.id, e instanceof Error ? e.message : e)
   );
@@ -173,7 +172,6 @@ router.put("/:Entity/:id", requireAdmin, async (req: AuthedRequest, res) => {
 
     if (meta.name === "CurtainCategory") afterCategoryWrite(row);
     if (meta.name === "CurtainModel") {
-      // re-render if fabric image or category changed
       if (data.image !== undefined || data.categorySlug !== undefined || data.subcategory !== undefined) {
         afterModelWrite(row);
       }
