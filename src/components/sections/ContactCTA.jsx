@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Phone, Check } from "lucide-react";
+import { SITE_PHONE_HREF, SITE_PHONE_DISPLAY } from "@/lib/siteContact";
 
 export default function ContactCTA() {
   const [sent, setSent] = useState(false);
@@ -36,8 +37,8 @@ export default function ContactCTA() {
               <p className="mt-2 font-body text-sm text-muted-foreground">
                 به‌زودی با شما تماس می‌گیریم. برای تماس فوری:
               </p>
-              <a href="tel:02112345678" className="btn-gold mt-5 justify-center">
-                <Phone className="h-4 w-4" /> ۰۲۱-۱۲۳۴۵۶۷۸
+              <a href={SITE_PHONE_HREF} className="btn-gold mt-5 justify-center">
+                <Phone className="h-4 w-4" /> {SITE_PHONE_DISPLAY}
               </a>
             </div>
           ) : (
