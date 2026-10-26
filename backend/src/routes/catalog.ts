@@ -188,11 +188,21 @@ router.get("/products/slug/:slug", async (req, res) => {
 
 router.get("/categories", async (_req, res) => {
   try {
-    const rows = await prisma.shopCategory.findMany({
-      where: { visible: true },
+    // دسته‌های اصلی (CurtainCategory) برای محصولات فروشگاه
+    const rows = await prisma.curtainCategory.findMany({
       orderBy: { order: "asc" },
     });
-    res.json({ categories: rows.map(toStoreCategory) });
+    res.json({
+      categories: rows.map((c) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        description: c.description || "",
+        image: c.image ? { url: c.image } : undefined,
+        visible: true,
+        order: c.order,
+      })),
+    });
   } catch (err) {
     sendError(res, err);
   }
