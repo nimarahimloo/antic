@@ -1,11 +1,11 @@
 /**
- * Chat notification sounds
- * Primary: short Web Audio beeps (no network, works offline)
- * Optional: /sounds/message-send.wav & message-receive.wav if present in public/
+ * Chat notification sounds — Web Audio only (reliable, offline, no 404).
+ * Optional files under /sounds/ are attempted only if they load successfully.
  */
 
 let unlocked = false;
 let audioCtx = null;
+let muted = false;
 
 function getCtx() {
   if (typeof window === "undefined") return null;
@@ -17,7 +17,6 @@ function getCtx() {
   return audioCtx;
 }
 
-/** Unlock autoplay — call on first user gesture (open panel / send) */
 export function unlockChatSounds() {
   if (unlocked) return;
   unlocked = true;
@@ -29,17 +28,26 @@ export function unlockChatSounds() {
   }
 }
 
-function playOsc(freqs, duration = 0.1, volume = 0.18) {
+export function setChatSoundsMuted(v) {
+  muted = !!v;
+}
+
+export function isChatSoundsMuted() {
+  return muted;
+}
+
+function playOsc(freqs, duration = 0.1, volume = 0.14) {
+  if (muted) return;
   try {
     const ctx = getCtx();
     if (!ctx) return;
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
     const now = ctx.currentTime;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(volume, now + 0.008);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-    gain.connect(ctx.destination);
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0, now);
+    master.gain.linearRampToValueAtTime(volume, now + 0.006);
+    master.gain.exponentialRampToValueAtTime(0.0008, now + duration);
+    master.connect(ctx.destination);
     for (const [f, amp] of freqs) {
       const osc = ctx.createOscillator();
       osc.type = "sine";
@@ -47,7 +55,7 @@ function playOsc(freqs, duration = 0.1, volume = 0.18) {
       const g = ctx.createGain();
       g.gain.value = amp;
       osc.connect(g);
-      g.connect(gain);
+      g.connect(master);
       osc.start(now);
       osc.stop(now + duration + 0.02);
     }
@@ -56,43 +64,66 @@ function playOsc(freqs, duration = 0.1, volume = 0.18) {
   }
 }
 
-function playFile(url, volume = 0.4) {
-  try {
-    const a = new Audio(url);
-    a.volume = volume;
-    const p = a.play();
-    if (p && typeof p.catch === "function") p.catch(() => {});
-    return true;
-  } catch {
-    return false;
-  }
+const fileOk = { send: null, receive: null };
+
+function tryPlayFile(key, url, volume) {
+  if (muted) return Promise.resolve(false);
+  if (fileOk[key] === false) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    try {
+      const a = new Audio(url);
+      a.volume = volume;
+      a.addEventListener("error", () => {
+        fileOk[key] = false;
+        resolve(false);
+      });
+      const p = a.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          fileOk[key] = true;
+          resolve(true);
+        }).catch(() => {
+          fileOk[key] = false;
+          resolve(false);
+        });
+      } else {
+        resolve(false);
+      }
+    } catch {
+      fileOk[key] = false;
+      resolve(false);
+    }
+  });
 }
 
-/** User sent a message — higher short blip */
 export function playSendSound() {
   unlockChatSounds();
-  // Prefer file if shipped under public/sounds/
-  if (playFile("/sounds/message-send.wav", 0.35)) return;
-  playOsc(
-    [
-      [880, 0.7],
-      [1320, 0.35],
-    ],
-    0.09,
-    0.16
-  );
+  tryPlayFile("send", "/sounds/message-send.wav", 0.35).then((ok) => {
+    if (!ok) {
+      playOsc(
+        [
+          [880, 0.65],
+          [1320, 0.3],
+        ],
+        0.08,
+        0.12
+      );
+    }
+  });
 }
 
-/** Bot replied — softer two-tone notification */
 export function playReceiveSound() {
   unlockChatSounds();
-  if (playFile("/sounds/message-receive.wav", 0.4)) return;
-  playOsc(
-    [
-      [523, 0.55],
-      [784, 0.5],
-    ],
-    0.15,
-    0.15
-  );
+  tryPlayFile("receive", "/sounds/message-receive.wav", 0.4).then((ok) => {
+    if (!ok) {
+      playOsc(
+        [
+          [523, 0.5],
+          [784, 0.45],
+        ],
+        0.14,
+        0.12
+      );
+    }
+  });
 }
