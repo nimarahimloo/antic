@@ -5,7 +5,7 @@ import { useCurtainCategories, pickSystemCategories } from "@/hooks/useCurtainCa
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 
 export default function CorporateCurtains() {
-  const { categories, loading } = useCurtainCategories();
+  const { categories, loading } = useCurtainCategories({ catalogOnly: true });
   const items = pickSystemCategories(categories, 6);
 
   if (loading && !items.length) {
