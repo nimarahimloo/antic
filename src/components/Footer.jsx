@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Phone, Mail, MapPin, Instagram, ShieldCheck, BadgeCheck } from "lucide-react";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
+import { SITE_PHONE_HREF, SITE_PHONE_DISPLAY, SITE_EMAIL } from "@/lib/siteContact";
 
 export default function Footer() {
   const { categories } = useCurtainCategories();
@@ -65,10 +66,12 @@ export default function Footer() {
             <h4 className="eyebrow mb-5">تماس</h4>
             <ul className="space-y-3 font-body text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-primary" /> ۰۲۱-۱۲۳۴۵۶۷۸
+                <Phone className="h-4 w-4 text-primary" />
+                <a href={SITE_PHONE_HREF} className="hover:text-primary">{SITE_PHONE_DISPLAY}</a>
               </li>
               <li className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-primary" /> info@pardehantik.com
+                <Mail className="h-4 w-4 text-primary" />
+                <a href={`mailto:${SITE_EMAIL}`} className="hover:text-primary">{SITE_EMAIL}</a>
               </li>
               <li className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-primary" /> تهران، نمایشگاه دائمی پرده
