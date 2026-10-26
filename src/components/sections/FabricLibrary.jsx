@@ -34,13 +34,13 @@ export default function FabricLibrary() {
       <div className="mx-auto max-w-7xl px-5 lg:px-10">
         <div className="mb-14 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <span className="eyebrow mb-4 block">کاتالوگ · دسته‌بندی</span>
+            <span className="eyebrow mb-4 block">کاتالوگ · هماهنگی</span>
             <h2 className="font-display text-3xl font-bold leading-tight text-foreground lg:text-4xl">
-              حس <span className="text-gold-gradient">بافت</span> را کشف کنید
+              هارمونی <span className="text-gold-gradient">بافت و رنگ</span>
             </h2>
           </div>
           <p className="max-w-md font-body text-sm leading-7 text-muted-foreground">
-            دسته‌بندی‌های کاتالوگ را مرور کنید و مدل مناسب فضای خود را انتخاب کنید.
+            بافت و رنگ پارچه‌ها را کنار هم ببینید و ترکیب مناسب فضای خود را انتخاب کنید.
           </p>
         </div>
 
