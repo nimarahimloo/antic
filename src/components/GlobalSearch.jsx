@@ -37,7 +37,7 @@ export default function GlobalSearch({ compact = false, className = "" }) {
     setLoading(true);
     try {
       const res = await fetch(
-        `${API_BASE}/search?q=${encodeURIComponent(text)}&limit=12`,
+        `${API_BASE}/search?q=${encodeURIComponent(text)}&limit=24`,
         { signal: ctrl.signal, headers: { Accept: "application/json" } }
       );
       const data = await res.json().catch(() => ({}));
@@ -125,7 +125,7 @@ export default function GlobalSearch({ compact = false, className = "" }) {
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          placeholder="جستجو: نمونه آشپزخانه، مدل شید…"
+          placeholder="جستجو در همه بخش‌ها…"
           className={`min-w-0 flex-1 bg-transparent font-body text-sm text-foreground outline-none placeholder:text-muted-foreground/70 ${
             compact ? "w-28 md:w-40" : "w-36 md:w-56 lg:w-64"
           }`}

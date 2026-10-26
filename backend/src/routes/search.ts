@@ -4,7 +4,7 @@ import { sendError } from "../lib/errors.js";
 
 const router = Router();
 
-/** گسترش هوشمند واژه‌های فارسی/انگلیسی برای جستجوی مفهومی */
+/** مترادف‌ها فقط برای تقویت امتیاز؛ محدودکنندهٔ نتایج نیستند */
 const SYNONYMS: Record<string, string[]> = {
   آشپزخانه: ["آشپزخانه", "آشپز", "kitchen", "کابینت", "اوپن"],
   پذیرایی: ["پذیرایی", "نشیمن", "سالن", "living", "هال"],
@@ -35,31 +35,14 @@ function normalize(s: string) {
     .replace(/\s+/g, " ");
 }
 
+/** همهٔ توکن‌ها حفظ می‌شوند — هیچ کلمه‌ای حذف اجباری نمی‌شود */
 function tokenize(q: string): string[] {
   const n = normalize(q);
   if (!n) return [];
-  const stop = new Set([
-    "از",
-    "به",
-    "در",
-    "با",
-    "برای",
-    "که",
-    "و",
-    "یا",
-    "را",
-    "یک",
-    "های",
-    "ها",
-    "شده",
-    "the",
-    "a",
-    "of",
-    "for",
-  ]);
-  const raw = n.split(/[\s،,.\-/|]+/).filter(Boolean);
-  const meaningful = raw.filter((t) => t.length > 1 && !stop.has(t));
-  return meaningful.length ? meaningful : raw.filter((t) => t.length > 1);
+  const raw = n.split(/[\s،,.\-/|_]+/).filter((t) => t.length > 0);
+  const out = new Set<string>(raw);
+  if (n.length >= 2) out.add(n);
+  return [...out];
 }
 
 function expandTokens(tokens: string[]): string[] {
@@ -73,19 +56,23 @@ function expandTokens(tokens: string[]): string[] {
       }
     }
   }
-  return [...out].filter(Boolean).slice(0, 24);
+  return [...out].filter(Boolean).slice(0, 40);
 }
 
-function scoreText(hay: string, tokens: string[], expanded: string[]): number {
+function scoreText(hay: string, tokens: string[], expanded: string[], fullQ: string): number {
   const h = normalize(hay);
   if (!h) return 0;
   let score = 0;
+  const nq = normalize(fullQ);
+  if (nq && h.includes(nq)) score += 30;
   for (const t of tokens) {
-    if (h.includes(t)) score += 12;
-    else if (expanded.some((e) => e !== t && h.includes(e))) score += 6;
+    if (t.length < 1) continue;
+    if (h.includes(t)) score += t.length >= 2 ? 12 : 4;
   }
-  const joined = tokens.join(" ");
-  if (joined && h.includes(joined)) score += 20;
+  for (const e of expanded) {
+    if (e.length < 2) continue;
+    if (h.includes(e) && !tokens.includes(e)) score += 5;
+  }
   return score;
 }
 
@@ -99,79 +86,140 @@ type Hit = {
   score: number;
 };
 
+function buildOr(fields: string[], terms: string[]) {
+  const clauses: Record<string, unknown>[] = [];
+  for (const term of terms) {
+    if (!term || term.length < 1) continue;
+    for (const f of fields) {
+      clauses.push({ [f]: { contains: term } });
+    }
+  }
+  return clauses;
+}
+
 router.get("/", async (req, res) => {
   try {
     const q = String(req.query.q || req.query.search || "").trim();
-    const limit = Math.min(30, Math.max(1, Number(req.query.limit) || 16));
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 24));
     if (q.length < 1) {
       return res.json({ q, results: [], total: 0 });
     }
 
     const tokens = tokenize(q);
     const expanded = expandTokens(tokens);
-    const orContains = (fields: string[]) => {
-      const clauses: Record<string, unknown>[] = [];
-      for (const term of expanded.slice(0, 12)) {
-        for (const f of fields) {
-          clauses.push({ [f]: { contains: term } });
-        }
-      }
-      return clauses.length ? clauses : [{ id: "__none__" }];
-    };
+    const terms = Array.from(new Set([normalize(q), ...tokens, ...expanded])).filter(
+      (t) => t && t.length >= 1
+    );
+
+    const projectFields = ["title", "description", "categorySlug", "subcategory"];
+    const modelFields = [
+      "name",
+      "code",
+      "description",
+      "categorySlug",
+      "subcategory",
+      "color",
+      "fabric",
+      "material",
+      "texture",
+    ];
+    const catFields = ["name", "slug", "description", "mechanism"];
+    const productFields = ["name", "slug", "description"];
+    const shopCatFields = ["name", "slug", "description"];
+
+    const orP = buildOr(projectFields, terms);
+    const orM = buildOr(modelFields, terms);
+    const orC = buildOr(catFields, terms);
+    const orPr = buildOr(productFields, terms);
+    const orSc = buildOr(shopCatFields, terms);
+
+    const clip = (clauses: Record<string, unknown>[]) => clauses.slice(0, 80);
 
     const [projects, models, categories, products, shopCats] = await Promise.all([
-      prisma.project.findMany({
-        where: { OR: orContains(["title", "description", "categorySlug", "subcategory"]) },
-        take: 40,
-        orderBy: { updatedAt: "desc" },
-      }),
-      prisma.curtainModel.findMany({
-        where: {
-          OR: orContains([
-            "name",
-            "code",
-            "description",
-            "categorySlug",
-            "subcategory",
-            "color",
-            "fabric",
-            "material",
-          ]),
-        },
-        take: 40,
-        orderBy: { updatedAt: "desc" },
-      }),
-      prisma.curtainCategory.findMany({
-        where: { OR: orContains(["name", "slug", "description", "mechanism"]) },
-        take: 20,
-        orderBy: { order: "asc" },
-      }),
-      prisma.product.findMany({
-        where: {
-          visible: true,
-          OR: orContains(["name", "slug", "description"]),
-        },
-        take: 20,
-        orderBy: { sortOrder: "asc" },
-      }),
-      prisma.shopCategory.findMany({
-        where: { visible: true, OR: orContains(["name", "slug", "description"]) },
-        take: 10,
-        orderBy: { order: "asc" },
-      }),
+      orP.length
+        ? prisma.project.findMany({
+            where: { OR: clip(orP) },
+            take: 80,
+            orderBy: { updatedAt: "desc" },
+          })
+        : Promise.resolve([]),
+      orM.length
+        ? prisma.curtainModel.findMany({
+            where: { OR: clip(orM) },
+            take: 80,
+            orderBy: { updatedAt: "desc" },
+          })
+        : Promise.resolve([]),
+      orC.length
+        ? prisma.curtainCategory.findMany({
+            where: { OR: clip(orC) },
+            take: 40,
+            orderBy: { order: "asc" },
+          })
+        : Promise.resolve([]),
+      orPr.length
+        ? prisma.product.findMany({
+            where: { OR: clip(orPr) },
+            take: 40,
+            orderBy: { sortOrder: "asc" },
+          })
+        : Promise.resolve([]),
+      orSc.length
+        ? prisma.shopCategory.findMany({
+            where: { OR: clip(orSc) },
+            take: 20,
+            orderBy: { order: "asc" },
+          })
+        : Promise.resolve([]),
     ]);
 
-    const hits: Hit[] = [];
+    let projectsF = projects;
+    let modelsF = models;
+    let categoriesF = categories;
+    let productsF = products;
+    let shopCatsF = shopCats;
 
+    const totalDb =
+      projects.length + models.length + categories.length + products.length + shopCats.length;
+
+    if (totalDb === 0) {
+      const [p2, m2, c2, pr2, sc2] = await Promise.all([
+        prisma.project.findMany({ take: 100, orderBy: { updatedAt: "desc" } }),
+        prisma.curtainModel.findMany({ take: 100, orderBy: { updatedAt: "desc" } }),
+        prisma.curtainCategory.findMany({ take: 50, orderBy: { order: "asc" } }),
+        prisma.product.findMany({ take: 50, orderBy: { sortOrder: "asc" } }),
+        prisma.shopCategory.findMany({ take: 30, orderBy: { order: "asc" } }),
+      ]);
+      const matchAny = (bag: string) => {
+        const h = normalize(bag);
+        return terms.some((t) => t.length >= 1 && h.includes(t));
+      };
+      projectsF = p2.filter((p) =>
+        matchAny([p.title, p.description, p.categorySlug, p.subcategory].join(" "))
+      );
+      modelsF = m2.filter((m) =>
+        matchAny(
+          [m.name, m.code, m.description, m.categorySlug, m.subcategory, m.color, m.fabric].join(" ")
+        )
+      );
+      categoriesF = c2.filter((c) =>
+        matchAny([c.name, c.slug, c.description, c.mechanism].join(" "))
+      );
+      productsF = pr2.filter((p) => matchAny([p.name, p.slug, p.description].join(" ")));
+      shopCatsF = sc2.filter((c) => matchAny([c.name, c.slug, c.description].join(" ")));
+    }
+
+    const hits: Hit[] = [];
     const projectIntent = /نمونه|پروژه|اجرا|نصب|portfolio|project/i.test(q);
     const catalogIntent = /کاتالوگ|مدل|پارچه|curtain|catalog/i.test(q);
     const shopIntent = /فروشگاه|محصول|اکسسوری|shop|product/i.test(q);
 
-    for (const p of projects) {
+    for (const p of projectsF) {
       const bag = [p.title, p.description, p.categorySlug, p.subcategory].join(" ");
-      let score = scoreText(bag, tokens, expanded);
-      if (projectIntent) score += 15;
-      if (score <= 0) continue;
+      let score = scoreText(bag, tokens, expanded, q);
+      if (projectIntent) score += 10;
+      if (score <= 0 && !normalize(bag).includes(normalize(q))) continue;
+      if (score <= 0) score = 1;
       hits.push({
         type: "project",
         id: p.id,
@@ -183,13 +231,14 @@ router.get("/", async (req, res) => {
       });
     }
 
-    for (const m of models) {
-      const bag = [m.name, m.code, m.description, m.categorySlug, m.subcategory, m.color, m.fabric].join(
-        " "
-      );
-      let score = scoreText(bag, tokens, expanded);
-      if (catalogIntent) score += 12;
-      if (score <= 0) continue;
+    for (const m of modelsF) {
+      const bag = [m.name, m.code, m.description, m.categorySlug, m.subcategory, m.color, m.fabric, m.material, m.texture].join(" ");
+      let score = scoreText(bag, tokens, expanded, q);
+      if (catalogIntent) score += 8;
+      if (score <= 0 && !normalize(bag).includes(normalize(q))) {
+        if (!tokens.some((t) => normalize(bag).includes(t))) continue;
+      }
+      if (score <= 0) score = 1;
       hits.push({
         type: "model",
         id: m.id,
@@ -201,11 +250,12 @@ router.get("/", async (req, res) => {
       });
     }
 
-    for (const c of categories) {
+    for (const c of categoriesF) {
       const bag = [c.name, c.slug, c.description, c.mechanism].join(" ");
-      let score = scoreText(bag, tokens, expanded);
-      if (catalogIntent) score += 10;
-      if (score <= 0) continue;
+      let score = scoreText(bag, tokens, expanded, q);
+      if (catalogIntent) score += 6;
+      if (score <= 0 && !tokens.some((t) => normalize(bag).includes(t))) continue;
+      if (score <= 0) score = 1;
       hits.push({
         type: "category",
         id: c.id,
@@ -226,11 +276,12 @@ router.get("/", async (req, res) => {
       });
     }
 
-    for (const p of products) {
+    for (const p of productsF) {
       const bag = [p.name, p.slug, p.description].join(" ");
-      let score = scoreText(bag, tokens, expanded);
-      if (shopIntent) score += 12;
-      if (score <= 0) continue;
+      let score = scoreText(bag, tokens, expanded, q);
+      if (shopIntent) score += 8;
+      if (score <= 0 && !tokens.some((t) => normalize(bag).includes(t))) continue;
+      if (score <= 0) score = 1;
       hits.push({
         type: "product",
         id: p.id,
@@ -242,11 +293,12 @@ router.get("/", async (req, res) => {
       });
     }
 
-    for (const c of shopCats) {
+    for (const c of shopCatsF) {
       const bag = [c.name, c.slug, c.description].join(" ");
-      let score = scoreText(bag, tokens, expanded);
-      if (shopIntent) score += 8;
-      if (score <= 0) continue;
+      let score = scoreText(bag, tokens, expanded, q);
+      if (shopIntent) score += 6;
+      if (score <= 0 && !tokens.some((t) => normalize(bag).includes(t))) continue;
+      if (score <= 0) score = 1;
       hits.push({
         type: "product",
         id: c.id,
@@ -265,7 +317,7 @@ router.get("/", async (req, res) => {
         title: "نمونه‌های اجرا شده",
         subtitle: "صفحه",
         href: "/projects",
-        score: projectIntent ? 18 : scoreText("نمونه اجرا پروژه", tokens, expanded),
+        score: projectIntent ? 20 : scoreText("نمونه اجرا پروژه نصب", tokens, expanded, q),
       },
       {
         type: "page",
@@ -273,7 +325,7 @@ router.get("/", async (req, res) => {
         title: "کاتالوگ پرده",
         subtitle: "صفحه",
         href: "/catalog",
-        score: catalogIntent ? 18 : scoreText("کاتالوگ مدل پرده", tokens, expanded),
+        score: catalogIntent ? 20 : scoreText("کاتالوگ مدل پرده", tokens, expanded, q),
       },
       {
         type: "page",
@@ -281,7 +333,7 @@ router.get("/", async (req, res) => {
         title: "فروشگاه",
         subtitle: "صفحه",
         href: "/shop",
-        score: shopIntent ? 18 : scoreText("فروشگاه اکسسوری", tokens, expanded),
+        score: shopIntent ? 20 : scoreText("فروشگاه اکسسوری محصول", tokens, expanded, q),
       },
       {
         type: "page",
@@ -289,7 +341,15 @@ router.get("/", async (req, res) => {
         title: "تماس و مشاوره",
         subtitle: "صفحه",
         href: "/contact",
-        score: scoreText("تماس مشاوره سفارش", tokens, expanded),
+        score: scoreText("تماس مشاوره سفارش تلفن", tokens, expanded, q),
+      },
+      {
+        type: "page",
+        id: "page-about",
+        title: "درباره ما",
+        subtitle: "صفحه",
+        href: "/about",
+        score: scoreText("درباره ما درباره شرکت", tokens, expanded, q),
       },
     ];
     for (const pg of pages) {
