@@ -23,7 +23,7 @@ const MENU = [
   { to: "/admin/models", label: "مدل‌های پرده", icon: Layers },
   { to: "/admin/categories", label: "دسته‌بندی", icon: ListTree },
   { to: "/admin/projects", label: "نمونه‌های اجرا", icon: FolderKanban },
-  { to: "/admin/products", label: "فروشگاه (اکسسوری)", icon: ShoppingBag },
+  { to: "/admin/products", label: "فروشگاه", icon: ShoppingBag },
   { to: "/admin/orders", label: "سفارش‌ها", icon: Package },
   { to: "/admin/window", label: "قالب نصب", icon: AppWindow },
   { to: "/admin/settings", label: "تنظیمات", icon: Settings },
