@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { base44 } from "@/api/base44Client";
-import { rootSelectOptions } from "@/lib/categoryTree";
+import { allCategorySelectOptions } from "@/lib/categoryTree";
 
-/** نمونه‌های اجرا — عنوان، کاور، دسته، توضیح، گالری */
+/** نمونه‌های اجرا — گالری چندتصویری با انتخاب فایل */
 export default function AdminProjects() {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    base44.entities.CurtainCategory.list("order", 200)
+    base44.entities.CurtainCategory.list("order", 500)
       .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
       .catch(() => setCategories([]));
   }, []);
@@ -26,8 +26,8 @@ export default function AdminProjects() {
     {
       key: "images",
       label: "گالری (اختیاری)",
-      type: "list",
-      help: "لینک تصاویر با کاما",
+      type: "gallery",
+      help: "چند تصویر را یکجا یا جداگانه انتخاب کنید",
     },
   ];
 
@@ -46,7 +46,10 @@ export default function AdminProjects() {
     {
       key: "category_slug",
       label: "دسته",
-      render: (v) => v || "—",
+      render: (v) => {
+        const cat = categories.find((c) => c.slug === v);
+        return cat?.name || v || "—";
+      },
     },
   ];
 
@@ -56,7 +59,7 @@ export default function AdminProjects() {
       entity="Project"
       fields={fields}
       columns={columns}
-      options={{ category_slug: rootSelectOptions(categories, { includeSpace: true }) }}
+      options={{ category_slug: allCategorySelectOptions(categories) }}
     />
   );
 }

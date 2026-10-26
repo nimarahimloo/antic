@@ -26,7 +26,7 @@ const SPACE_ONLY = new Set([
 const JUNK_ROOTS = new Set([
   "shade-zebra",
   "pleated-roman",
-  "track-panel", // تکراری با turk-panel
+  "track-panel",
   "shade-blackout",
   "shade-screen",
   "double-shade",
@@ -64,7 +64,6 @@ export function parseSubs(raw) {
     .filter((s) => s.slug);
 }
 
-/** همه slugهایی که جایی زیردسته تعریف شده‌اند */
 export function collectSubSlugs(categories) {
   const set = new Set();
   for (const c of categories || []) {
@@ -75,12 +74,6 @@ export function collectSubSlugs(categories) {
   return set;
 }
 
-/**
- * فقط دسته‌های مادر برای سلکت باکس:
- * - نه فضاهای صرفاً نمونه‌کار (اختیاری با includeSpace)
- * - نه اسلاگی که خودش زیردستهٔ دیگری است
- * - نه اسلاگ‌های ترکیبی/تکراری شناخته‌شده
- */
 export function getRootCategories(categories, { includeSpace = true } = {}) {
   const subSlugs = collectSubSlugs(categories);
   return (Array.isArray(categories) ? categories : [])
@@ -114,4 +107,30 @@ export function rootSelectOptions(categories, opts) {
     value: c.slug,
     label: c.name,
   }));
+}
+
+/** همهٔ دسته‌ها بدون فیلتر — برای سلکت ادمین */
+export function allCategorySelectOptions(categories) {
+  return (Array.isArray(categories) ? categories : [])
+    .filter((c) => c && c.slug)
+    .slice()
+    .sort(
+      (a, b) =>
+        (Number(a.order) || 0) - (Number(b.order) || 0) ||
+        String(a.name || "").localeCompare(String(b.name || ""), "fa")
+    )
+    .map((c) => ({ value: c.slug, label: c.name || c.slug }));
+}
+
+/** سازوکار نصب از مقادیر جدول دسته + کلیدهای استاندارد */
+export function mechanismSelectOptions(categories, labels = {}) {
+  const fromDb = new Map();
+  for (const c of categories || []) {
+    const m = (c.mechanism || "").trim();
+    if (m && !fromDb.has(m)) fromDb.set(m, labels[m] || c.name || m);
+  }
+  for (const [k, lab] of Object.entries(labels || {})) {
+    if (k && !fromDb.has(k)) fromDb.set(k, lab || k);
+  }
+  return Array.from(fromDb.entries()).map(([value, label]) => ({ value, label }));
 }

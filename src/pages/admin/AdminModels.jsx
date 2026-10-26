@@ -2,18 +2,16 @@ import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import FabricSwatch from "@/components/catalog/FabricSwatch";
 import { api } from "@/api/client";
-import { getRootCategories, rootSelectOptions } from "@/lib/categoryTree";
+import { allCategorySelectOptions } from "@/lib/categoryTree";
 
 export default function AdminModels() {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    api.entities.CurtainCategory.list("order", 200)
+    api.entities.CurtainCategory.list("order", 500)
       .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
       .catch(() => setCategories([]));
   }, []);
-
-  const roots = getRootCategories(categories, { includeSpace: false });
 
   const fields = [
     { key: "image", label: "عکس پارچه", type: "image", required: true },
@@ -73,9 +71,7 @@ export default function AdminModels() {
       columns={columns}
       autoAnalyzeFabric
       options={{
-        category_slug: rootSelectOptions(roots.length ? roots : categories, {
-          includeSpace: false,
-        }),
+        category_slug: allCategorySelectOptions(categories),
       }}
     />
   );

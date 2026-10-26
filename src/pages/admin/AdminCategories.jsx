@@ -1,8 +1,18 @@
+import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
-import { MECHANISM_KEYS, MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
+import { MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
+import { mechanismSelectOptions } from "@/lib/categoryTree";
+import { base44 } from "@/api/base44Client";
 
-/** مدیریت دسته‌ها — هر ردیف یک دسته؛ تیک «کاتالوگ دارد» برای نمایش در کاتالوگ */
 export default function AdminCategories() {
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    base44.entities.CurtainCategory.list("order", 500)
+      .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
+      .catch(() => setCategories([]));
+  }, []);
+
   const fields = [
     { key: "name", label: "نام دسته", required: true, placeholder: "مثلاً: شید" },
     {
@@ -66,10 +76,7 @@ export default function AdminCategories() {
       columns={columns}
       sortBy="order"
       options={{
-        mechanism: MECHANISM_KEYS.map((k) => ({
-          value: k,
-          label: MECHANISM_LABELS[k] || k,
-        })),
+        mechanism: mechanismSelectOptions(categories, MECHANISM_LABELS),
       }}
     />
   );
