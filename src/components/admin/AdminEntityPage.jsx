@@ -47,7 +47,7 @@ export default function AdminEntityPage({
   function openNew() {
     const initial = {};
     fields.forEach((f) => {
-      if (f.type === "boolean") initial[f.key] = false;
+      if (f.type === "boolean") initial[f.key] = f.default !== undefined ? !!f.default : false;
       else initial[f.key] = "";
     });
     setError("");
