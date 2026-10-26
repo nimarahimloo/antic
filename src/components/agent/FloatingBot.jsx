@@ -9,13 +9,24 @@ import {
   RotateCcw,
   Maximize2,
   Minimize2,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import MessageBubble, { TypingIndicator } from "@/components/agent/MessageBubble";
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
-import { playSendSound, playReceiveSound, unlockChatSounds } from "@/lib/chatSounds";
+import {
+  playSendSound,
+  playReceiveSound,
+  unlockChatSounds,
+  setChatSoundsMuted,
+  isChatSoundsMuted,
+} from "@/lib/chatSounds";
 
-/** Floating intelligent chat robot — customer | admin (panel on the RIGHT) */
+/**
+ * Floating chat — customer | admin
+ * Panel + FAB on the RIGHT. Messaging layout: user right, bot left.
+ */
 export default function FloatingBot({
   mode = "customer",
   agentName = "design_consultant",
@@ -38,11 +49,22 @@ export default function FloatingBot({
   const [uploading, setUploading] = useState(false);
   const [errorBanner, setErrorBanner] = useState("");
   const [unread, setUnread] = useState(0);
+  const [muted, setMuted] = useState(() => {
+    try {
+      return localStorage.getItem("antic_bot_muted") === "1";
+    } catch {
+      return false;
+    }
+  });
+
   const endRef = useRef(null);
+  const listRef = useRef(null);
   const fileRef = useRef(null);
   const inputRef = useRef(null);
-  const wasOpen = useRef(false);
-  const prevMsgCount = useRef(0);
+  const sendingRef = useRef(false);
+  /** Only play receive after user has interacted (sent) in this session */
+  const allowReceiveSound = useRef(false);
+  const bootstrapped = useRef(false);
 
   const scrollToEnd = useCallback((smooth = true) => {
     requestAnimationFrame(() => {
@@ -50,56 +72,78 @@ export default function FloatingBot({
     });
   }, []);
 
-  const ensureConversation = async (forceNew = false) => {
-    if (!forceNew && conversationId) return conversationId;
-    setLoading(true);
-    setErrorBanner("");
-    try {
-      if (!forceNew) {
-        const stored = localStorage.getItem(storageKey);
-        if (stored) {
-          try {
-            const conv = await api.agents.getConversation(stored);
-            setConversationId(conv.id);
-            setMessages(conv.messages || []);
-            prevMsgCount.current = (conv.messages || []).length;
-            return conv.id;
-          } catch {
-            localStorage.removeItem(storageKey);
+  const ensureConversation = useCallback(
+    async (forceNew = false) => {
+      if (!forceNew && conversationId) return conversationId;
+      setLoading(true);
+      setErrorBanner("");
+      try {
+        if (!forceNew) {
+          const stored = localStorage.getItem(storageKey);
+          if (stored) {
+            try {
+              const conv = await api.agents.getConversation(stored);
+              setConversationId(conv.id);
+              setMessages(conv.messages || []);
+              bootstrapped.current = true;
+              return conv.id;
+            } catch {
+              localStorage.removeItem(storageKey);
+            }
           }
+        } else {
+          localStorage.removeItem(storageKey);
+          setConversationId(null);
+          setMessages([]);
+          allowReceiveSound.current = false;
+          bootstrapped.current = false;
         }
-      } else {
-        localStorage.removeItem(storageKey);
-        setConversationId(null);
-        setMessages([]);
-        prevMsgCount.current = 0;
+        const conv = await api.agents.createConversation({
+          agent_name: agentName,
+          metadata: { mode, name: title, context },
+        });
+        setConversationId(conv.id);
+        setMessages(conv.messages || []);
+        bootstrapped.current = true;
+        localStorage.setItem(storageKey, conv.id);
+        return conv.id;
+      } catch {
+        setErrorBanner("اتصال به دستیار برقرار نشد. دوباره تلاش کنید.");
+        return null;
+      } finally {
+        setLoading(false);
       }
-      const conv = await api.agents.createConversation({
-        agent_name: agentName,
-        metadata: { mode, name: title, context },
-      });
-      setConversationId(conv.id);
-      setMessages(conv.messages || []);
-      prevMsgCount.current = (conv.messages || []).length;
-      localStorage.setItem(storageKey, conv.id);
-      return conv.id;
+    },
+    [conversationId, storageKey, agentName, mode, title, context]
+  );
+
+  // Lock body scroll when panel open on small screens
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    setChatSoundsMuted(muted);
+    try {
+      localStorage.setItem("antic_bot_muted", muted ? "1" : "0");
     } catch {
-      setErrorBanner("اتصال به دستیار برقرار نشد. دوباره تلاش کنید.");
-      return null;
-    } finally {
-      setLoading(false);
+      /* ignore */
     }
-  };
+  }, [muted]);
 
   useEffect(() => {
     if (open) {
       setUnread(0);
       unlockChatSounds();
       ensureConversation().then(() => {
-        setTimeout(() => inputRef.current?.focus(), 180);
+        setTimeout(() => inputRef.current?.focus(), 200);
         scrollToEnd(false);
       });
-      wasOpen.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -108,17 +152,18 @@ export default function FloatingBot({
     if (open) scrollToEnd(true);
   }, [messages, sending, open, scrollToEnd]);
 
-  // Play receive sound when a new assistant message appears
+  // Receive sound only after a user send in this session, and only for new assistant msgs
   useEffect(() => {
-    const n = messages.length;
-    if (n > prevMsgCount.current) {
-      const last = messages[n - 1];
-      if (last?.role === "assistant" && !last.pending) {
-        playReceiveSound();
-      }
+    if (!bootstrapped.current) return;
+    if (!allowReceiveSound.current) return;
+    if (!messages.length) return;
+    const last = messages[messages.length - 1];
+    if (last?.role === "assistant" && !last.pending && !sending) {
+      playReceiveSound();
+      // consume so re-renders of same last message don't re-fire
+      allowReceiveSound.current = false;
     }
-    prevMsgCount.current = n;
-  }, [messages]);
+  }, [messages, sending]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -129,6 +174,10 @@ export default function FloatingBot({
 
   const pickImage = async (file) => {
     if (!file || !allowImage) return;
+    if (!file.type?.startsWith("image/")) {
+      setErrorBanner("فقط فایل تصویری مجاز است.");
+      return;
+    }
     setUploading(true);
     setErrorBanner("");
     try {
@@ -146,18 +195,20 @@ export default function FloatingBot({
 
   const send = async (text) => {
     const content = (text ?? input).trim();
-    if ((!content && !pendingImage) || sending) return;
+    if ((!content && !pendingImage) || sendingRef.current) return;
 
+    sendingRef.current = true;
     unlockChatSounds();
     playSendSound();
 
     const attachments = pendingImage ? [{ type: "image", url: pendingImage }] : undefined;
+    const localId = `local-${Date.now()}`;
     const optimistic = {
       role: "user",
       content: content || (attachments ? "📷 تصویر" : ""),
       attachments,
       pending: true,
-      _localId: `local-${Date.now()}`,
+      _localId: localId,
     };
 
     setInput("");
@@ -165,6 +216,8 @@ export default function FloatingBot({
     setErrorBanner("");
     setMessages((m) => [...m, optimistic]);
     setSending(true);
+    // Next assistant reply may play sound
+    allowReceiveSound.current = true;
 
     try {
       const id = await ensureConversation();
@@ -182,8 +235,9 @@ export default function FloatingBot({
         if (last?.role === "assistant") setUnread((u) => u + 1);
       }
     } catch {
+      allowReceiveSound.current = false;
       setMessages((m) => [
-        ...m.filter((x) => x._localId !== optimistic._localId),
+        ...m.filter((x) => x._localId !== localId),
         { ...optimistic, pending: false },
         {
           role: "assistant",
@@ -198,6 +252,7 @@ export default function FloatingBot({
       ]);
       setErrorBanner("ارسال ناموفق بود.");
     } finally {
+      sendingRef.current = false;
       setSending(false);
       setTimeout(() => inputRef.current?.focus(), 40);
     }
@@ -212,7 +267,10 @@ export default function FloatingBot({
   };
 
   const showStarters =
-    !sending && starters?.length > 0 && messages.filter((m) => m.role === "user").length === 0;
+    !sending &&
+    !loading &&
+    starters?.length > 0 &&
+    messages.filter((m) => m.role === "user").length === 0;
 
   const statusLabel = sending
     ? "در حال نوشتن…"
@@ -220,10 +278,11 @@ export default function FloatingBot({
       ? "در حال اتصال…"
       : subtitle || "آنلاین";
 
-  // پنل و دکمه شناور — سمت راست صفحه
-  const panelSize = expanded
+  const panelClass = expanded
     ? "fixed inset-3 z-[90] flex flex-col overflow-hidden rounded-2xl border border-secondary/70 bg-card shadow-2xl md:inset-auto md:bottom-6 md:right-6 md:h-[min(88vh,720px)] md:w-[440px]"
-    : "fixed bottom-20 left-3 right-3 z-[90] flex max-h-[min(78vh,640px)] flex-col overflow-hidden rounded-2xl border border-secondary/70 bg-card shadow-2xl md:bottom-6 md:right-6 md:left-auto md:w-[400px]";
+    : "fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-3 right-3 z-[90] flex h-[min(72vh,580px)] flex-col overflow-hidden rounded-2xl border border-secondary/70 bg-card shadow-2xl md:bottom-6 md:right-6 md:left-auto md:h-[min(78vh,640px)] md:w-[400px]";
+
+  const fabClass = `fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-[90] flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition hover:scale-105 active:scale-95 md:bottom-6 md:right-6 ${accentClass}`;
 
   return (
     <>
@@ -234,7 +293,7 @@ export default function FloatingBot({
             unlockChatSounds();
             setOpen(true);
           }}
-          className={`fixed bottom-20 right-4 z-[90] flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition hover:scale-105 active:scale-95 md:bottom-6 md:right-6 ${accentClass}`}
+          className={fabClass}
           aria-label={title}
         >
           <span className="absolute inset-0 animate-ping rounded-full bg-current opacity-20" />
@@ -248,9 +307,16 @@ export default function FloatingBot({
       )}
 
       {open && (
-        <div className={panelSize} role="dialog" aria-label={title}>
-          <header className="flex shrink-0 items-center gap-3 border-b border-secondary/60 bg-background/95 px-3 py-2.5 backdrop-blur">
-            <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${accentClass}`}>
+        <div
+          className={panelClass}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+        >
+          <header className="flex shrink-0 items-center gap-2 border-b border-secondary/60 bg-background/95 px-3 py-2.5 backdrop-blur">
+            <div
+              className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${accentClass}`}
+            >
               <MessageCircle className="h-5 w-5" />
               <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-card bg-emerald-500" />
             </div>
@@ -264,6 +330,18 @@ export default function FloatingBot({
                 {statusLabel}
               </p>
             </div>
+            <button
+              type="button"
+              title={muted ? "فعال‌سازی صدا" : "قطع صدا"}
+              onClick={() => setMuted((v) => !v)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary/50 hover:text-foreground"
+            >
+              {muted || isChatSoundsMuted() ? (
+                <VolumeX className="h-4 w-4" />
+              ) : (
+                <Volume2 className="h-4 w-4" />
+              )}
+            </button>
             <button
               type="button"
               title="گفتگوی جدید"
@@ -296,7 +374,10 @@ export default function FloatingBot({
             </div>
           )}
 
-          <div className="flex-1 space-y-3.5 overflow-y-auto overscroll-contain bg-gradient-to-b from-background/50 to-card px-3 py-3">
+          <div
+            ref={listRef}
+            className="flex-1 space-y-3.5 overflow-y-auto overscroll-contain bg-gradient-to-b from-background/50 to-card px-3 py-3"
+          >
             {loading && messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-3 py-14">
                 <Loader2 className="h-7 w-7 animate-spin text-primary" />
@@ -306,10 +387,11 @@ export default function FloatingBot({
               <>
                 {messages.map((msg, idx) => (
                   <MessageBubble
-                    key={msg._localId || `${msg.role}-${idx}-${(msg.content || "").slice(0, 16)}`}
+                    key={msg._localId || msg.id || `${msg.role}-${idx}-${(msg.content || "").slice(0, 12)}`}
                     message={msg}
                     mode={mode}
                     onQuickReply={(t) => send(t)}
+                    onNavigate={() => setOpen(false)}
                   />
                 ))}
                 {sending && <TypingIndicator mode={mode} />}
@@ -326,7 +408,7 @@ export default function FloatingBot({
                   type="button"
                   disabled={sending}
                   onClick={() => send(s)}
-                  className="rounded-full border border-secondary/70 bg-card px-2.5 py-1 font-body text-[10px] text-foreground transition hover:border-primary hover:text-primary active:scale-95"
+                  className="rounded-full border border-secondary/70 bg-card px-2.5 py-1 font-body text-[10px] text-foreground transition hover:border-primary hover:text-primary active:scale-95 disabled:opacity-50"
                 >
                   {s}
                 </button>
@@ -336,7 +418,11 @@ export default function FloatingBot({
 
           {pendingImage && (
             <div className="flex shrink-0 items-center gap-2 border-t border-secondary/40 px-3 py-2">
-              <img src={pendingImage} alt="" className="h-12 w-12 rounded-lg object-cover ring-1 ring-secondary" />
+              <img
+                src={pendingImage}
+                alt=""
+                className="h-12 w-12 rounded-lg object-cover ring-1 ring-secondary"
+              />
               <div className="min-w-0 flex-1 text-right">
                 <p className="truncate font-body text-[11px] text-muted-foreground">آماده ارسال</p>
               </div>
@@ -356,6 +442,7 @@ export default function FloatingBot({
               send();
             }}
             className="flex shrink-0 items-end gap-2 border-t border-secondary/60 bg-background/95 p-2.5 backdrop-blur"
+            style={{ paddingBottom: "max(0.625rem, env(safe-area-inset-bottom))" }}
           >
             {allowImage && (
               <>
@@ -393,7 +480,7 @@ export default function FloatingBot({
               rows={1}
               dir="rtl"
               placeholder={mode === "admin" ? "دستور یا سوال…" : "پیامت را بنویس…"}
-              className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-xl border border-secondary bg-card px-3 py-2.5 text-right font-body text-sm leading-5 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+              className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-xl border border-secondary bg-card px-3 py-2.5 text-right font-body text-sm leading-5 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-60"
               disabled={loading && messages.length === 0}
             />
             <button
