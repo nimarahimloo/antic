@@ -10,7 +10,7 @@ import { base44 } from "@/api/base44Client";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 
 export default function InteractiveCatalog({ initialCategory }) {
-  const { categories: CATEGORIES, loading: catsLoading } = useCurtainCategories();
+  const { categories: CATEGORIES, loading: catsLoading } = useCurtainCategories({ catalogOnly: true });
 
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || "");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
