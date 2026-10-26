@@ -14,7 +14,9 @@
     "smoke": "node scripts/smoke-test.mjs",
     "test:functional": "node scripts/functional-test.mjs",
     "test": "node scripts/smoke-test.mjs && node scripts/functional-test.mjs",
-    "render:batch": "tsx scripts/run-batch.ts"
+    "render:batch": "tsx scripts/run-batch.ts",
+    "chroma:ensure": "node scripts/ensure-chroma.mjs",
+    "postdeploy": "node scripts/ensure-chroma.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
