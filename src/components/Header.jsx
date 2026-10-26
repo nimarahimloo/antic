@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, LayoutDashboard, LogIn } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
+import GlobalSearch from "@/components/GlobalSearch";
 
 const NAV = [
   { label: "خانه", to: "/" },
@@ -38,8 +39,8 @@ export default function Header() {
           : "bg-transparent border-b border-transparent"
       }`}
     >
-      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-10">
-        <Link to="/" className="group flex items-center gap-3">
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-3 px-5 lg:px-10">
+        <Link to="/" className="group flex shrink-0 items-center gap-3">
           <img
             src="/brand/mark.svg"
             alt="Antic Curtain"
@@ -47,13 +48,13 @@ export default function Header() {
             width={44}
             height={44}
           />
-          <span className="flex flex-col leading-none">
+          <span className="hidden flex-col leading-none sm:flex">
             <span className="font-display text-lg font-bold text-foreground">پرده آنتیک</span>
             <span className="font-body text-[10px] tracking-wider text-primary">ANTIC CURTAIN</span>
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-9 md:flex">
+        <nav className="hidden items-center gap-7 lg:flex">
           {NAV.map((item) => (
             <Link
               key={item.label}
@@ -65,11 +66,13 @@ export default function Header() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
+          <GlobalSearch compact className="max-w-[min(100%,18rem)] flex-1 sm:flex-none" />
+
           {isAdmin && (
             <Link
               to="/admin"
-              className="hidden items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground sm:inline-flex"
+              className="hidden items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground md:inline-flex"
             >
               <LayoutDashboard className="h-3.5 w-3.5" />
               پنل مدیریت
@@ -85,7 +88,7 @@ export default function Header() {
             </Link>
           )}
           <button
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-secondary text-foreground md:hidden"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-secondary text-foreground lg:hidden"
             onClick={() => setOpen((v) => !v)}
             aria-label="منو"
             type="button"
@@ -96,7 +99,10 @@ export default function Header() {
       </div>
 
       {open && (
-        <div className="border-t border-secondary/60 bg-background/95 px-5 py-4 backdrop-blur-xl md:hidden">
+        <div className="border-t border-secondary/60 bg-background/95 px-5 py-4 backdrop-blur-xl lg:hidden">
+          <div className="mb-4">
+            <GlobalSearch className="w-full" />
+          </div>
           <nav className="flex flex-col gap-3">
             {NAV.map((item) => (
               <Link key={item.label} to={item.to} className="font-body text-sm text-foreground">
