@@ -125,26 +125,27 @@ export function isFlatStyle(style?: string): boolean {
 }
 
 /**
- * Close-up fabric photos → smaller factor = finer pattern on curtain.
- * ~0.55 ≈ almost 2 repeats across width.
+ * ضریب تایل: عدد کوچک‌تر = الگوی ریزتر و حفظ جزئیات نخ روی پرده.
+ * عکس کلوزآپ پارچه (مثل پلیسه ریز) به ضریب پایین‌تر نیاز دارد.
  */
 export function styleTileFactor(style?: string) {
-  if (isFlatStyle(style)) return 0.55;
+  if (isFlatStyle(style)) return 0.48;
   switch (style) {
     case "zebra":
-      return 0.65;
+      return 0.55;
     case "panel":
-      return 0.7;
+      return 0.58;
     case "pleated-manual":
     case "pleated-chain":
     case "pleated-sheer":
-      return 0.65;
+      // پلیسه: بافت نخ و طرح پارچه نباید درشت و تار شود
+      return 0.38;
     case "wave":
-      return 0.85;
+      return 0.72;
     case "drape":
-      return 0.9;
+      return 0.78;
     default:
-      return 0.7;
+      return 0.55;
   }
 }
 
@@ -158,7 +159,8 @@ export function styleWarpFactor(style?: string): number {
     case "pleated-manual":
     case "pleated-chain":
     case "pleated-sheer":
-      return 0.018;
+      // warp کمتر = کشیدگی کمتر روی چین‌ها و حفظ بافت
+      return 0.007;
     case "wave":
       return 0.024;
     case "drape":
