@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import CategoryCoverCard from "@/components/CategoryCoverCard";
 import ProjectCard from "@/components/ProjectCard";
+import { mosaicGridClass, mosaicItemClass } from "@/lib/mosaicLayout";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { base44 } from "@/api/base44Client";
 
@@ -68,84 +69,69 @@ export default function PortfolioCategoryPage() {
 
       <section className="mx-auto max-w-7xl px-5 py-10 lg:px-10">
         <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
-          <div className="relative aspect-[4/3] overflow-hidden rounded-3xl border border-secondary/60 bg-card">
-            {category.image ? (
+          <div>
+            <span className="eyebrow mb-3 block">نمونه کار</span>
+            <h1 className="font-display text-3xl font-black text-foreground lg:text-4xl">
+              {category.name}
+            </h1>
+            {category.description ? (
+              <p className="mt-4 font-body text-sm leading-8 text-muted-foreground">
+                {category.description}
+              </p>
+            ) : null}
+          </div>
+          {category.image ? (
+            <div className="overflow-hidden rounded-3xl border border-secondary/60">
               <img
                 src={category.image}
                 alt={category.name}
-                className="h-full w-full object-cover"
+                className="aspect-[16/10] w-full object-cover"
               />
-            ) : (
-              <div className="flex h-full items-center justify-center bg-secondary/40">
-                <span className="font-display text-2xl font-bold text-muted-foreground">
-                  {category.name}
-                </span>
-              </div>
-            )}
-          </div>
-          <div>
-            <span className="eyebrow mb-3 block">دسته · کاتالوگ و نمونه اجرا</span>
-            <h1 className="font-display text-3xl font-bold text-foreground lg:text-4xl">
-              {category.name}
-            </h1>
-            {category.description && (
-              <p className="mt-5 font-body text-sm leading-8 text-muted-foreground">
-                {category.description}
-              </p>
-            )}
-            <Link
-              to={`/catalog?category=${category.slug}`}
-              className="btn-ghost-gold mt-6 inline-flex"
-            >
-              مشاهده در کاتالوگ
-            </Link>
-          </div>
+            </div>
+          ) : null}
         </div>
-      </section>
 
-      {category.subcategories?.length > 0 && (
-        <section className="border-t border-secondary/40 bg-card/30 py-14">
-          <div className="mx-auto max-w-7xl px-5 lg:px-10">
-            <h2 className="mb-8 font-display text-xl font-black text-foreground lg:text-2xl">
-              زیردسته‌ها
-            </h2>
+        {category.subcategories?.length ? (
+          <div className="mt-12">
+            <h2 className="mb-5 font-display text-lg font-bold text-foreground">زیردسته‌ها</h2>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {category.subcategories.map((sub) => (
                 <CategoryCoverCard
                   key={sub.slug}
                   name={sub.name}
-                  image={category.image}
+                  image={sub.image || category.image}
                   to={`/projects/category/${category.slug}/${sub.slug}`}
                 />
               ))}
             </div>
           </div>
-        </section>
-      )}
+        ) : null}
 
-      <section className="mx-auto max-w-7xl px-5 py-14 lg:px-10">
-        <h2 className="mb-8 font-display text-xl font-black text-foreground lg:text-2xl">
-          نمونه‌های این دسته
-        </h2>
-        {loadingProjects ? (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="aspect-[4/3] animate-pulse rounded-2xl bg-secondary/30" />
-            ))}
-          </div>
-        ) : rootProjects.length === 0 ? (
-          <p className="font-body text-sm text-muted-foreground">
-            {category.subcategories?.length
-              ? "نمونه‌های این دسته در زیردسته‌ها قرار دارند."
-              : "هنوز نمونه‌ای در این دسته ثبت نشده است."}
-          </p>
-        ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {rootProjects.map((p) => (
-              <ProjectCard key={p.id} project={p} />
-            ))}
-          </div>
-        )}
+        <div className="mt-12">
+          <h2 className="mb-5 font-display text-lg font-bold text-foreground">نمونه‌ها</h2>
+          {loadingProjects ? (
+            <div className={mosaicGridClass}>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className={`min-h-[200px] animate-pulse rounded-2xl bg-secondary/30 ${mosaicItemClass(i - 1)}`}
+                />
+              ))}
+            </div>
+          ) : rootProjects.length === 0 ? (
+            <p className="font-body text-sm text-muted-foreground">
+              {category.subcategories?.length
+                ? "نمونه‌های این دسته در زیردسته‌ها قرار دارند."
+                : "هنوز نمونه‌ای در این دسته ثبت نشده است."}
+            </p>
+          ) : (
+            <div className={mosaicGridClass}>
+              {rootProjects.map((p, i) => (
+                <ProjectCard key={p.id} project={p} className={mosaicItemClass(i)} />
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );
