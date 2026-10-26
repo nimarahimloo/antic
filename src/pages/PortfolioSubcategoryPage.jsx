@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import ProjectCard from "@/components/ProjectCard";
+import { mosaicGridClass, mosaicItemClass } from "@/lib/mosaicLayout";
 import { usePortfolioCategories } from "@/hooks/usePortfolioCategories";
 import { base44 } from "@/api/base44Client";
 
@@ -83,9 +84,12 @@ export default function PortfolioSubcategoryPage() {
 
       <section className="mx-auto max-w-7xl px-5 py-12 lg:px-10">
         {loading ? (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="aspect-[4/3] animate-pulse rounded-2xl bg-secondary/30" />
+          <div className={mosaicGridClass}>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className={`min-h-[200px] animate-pulse rounded-2xl bg-secondary/30 ${mosaicItemClass(i - 1)}`}
+              />
             ))}
           </div>
         ) : projects.length === 0 ? (
@@ -93,9 +97,9 @@ export default function PortfolioSubcategoryPage() {
             هنوز نمونه‌ای در این زیردسته ثبت نشده است.
           </p>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((p) => (
-              <ProjectCard key={p.id} project={p} />
+          <div className={mosaicGridClass}>
+            {projects.map((p, i) => (
+              <ProjectCard key={p.id} project={p} className={mosaicItemClass(i)} />
             ))}
           </div>
         )}
