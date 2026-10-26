@@ -15,6 +15,7 @@ function parseJson<T>(s: string | null | undefined, fallback: T): T {
 }
 
 function formatPrice(amount: number, currency = "IRR") {
+  if (!amount || amount <= 0) return "";
   if (currency === "IRR" || currency === "TMN") {
     return new Intl.NumberFormat("fa-IR").format(Math.round(amount)) + " تومان";
   }
@@ -166,7 +167,6 @@ router.get("/products", async (req, res) => {
   }
 });
 
-// count before slug/:slug for clarity
 router.get("/products/count", async (_req, res) => {
   try {
     const count = await prisma.product.count({ where: { visible: true } });
