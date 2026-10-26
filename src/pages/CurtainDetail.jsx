@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowRight, Phone, CheckCircle2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import CurtainPreview from "@/components/catalog/CurtainPreview";
+import { SITE_PHONE_HREF } from "@/lib/siteContact";
 
 export default function CurtainDetail() {
   const { id } = useParams();
@@ -107,7 +108,7 @@ export default function CurtainDetail() {
                 </p>
               )}
 
-              <a href="tel:02112345678" className="btn-gold mt-8 w-full justify-center">
+              <a href={SITE_PHONE_HREF} className="btn-gold mt-8 w-full justify-center">
                 <Phone className="h-4 w-4" /> مشاوره و سفارش
               </a>
               <Link to="/catalog" className="btn-ghost-gold mt-3 w-full justify-center">
