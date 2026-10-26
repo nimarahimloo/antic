@@ -91,7 +91,7 @@ function LinkButtons({ items }) {
 function QuickReplies({ items, onPick }) {
   if (!items?.length || !onPick) return null;
   return (
-    <div className="mt-2 flex flex-wrap justify-end gap-1.5">
+    <div className="mt-2 flex flex-wrap justify-start gap-1.5">
       {items.map((item, i) => (
         <button
           key={i}
@@ -160,88 +160,86 @@ function CopyBtn({ text }) {
   );
 }
 
-/** Typing dots — bot on the right */
+/** Typing dots — bot on the LEFT (messaging style) */
 export function TypingIndicator({ mode = "customer" }) {
   return (
-    <div className="flex items-end justify-end gap-2">
-      <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md border border-secondary/50 bg-card px-4 py-3 shadow-sm">
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:-0.3s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:-0.15s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70" />
-      </div>
-      <div
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-          mode === "admin"
-            ? "bg-foreground text-background"
-            : "bg-primary/15 text-primary"
-        }`}
-      >
-        <Bot className="h-3.5 w-3.5" />
-      </div>
-    </div>
-  );
-}
-
-/**
- * جهت پیام‌ها (برعکس شده):
- * - کاربر → سمت چپ
- * - ربات → سمت راست
- */
-export default function MessageBubble({ message, onQuickReply, mode = "customer" }) {
-  const isUser = message.role === "user";
-
-  if (isUser) {
-    return (
-      <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-start gap-2 duration-300">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
-          <User className="h-3.5 w-3.5" />
-        </div>
-        <div className="max-w-[85%] space-y-1">
-          {message.attachments?.length > 0 && (
-            <div className="flex flex-wrap justify-start gap-1.5">
-              {message.attachments.map((a, i) =>
-                a.type === "image" ? (
-                  <img
-                    key={i}
-                    src={a.url}
-                    alt=""
-                    className="max-h-44 rounded-2xl rounded-br-md border border-primary/20 object-cover shadow-sm"
-                  />
-                ) : null
-              )}
-            </div>
-          )}
-          {message.content && (
-            <div className="relative rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-right font-body text-[13px] leading-7 text-primary-foreground shadow-md shadow-primary/10">
-              {message.content}
-            </div>
-          )}
-          {message.pending && (
-            <p className="text-right font-body text-[9px] text-muted-foreground">در حال ارسال…</p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-end gap-2 duration-300">
-      <div className="w-full max-w-[88%]">
-        <div className="relative rounded-2xl rounded-bl-md border border-secondary/50 bg-card px-3.5 py-3 text-right shadow-sm">
-          <div className="absolute right-2 top-2">
-            <CopyBtn text={message.content} />
-          </div>
-          {message.content && <MarkdownBody content={message.content} />}
-          <Blocks blocks={message.blocks} onQuickReply={onQuickReply} onlyQuick={false} />
-        </div>
-        <Blocks blocks={message.blocks} onQuickReply={onQuickReply} onlyQuick />
-      </div>
+    <div className="flex items-end justify-start gap-2">
       <div
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
           mode === "admin" ? "bg-foreground text-background" : "bg-primary/15 text-primary"
         }`}
       >
         <Bot className="h-3.5 w-3.5" />
+      </div>
+      <div className="flex items-center gap-1.5 rounded-2xl rounded-br-md border border-secondary/50 bg-card px-4 py-3 shadow-sm">
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:-0.3s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:-0.15s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * جهت پیام‌ها (حس پیام‌رسان RTL مثل واتساپ/تلگرام):
+ * - کاربر / ادمین → سمت راست
+ * - ربات → سمت چپ
+ */
+export default function MessageBubble({ message, onQuickReply, mode = "customer" }) {
+  const isUser = message.role === "user";
+
+  if (isUser) {
+    return (
+      <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-end gap-2 duration-300">
+        <div className="max-w-[85%] space-y-1">
+          {message.attachments?.length > 0 && (
+            <div className="flex flex-wrap justify-end gap-1.5">
+              {message.attachments.map((a, i) =>
+                a.type === "image" ? (
+                  <img
+                    key={i}
+                    src={a.url}
+                    alt=""
+                    className="max-h-44 rounded-2xl rounded-bl-md border border-primary/20 object-cover shadow-sm"
+                  />
+                ) : null
+              )}
+            </div>
+          )}
+          {message.content && (
+            <div className="relative rounded-2xl rounded-bl-md bg-primary px-3.5 py-2.5 text-right font-body text-[13px] leading-7 text-primary-foreground shadow-md shadow-primary/10">
+              {message.content}
+            </div>
+          )}
+          {message.pending && (
+            <p className="text-left font-body text-[9px] text-muted-foreground">در حال ارسال…</p>
+          )}
+        </div>
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
+          <User className="h-3.5 w-3.5" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-start gap-2 duration-300">
+      <div
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+          mode === "admin" ? "bg-foreground text-background" : "bg-primary/15 text-primary"
+        }`}
+      >
+        <Bot className="h-3.5 w-3.5" />
+      </div>
+      <div className="w-full max-w-[88%]">
+        <div className="relative rounded-2xl rounded-br-md border border-secondary/50 bg-card px-3.5 py-3 text-right shadow-sm">
+          <div className="absolute left-2 top-2">
+            <CopyBtn text={message.content} />
+          </div>
+          {message.content && <MarkdownBody content={message.content} />}
+          <Blocks blocks={message.blocks} onQuickReply={onQuickReply} onlyQuick={false} />
+        </div>
+        <Blocks blocks={message.blocks} onQuickReply={onQuickReply} onlyQuick />
       </div>
     </div>
   );
