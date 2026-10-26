@@ -21,31 +21,20 @@ export function clearToken() {
 }
 
 async function request(path, { method = "GET", body, auth = true } = {}) {
-  const headers = { Accept: "application/json" };
+  const headers = { "Content-Type": "application/json" };
   if (auth) {
     const token = getToken();
     if (token) headers.Authorization = "Bearer " + token;
   }
-  if (body !== undefined) headers["Content-Type"] = "application/json";
   const res = await fetch(API_BASE + path, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  const text = await res.text();
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = text;
-  }
+  if (res.status === 204) return undefined;
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg =
-      (data && (data.error || data.message)) ||
-      (typeof data === "string" ? data : null) ||
-      res.statusText ||
-      "Request failed";
-    const err = new Error(msg);
+    const err = new Error(data.error || "HTTP " + res.status);
     err.status = res.status;
     err.data = data;
     throw err;
@@ -53,76 +42,165 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
   return data;
 }
 
-function entitiesApi(entity) {
+function normalizeList(data) {
+  if (Array.isArray(data)) return data;
+  if (data && data.items && Array.isArray(data.items)) return data.items;
+  return [];
+}
+
+function createEntityApi(name) {
   return {
-    async list(sort, limit) {
-      const q = new URLSearchParams();
-      if (sort) q.set("sort", sort);
-      if (limit) q.set("limit", String(limit));
-      const qs = q.toString();
-      return request("/entities/" + entity + (qs ? "?" + qs : ""));
-    },
-    async filter(filter, sort, limit) {
-      return request("/entities/" + entity + "/filter", {
-        method: "POST",
-        body: { filter: filter || {}, sort, limit },
+    async list(sortBy, limit) {
+      if (sortBy === undefined) sortBy = "-created_date";
+      if (limit === undefined) limit = 100;
+      if (sortBy && typeof sortBy === "object") {
+        const opts = sortBy;
+        sortBy = opts.sort || opts.sort_by || "-created_date";
+        limit = opts.limit || 100;
+      }
+      const q = new URLSearchParams({
+        sort_by: String(sortBy),
+        limit: String(limit),
       });
+      return normalizeList(await request("/entities/" + name + "?" + q));
     },
+
+    async filter(filter, sortBy, limit) {
+      if (filter === undefined) filter = {};
+      if (sortBy === undefined) sortBy = "-created_date";
+      if (limit === undefined) limit = 100;
+      let search = "";
+      if (sortBy && typeof sortBy === "object") {
+        const opts = sortBy;
+        search = opts.search || opts.q || "";
+        sortBy = opts.sort || opts.sort_by || "-created_date";
+        limit = opts.limit || 100;
+      }
+      const clean = {};
+      for (const [k, v] of Object.entries(filter || {})) {
+        if (k.startsWith("$")) continue;
+        if (v !== null && typeof v === "object") continue;
+        if (v === undefined || v === "") continue;
+        clean[k] = v;
+      }
+      const q = new URLSearchParams({
+        sort_by: String(sortBy),
+        limit: String(limit),
+        filter: JSON.stringify(clean),
+      });
+      if (search) q.set("search", String(search));
+      return normalizeList(await request("/entities/" + name + "?" + q));
+    },
+
     async get(id) {
-      return request("/entities/" + entity + "/" + id);
+      return request("/entities/" + name + "/" + id);
     },
     async create(data) {
-      return request("/entities/" + entity, { method: "POST", body: data });
+      return request("/entities/" + name, { method: "POST", body: data || {} });
     },
     async update(id, data) {
-      return request("/entities/" + entity + "/" + id, { method: "PUT", body: data });
+      return request("/entities/" + name + "/" + id, {
+        method: "PUT",
+        body: data || {},
+      });
     },
     async delete(id) {
-      return request("/entities/" + entity + "/" + id, { method: "DELETE" });
+      return request("/entities/" + name + "/" + id, { method: "DELETE" });
+    },
+    async count(filter) {
+      if (filter === undefined) filter = {};
+      const clean = {};
+      for (const [k, v] of Object.entries(filter || {})) {
+        if (k.startsWith("$") || (v !== null && typeof v === "object")) continue;
+        if (v === undefined || v === "") continue;
+        clean[k] = v;
+      }
+      const q = new URLSearchParams({ filter: JSON.stringify(clean) });
+      const res = await request("/entities/" + name + "/count?" + q);
+      return typeof res === "number" ? res : res.count;
     },
   };
 }
 
 const ENTITY_NAMES = [
-  "User",
-  "CurtainModel",
-  "CurtainCategory",
-  "PortfolioCategory",
-  "Project",
   "ConsultationRequest",
-  "RenderTemplate",
+  "CurtainCategory",
+  "CurtainModel",
+  "PortfolioCategory",
   "InstallReference",
+  "Project",
+  "RenderTemplate",
   "SavedDesign",
+  "User",
   "VirtualWindowSetting",
-  "Product",
-  "ShopCategory",
-  "Order",
 ];
 
-const entities = {};
-for (const name of ENTITY_NAMES) entities[name] = entitiesApi(name);
+const entities = Object.fromEntries(ENTITY_NAMES.map((n) => [n, createEntityApi(n)]));
+
+const agents = {
+  async createConversation(opts) {
+    const agent_name = (opts && opts.agent_name) || "design_consultant";
+    const metadata = opts && opts.metadata;
+    return request("/agents/conversations", {
+      method: "POST",
+      body: { agent_name: agent_name, metadata: metadata },
+      auth: true,
+    });
+  },
+  async getConversation(id) {
+    return request("/agents/conversations/" + id, { auth: true });
+  },
+  async addMessage(conversation, message) {
+    const id = typeof conversation === "string" ? conversation : conversation.id;
+    return request("/agents/conversations/" + id + "/messages", {
+      method: "POST",
+      body: message,
+      auth: true,
+    });
+  },
+  subscribeToConversation(id, onUpdate) {
+    let stopped = false;
+    let lastLen = -1;
+    let timer = null;
+    const tick = async () => {
+      if (stopped) return;
+      try {
+        const conv = await agents.getConversation(id);
+        const len = (conv.messages && conv.messages.length) || 0;
+        if (len !== lastLen) {
+          lastLen = len;
+          onUpdate && onUpdate(conv);
+        }
+      } catch (e) {
+        /* ignore poll errors */
+      }
+      if (!stopped) timer = setTimeout(tick, 2500);
+    };
+    tick();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
+  },
+};
+
+async function uploadFile(file, publicEndpoint) {
+  const form = new FormData();
+  form.append("file", file);
+  const path = publicEndpoint ? "/upload/public" : "/upload";
+  const headers = {};
+  const token = getToken();
+  if (token) headers.Authorization = "Bearer " + token;
+  const res = await fetch(API_BASE + path, { method: "POST", headers, body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Upload failed");
+  return data;
+}
 
 export const api = {
   entities,
-  agents: {
-    async createConversation(agent_name, metadata) {
-      return request("/agents/conversations", {
-        method: "POST",
-        body: { agent_name, metadata },
-        auth: true,
-      });
-    },
-    async getConversation(id) {
-      return request("/agents/conversations/" + id, { auth: true });
-    },
-    async sendMessage(id, payload) {
-      return request("/agents/conversations/" + id + "/messages", {
-        method: "POST",
-        body: payload,
-        auth: true,
-      });
-    },
-  },
+  agents,
+
   auth: {
     async me() {
       return request("/auth/me");
@@ -194,12 +272,57 @@ export const api = {
       window.location.href = "/login" + q;
     },
   },
+
   app: {
     async getPublicSettings() {
       return request("/app/public-settings", { auth: false });
     },
   },
+
+  functions: {
+    async invoke(name, payload) {
+      return request("/functions/" + name, {
+        method: "POST",
+        body: payload || {},
+      });
+    },
+  },
+
+  render: {
+    categoriesCoverage() {
+      return request("/render/categories-coverage");
+    },
+    templateFromCategory(category_slug, mechanism) {
+      return request("/render/template/from-category", {
+        method: "POST",
+        body: { category_slug, mechanism },
+      });
+    },
+    templateAllCategories() {
+      return request("/render/template/all-categories", { method: "POST", body: {} });
+    },
+    stats() {
+      return request("/render/stats");
+    },
+    styles() {
+      return request("/render/styles", { auth: false });
+    },
+  },
+
+  integrations: {
+    Core: {
+      async UploadPublicFile(opts) {
+        const file = opts && opts.file;
+        try {
+          if (getToken()) return await uploadFile(file, false);
+        } catch (e) {
+          /* fall through */
+        }
+        return uploadFile(file, true);
+      },
+    },
+  },
 };
 
+/** @deprecated use `api` */
 export const base44 = api;
-export default api;
