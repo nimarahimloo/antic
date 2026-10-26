@@ -1,14 +1,37 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import ConsultationForm from "@/components/ConsultationForm";
+import ProductGallery from "@/components/product/ProductGallery";
+
+function buildProjectImages(project) {
+  if (!project) return [];
+  const cover = project.cover_image || project.coverImage || "";
+  let gallery = project.images;
+  if (typeof gallery === "string") {
+    try {
+      gallery = JSON.parse(gallery);
+    } catch {
+      gallery = gallery.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  if (!Array.isArray(gallery)) gallery = [];
+  const urls = [cover, ...gallery].filter(Boolean);
+  const seen = new Set();
+  return urls
+    .filter((u) => {
+      if (seen.has(u)) return false;
+      seen.add(u);
+      return true;
+    })
+    .map((url) => ({ url, altText: project.title || "" }));
+}
 
 export default function ProjectDetail() {
   const { id } = useParams();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeImage, setActiveImage] = useState(0);
 
   useEffect(() => {
     base44.entities.Project.get(id)
@@ -18,6 +41,8 @@ export default function ProjectDetail() {
       })
       .catch(() => setLoading(false));
   }, [id]);
+
+  const images = useMemo(() => buildProjectImages(project), [project]);
 
   if (loading) {
     return (
@@ -37,9 +62,6 @@ export default function ProjectDetail() {
       </div>
     );
   }
-
-  const images =
-    project.images?.length > 0 ? project.images : [project.cover_image].filter(Boolean);
 
   return (
     <div className="bg-background pb-24">
@@ -71,40 +93,25 @@ export default function ProjectDetail() {
       <div className="mx-auto max-w-7xl px-5 py-10 lg:px-10">
         <h1 className="font-display text-3xl font-bold text-foreground lg:text-5xl">{project.title}</h1>
 
-        <div className="mt-8 grid gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-secondary/60 bg-card">
-              {images[activeImage] && (
-                <img
-                  src={images[activeImage]}
-                  alt={project.title}
-                  className="h-full w-full object-cover"
-                />
-              )}
-            </div>
+        {/* همان گالری صفحه محصول: زوم با اشاره + لایت‌باکس + بندانگشتی زیر تصویر */}
+        <div className="mt-8 grid gap-10 lg:grid-cols-5 lg:gap-14">
+          <div className="lg:col-span-2 lg:sticky lg:top-28 lg:self-start">
+            <ProductGallery images={images} productName={project.title} />
           </div>
-          <div className="flex gap-3 overflow-x-auto lg:flex-col lg:overflow-visible">
-            {images.map((img, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setActiveImage(i)}
-                className={`relative aspect-square w-24 shrink-0 overflow-hidden rounded-xl border transition-all lg:w-full ${
-                  activeImage === i ? "border-primary" : "border-secondary/60"
-                }`}
-              >
-                <img src={img} alt="" className="h-full w-full object-cover" />
-              </button>
-            ))}
+
+          <div className="lg:col-span-3">
+            {project.description ? (
+              <div className="rounded-3xl border border-secondary/60 bg-card p-6 lg:p-8">
+                <h2 className="mb-4 font-display text-lg font-bold text-foreground">توضیحات</h2>
+                <p className="font-body text-sm leading-8 text-muted-foreground">{project.description}</p>
+              </div>
+            ) : (
+              <div className="rounded-3xl border border-secondary/60 bg-card p-6 lg:p-8">
+                <p className="font-body text-sm text-muted-foreground">توضیحی ثبت نشده است.</p>
+              </div>
+            )}
           </div>
         </div>
-
-        {project.description && (
-          <div className="mt-10 max-w-3xl">
-            <h2 className="mb-4 font-display text-lg font-bold text-foreground">توضیحات</h2>
-            <p className="font-body text-sm leading-8 text-muted-foreground">{project.description}</p>
-          </div>
-        )}
 
         <div className="mt-16 rounded-3xl border border-primary/20 bg-card p-6 lg:p-10">
           <div className="mb-8 text-center">
