@@ -23,6 +23,7 @@ const FIELD_MAP: Record<string, string> = {
   viewImage: "view_image",
   createdAt: "created_date",
   updatedAt: "updated_date",
+  inCatalog: "in_catalog",
 };
 
 const JSON_FIELDS = new Set([
@@ -59,6 +60,7 @@ const ALLOWED: Record<string, Set<string>> = {
     "order",
     "mechanism",
     "subcategories",
+    "inCatalog",
   ]),
   PortfolioCategory: new Set([
     "name",
@@ -150,7 +152,7 @@ export function fromApi(body: AnyRec, entity: string): AnyRec {
 
     if (JSON_FIELDS.has(camel) || JSON_FIELDS.has(k)) {
       out[camel] = typeof v === "string" ? v : JSON.stringify(v ?? null);
-    } else if (camel === "featured" || camel === "visible" || camel === "inStock") {
+    } else if (camel === "featured" || camel === "visible" || camel === "inStock" || camel === "inCatalog") {
       out[camel] = v === true || v === "true" || v === 1 || v === "1";
     } else if (camel === "order" || camel === "installScore" || camel === "sortOrder") {
       const n = Number(v);
