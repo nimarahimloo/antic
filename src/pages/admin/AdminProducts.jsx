@@ -5,6 +5,7 @@ import { compressImage } from "@/lib/compressImage";
 
 const API = import.meta.env.VITE_API_BASE || "/api";
 const GALLERY_MAX = 20;
+const ACCEPT = "image/jpeg,image/png,image/webp,image/gif,image/*";
 
 function authHeaders() {
   const t = localStorage.getItem("antic_access_token");
@@ -22,6 +23,25 @@ function extractGallery(p) {
     .filter(Boolean)
     .filter((u) => u !== main);
   return [...new Set(urls)];
+}
+
+/** همان مسیر آپلود نمونه‌های اجرا — فشرده‌سازی با fallback روی فایل اصلی */
+async function uploadOne(file) {
+  if (!file) throw new Error("فایلی انتخاب نشد");
+  let toSend = file;
+  try {
+    toSend = await compressImage(file);
+  } catch {
+    toSend = file;
+  }
+  const uploader = base44?.integrations?.Core?.UploadPublicFile;
+  if (typeof uploader !== "function") {
+    throw new Error("سرویس آپلود در دسترس نیست");
+  }
+  const res = await uploader({ file: toSend });
+  const url = res?.file_url || res?.url || res?.path;
+  if (!url) throw new Error("آپلود پاسخ معتبری نداد");
+  return url;
 }
 
 const empty = {
@@ -46,11 +66,15 @@ export default function AdminProducts() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [error, setError] = useState("");
+  const [hint, setHint] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([
-      fetch(`${API}/catalog/admin/products`, { headers: authHeaders() }).then((r) => r.json()),
+      fetch(`${API}/catalog/admin/products`, { headers: authHeaders() }).then((r) => {
+        if (!r.ok) throw new Error("load");
+        return r.json();
+      }),
       base44.entities.CurtainCategory.list("order", 500).catch(() => []),
     ])
       .then(([products, categories]) => {
@@ -66,9 +90,10 @@ export default function AdminProducts() {
   }, [load]);
 
   function openNew() {
-    setForm(empty);
+    setForm({ ...empty, gallery: [] });
     setEditing({});
     setError("");
+    setHint("");
   }
 
   function openEdit(p) {
@@ -88,20 +113,27 @@ export default function AdminProducts() {
     });
     setEditing(p);
     setError("");
+    setHint("");
+  }
+
+  function closeModal() {
+    setEditing(null);
+    setError("");
+    setHint("");
+    setUploadingCover(false);
+    setUploadingGallery(false);
   }
 
   async function uploadCover(file) {
     if (!file) return;
     setUploadingCover(true);
     setError("");
+    setHint("");
     try {
-      const compressed = await compressImage(file);
-      const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
-      const url = res?.file_url || res?.url;
-      if (!url) throw new Error("آپلود ناموفق");
+      const url = await uploadOne(file);
       setForm((f) => ({ ...f, image: url }));
     } catch (e) {
-      setError(e.message || "آپلود تصویر کاور ناموفق بود");
+      setError(e?.message || "آپلود تصویر کاور ناموفق بود");
     } finally {
       setUploadingCover(false);
     }
@@ -109,24 +141,33 @@ export default function AdminProducts() {
 
   async function uploadGalleryFiles(filesInput) {
     const files = Array.from(filesInput || []).filter(Boolean);
-    if (!files.length) return;
+    if (!files.length) {
+      setError("فایلی انتخاب نشد");
+      return;
+    }
     setUploadingGallery(true);
     setError("");
+    setHint("");
     try {
       const urls = [];
       for (const file of files) {
-        const compressed = await compressImage(file);
-        const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
-        const url = res?.file_url || res?.url;
-        if (url) urls.push(url);
+        try {
+          urls.push(await uploadOne(file));
+        } catch (e) {
+          setError(e?.message || "آپلود یکی از تصاویر گالری ناموفق بود");
+        }
       }
-      if (!urls.length) throw new Error("آپلود گالری ناموفق");
-      setForm((f) => ({
-        ...f,
-        gallery: [...(f.gallery || []), ...urls].slice(0, GALLERY_MAX),
-      }));
+      if (!urls.length) throw new Error("آپلود گالری ناموفق بود");
+      setForm((f) => {
+        const cur = Array.isArray(f.gallery) ? f.gallery : [];
+        const next = [...cur, ...urls].slice(0, GALLERY_MAX);
+        if (cur.length + urls.length > GALLERY_MAX) {
+          setHint(`حداکثر ${GALLERY_MAX} تصویر؛ فقط ${next.length - cur.length} مورد اضافه شد.`);
+        }
+        return { ...f, gallery: next };
+      });
     } catch (e) {
-      setError(e.message || "آپلود گالری ناموفق بود");
+      setError(e?.message || "آپلود گالری ناموفق بود");
     } finally {
       setUploadingGallery(false);
     }
@@ -146,7 +187,7 @@ export default function AdminProducts() {
       price: form.price === "" || form.price == null ? 0 : Number(form.price) || 0,
       compareAtPrice: form.compareAtPrice ? Number(form.compareAtPrice) : null,
       image: form.image || null,
-      gallery: Array.isArray(form.gallery) ? form.gallery.filter(Boolean) : [],
+      gallery: Array.isArray(form.gallery) ? form.gallery.filter(Boolean).slice(0, GALLERY_MAX) : [],
       categoryId: form.categoryId || null,
       visible: form.visible,
       inStock: form.inStock,
@@ -160,11 +201,14 @@ export default function AdminProducts() {
         headers: authHeaders(),
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("ذخیره ناموفق");
-      setEditing(null);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "ذخیره ناموفق");
+      }
+      closeModal();
       load();
-    } catch {
-      setError("ذخیره ناموفق بود");
+    } catch (err) {
+      setError(err?.message || "ذخیره ناموفق بود");
     } finally {
       setSaving(false);
     }
@@ -185,6 +229,7 @@ export default function AdminProducts() {
 
   const input =
     "w-full rounded-xl border border-secondary bg-background px-3 py-2 font-body text-sm text-foreground outline-none focus:border-primary";
+  const busy = uploadingCover || uploadingGallery || saving;
 
   return (
     <div>
@@ -273,17 +318,21 @@ export default function AdminProducts() {
       </div>
 
       {editing !== null && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4" onClick={() => setEditing(null)}>
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4"
+          onClick={closeModal}
+        >
           <form
             onSubmit={save}
             onClick={(e) => e.stopPropagation()}
             className="mx-auto my-8 w-full max-w-lg rounded-3xl border border-secondary/60 bg-card p-6"
+            noValidate
           >
             <div className="mb-5 flex items-center justify-between">
               <h3 className="font-display text-lg font-black">
                 {editing?.id ? "ویرایش محصول" : "افزودن محصول"}
               </h3>
-              <button type="button" onClick={() => setEditing(null)} className="text-muted-foreground">
+              <button type="button" onClick={closeModal} className="text-muted-foreground" aria-label="بستن">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -329,36 +378,59 @@ export default function AdminProducts() {
                       <Upload className="h-4 w-4 text-muted-foreground" />
                     )}
                   </div>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 px-3 py-2 text-xs text-primary">
-                    {uploadingCover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                    {uploadingCover ? "آپلود…" : form.image ? "تعویض" : "انتخاب"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={uploadingCover}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        e.target.value = "";
-                        uploadCover(f);
-                      }}
-                    />
-                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-3 py-2 text-xs font-bold text-primary"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {uploadingCover ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5" />
+                      )}
+                      {uploadingCover ? "آپلود…" : form.image ? "تعویض" : "انتخاب"}
+                      <input
+                        type="file"
+                        accept={ACCEPT}
+                        className="hidden"
+                        disabled={uploadingCover}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null;
+                          e.target.value = "";
+                          if (f) uploadCover(f);
+                        }}
+                      />
+                    </label>
+                    {form.image && (
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, image: "" }))}
+                        className="rounded-xl border border-secondary/70 px-3 py-2 text-xs text-muted-foreground hover:border-destructive hover:text-destructive"
+                      >
+                        حذف
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">گالری (چند تصویر)</label>
+                <label className="mb-1 block text-xs text-muted-foreground">
+                  گالری (تا {GALLERY_MAX} تصویر)
+                </label>
                 <div className="flex flex-wrap gap-2">
                   {(form.gallery || []).map((url, idx) => (
-                    <div key={`${url}-${idx}`} className="relative h-16 w-16 overflow-hidden rounded-xl border border-secondary/60">
+                    <div
+                      key={`${url}-${idx}`}
+                      className="relative h-16 w-16 overflow-hidden rounded-xl border border-secondary/60"
+                    >
                       <img src={url} alt="" className="h-full w-full object-cover" />
                       <button
                         type="button"
                         onClick={() =>
                           setForm((f) => ({
                             ...f,
-                            gallery: f.gallery.filter((_, i) => i !== idx),
+                            gallery: (f.gallery || []).filter((_, i) => i !== idx),
                           }))
                         }
                         className="absolute left-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background/90 text-destructive"
@@ -369,7 +441,10 @@ export default function AdminProducts() {
                     </div>
                   ))}
                   {(form.gallery || []).length < GALLERY_MAX && (
-                    <label className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 text-primary">
+                    <label
+                      className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 text-primary"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {uploadingGallery ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
@@ -380,14 +455,14 @@ export default function AdminProducts() {
                       )}
                       <input
                         type="file"
-                        accept="image/*"
+                        accept={ACCEPT}
                         multiple
                         className="hidden"
                         disabled={uploadingGallery}
                         onChange={(e) => {
                           const files = e.target.files;
                           e.target.value = "";
-                          uploadGalleryFiles(files);
+                          if (files?.length) uploadGalleryFiles(files);
                         }}
                       />
                     </label>
@@ -441,15 +516,16 @@ export default function AdminProducts() {
                 </label>
               </div>
               {error && <p className="text-xs text-destructive">{error}</p>}
+              {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
-                  disabled={saving || uploadingCover || uploadingGallery}
+                  disabled={busy}
                   className="btn-gold flex-1 justify-center"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
                 </button>
-                <button type="button" onClick={() => setEditing(null)} className="btn-ghost-gold">
+                <button type="button" onClick={closeModal} className="btn-ghost-gold">
                   انصراف
                 </button>
               </div>
