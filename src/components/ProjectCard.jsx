@@ -2,8 +2,8 @@ import { Link } from "react-router-dom";
 
 export default function ProjectCard({ project, className = "" }) {
   return (
-    <Link to={`/projects/${project.id}`} className={`group block min-h-0 ${className}`}>
-      <div className="relative aspect-[4/3] h-full min-h-[200px] overflow-hidden rounded-2xl border border-secondary/60 bg-card lg:aspect-auto">
+    <Link to={`/projects/${project.id}`} className={`group block h-full min-h-0 ${className}`}>
+      <div className="relative aspect-[4/3] h-full min-h-[180px] overflow-hidden rounded-2xl border border-secondary/60 bg-card lg:aspect-auto lg:min-h-full">
         {project.cover_image ? (
           <img
             src={project.cover_image}
@@ -15,9 +15,9 @@ export default function ProjectCard({ project, className = "" }) {
             <span className="font-display text-sm font-bold text-muted-foreground">{project.title}</span>
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/25 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 p-5">
-          <h3 className="font-display text-lg font-bold text-foreground">{project.title}</h3>
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 p-4 lg:p-5">
+          <h3 className="font-display text-base font-bold text-foreground lg:text-lg">{project.title}</h3>
         </div>
       </div>
     </Link>
