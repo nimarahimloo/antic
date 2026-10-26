@@ -1,9 +1,10 @@
 import { Phone, Mail, MapPin, Clock, Instagram } from "lucide-react";
 import ConsultationForm from "@/components/ConsultationForm";
+import { SITE_PHONE, SITE_PHONE_DISPLAY, SITE_PHONE_HREF, SITE_EMAIL } from "@/lib/siteContact";
 
 const INFO = [
-  { icon: Phone, title: "تماس تلفنی", value: "۰۲۱-۱۲۳۴۵۶۷۸", href: "tel:02112345678" },
-  { icon: Mail, title: "ایمیل", value: "info@pardehantik.com", href: "mailto:info@pardehantik.com" },
+  { icon: Phone, title: "تماس تلفنی", value: SITE_PHONE_DISPLAY, href: SITE_PHONE_HREF },
+  { icon: Mail, title: "ایمیل", value: SITE_EMAIL, href: `mailto:${SITE_EMAIL}` },
   { icon: MapPin, title: "نشانی شوروم", value: "تهران، نمایشگاه دائمی پرده" },
   { icon: Clock, title: "ساعات کاری", value: "شنبه تا پنجشنبه، ۹ تا ۱۸" },
 ];
@@ -11,7 +12,6 @@ const INFO = [
 export default function Contact() {
   return (
     <div className="bg-background">
-      {/* هدر صفحه */}
       <section className="border-b border-secondary/50 bg-card/40">
         <div className="mx-auto max-w-7xl px-5 py-16 lg:px-10 lg:py-24">
           <span className="eyebrow mb-4 block">ارتباط با ما</span>
@@ -26,7 +26,6 @@ export default function Contact() {
 
       <section className="mx-auto max-w-7xl px-5 py-14 lg:px-10 lg:py-20">
         <div className="grid gap-10 lg:grid-cols-5">
-          {/* اطلاعات تماس */}
           <div className="space-y-4 lg:col-span-2">
             {INFO.map((item) => {
               const inner = (
@@ -74,7 +73,6 @@ export default function Contact() {
             </a>
           </div>
 
-          {/* فرم مشاوره */}
           <div className="rounded-3xl border border-secondary/60 bg-card p-6 lg:col-span-3 lg:p-10">
             <span className="eyebrow mb-3 block">فرم درخواست مشاوره</span>
             <h2 className="font-display text-xl font-black text-foreground lg:text-2xl">
