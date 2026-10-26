@@ -6,7 +6,9 @@ const STARTERS = [
   "تفاوت شید و زبرا چیست؟",
   "چه دسته‌هایی دارید؟",
   "قیمت پرده چطور حساب می‌شود؟",
+  "مراحل از انتخاب تا نصب چیست؟",
   "نمونه اجرای مشابه نشان بده",
+  "چطور از پرده مراقبت کنم؟",
 ];
 
 export default function CustomerAssistant() {
@@ -14,7 +16,7 @@ export default function CustomerAssistant() {
     <FloatingBot
       mode="customer"
       agentName="design_consultant"
-      storageKey="antic_bot_customer_v6"
+      storageKey="antic_bot_customer_v7"
       title="دستیار آنتیک"
       subtitle="آنلاین · آماده پاسخ"
       starters={STARTERS}
