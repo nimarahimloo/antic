@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 
-/** چهار بافت اصلی هارمونی — نام و تصویر از جدول CurtainCategory */
+/** چهار بافت اصلی هارمونی — نام و کاور از جدول CurtainCategory */
 const HARMONY_SLUGS = ["cotton", "silk", "sheer", "velvet"];
 
 const FALLBACK_META = {
@@ -44,7 +44,8 @@ export default function FabricLibrary() {
         description: (cat?.description && String(cat.description).trim()) || fb.blurb,
         image: cat?.image || null,
         tone: fb.tone,
-        href: `/catalog?category=${encodeURIComponent(slug)}`,
+        // نمونه‌های اجرا شده + کاور همان دسته
+        href: `/projects/category/${encodeURIComponent(slug)}`,
       };
     });
   }, [categories]);
@@ -60,7 +61,7 @@ export default function FabricLibrary() {
             </h2>
           </div>
           <p className="max-w-md font-body text-sm leading-7 text-muted-foreground">
-            چهار بافت اصلی را کنار هم ببینید و حس هر پارچه را قبل از انتخاب مدل تجربه کنید.
+            چهار بافت اصلی را کنار هم ببینید و نمونه‌های اجرا شده هر بافت را مرور کنید.
           </p>
         </div>
 
@@ -113,7 +114,7 @@ export default function FabricLibrary() {
                   {item.description}
                 </p>
                 <span className="mt-4 inline-flex items-center gap-1.5 font-display text-xs font-bold text-primary opacity-90 transition-all group-hover:gap-2.5">
-                  مشاهده در کاتالوگ
+                  نمونه‌های اجرا
                   <ArrowLeft className="h-3.5 w-3.5" />
                 </span>
               </div>
