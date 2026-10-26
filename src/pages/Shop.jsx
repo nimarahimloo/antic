@@ -1,17 +1,14 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
-import { useShop } from "@/hooks/useShop";
-import ProductCard from "@/components/ProductCard";
-import { formatPrice } from "@/rest/catalog";
+import { useShop, SORTS } from "@/hooks/useShop";
+import ProductGrid from "@/components/ProductGrid";
+import { Search, SlidersHorizontal } from "lucide-react";
 
 export default function Shop() {
-  const s = useShop();
-
-  const sortLabel = useMemo(() => {
-    const entry = Object.entries(s.sortOptions || {}).find(([k]) => k === s.sort);
-    if (!entry) return "";
-    return entry[1]?.label || entry[0];
-  }, [s.sort, s.sortOptions]);
+  const s = useShop({ pageSize: 24 });
+  const [sortKey] = useMemo(() => {
+    const entry = Object.entries(SORTS).find(([k]) => k === s.sort) ?? ["featured", { label: "پیش‌فرض" }];
+    return [entry[0], entry[1].label];
+  }, [s.sort]);
 
   return (
     <div className="bg-background">
@@ -33,76 +30,100 @@ export default function Shop() {
           <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
             <button
               type="button"
-              onClick={() => s.setCategory(null)}
-              className={`shrink-0 rounded-full border px-4 py-1.5 font-body text-xs transition-colors ${
-                !s.category
+              onClick={() => s.setActiveCategory(null)}
+              className={`flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-2xl border text-center transition-colors ${
+                !s.activeCategory
                   ? "border-primary bg-primary/10 text-primary"
-                  : "border-secondary/60 text-muted-foreground hover:border-primary/50"
+                  : "border-secondary/70 text-muted-foreground hover:border-primary/50"
               }`}
             >
-              همه
+              <span className="font-display text-[11px] font-bold">همه</span>
             </button>
-            {(s.categories || []).map((c) => (
-              <button
-                type="button"
-                key={c.id || c.slug}
-                onClick={() => s.setCategory(c.slug)}
-                className={`shrink-0 rounded-full border px-4 py-1.5 font-body text-xs transition-colors ${
-                  s.category === c.slug
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-secondary/60 text-muted-foreground hover:border-primary/50"
-                }`}
-              >
-                {c.name}
-              </button>
-            ))}
+            {s.categories.map((c) => {
+              const active = s.activeCategory?.id === c.id;
+              return (
+                <button
+                  type="button"
+                  key={c.id}
+                  onClick={() => s.setActiveCategory(c)}
+                  className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border transition-all ${
+                    active
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-secondary/70 hover:border-primary/50"
+                  }`}
+                >
+                  {c.image ? (
+                    <img src={c.image} alt={c.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-secondary/40 px-1">
+                      <span className="font-display text-[10px] font-bold text-muted-foreground">{c.name}</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
+                  <span className="absolute inset-x-0 bottom-1 px-1 text-center font-display text-[10px] font-bold text-foreground">
+                    {c.name}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              type="search"
-              value={s.query || ""}
-              onChange={(e) => s.setQuery?.(e.target.value)}
-              placeholder="جستجو در محصولات…"
-              className="w-full rounded-xl border border-secondary/60 bg-background px-4 py-2 font-body text-sm text-foreground/90 outline-none placeholder:text-muted-foreground/60 focus:border-primary sm:w-72"
-            />
-            {s.sortOptions && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="relative flex items-center">
+              <Search className="pointer-events-none absolute right-3 h-4 w-4 text-muted-foreground" />
+              <input
+                type="search"
+                value={s.filters.search ?? ""}
+                onChange={(e) => s.setFilters({ search: e.target.value || undefined })}
+                placeholder="جستجو…"
+                className="w-full rounded-full border border-secondary/70 bg-card py-2.5 pr-10 pl-4 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary sm:w-72"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
               <select
-                value={s.sort}
-                onChange={(e) => s.setSort?.(e.target.value)}
-                className="rounded-xl border border-secondary/60 bg-background px-3 py-2 font-body text-xs text-foreground"
-                aria-label="مرتب‌سازی"
+                value={sortKey}
+                onChange={(e) => s.setSort(e.target.value)}
+                className="rounded-full border border-secondary/70 bg-card px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors focus:border-primary"
               >
-                {Object.entries(s.sortOptions).map(([k, v]) => (
+                {Object.entries(SORTS).map(([k, v]) => (
                   <option key={k} value={k}>
-                    {v.label || k}
+                    {v.label}
                   </option>
                 ))}
               </select>
-            )}
-            {sortLabel ? (
-              <span className="font-body text-[11px] text-muted-foreground">{sortLabel}</span>
-            ) : null}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 py-10 lg:px-10 lg:py-14">
-        {s.loading ? (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-secondary/30" />
-            ))}
+      <section className="mx-auto max-w-7xl px-5 py-12 lg:px-10 lg:py-16">
+        {s.error ? (
+          <div className="rounded-2xl border border-destructive/40 bg-card p-10 text-center">
+            <p className="font-body text-sm text-muted-foreground">{s.error}</p>
+            <button type="button" onClick={s.retry} className="btn-ghost-gold mt-5">
+              تلاش دوباره
+            </button>
           </div>
-        ) : !(s.products || []).length ? (
-          <p className="py-20 text-center font-body text-sm text-muted-foreground">
-            محصولی در این دسته نیست.
-          </p>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {(s.products || []).map((p) => (
-              <ProductCard key={p.id || p.slug} product={p} />
-            ))}
+          <ProductGrid
+            products={s.products}
+            loading={s.loading}
+            emptyMessage={s.error ? "" : "در حال حاضر محصولی برای نمایش نیست."}
+            emptyHint={s.error ? "" : "محصولات جدید به‌زودی اضافه می‌شوند."}
+          />
+        )}
+
+        {s.hasMore && !s.error && (
+          <div className="mt-12 flex justify-center">
+            <button
+              type="button"
+              onClick={s.loadMore}
+              disabled={s.loadingMore}
+              className="btn-ghost-gold disabled:opacity-50"
+            >
+              {s.loadingMore ? "در حال بارگذاری…" : "مشاهده بیشتر"}
+            </button>
           </div>
         )}
       </section>
