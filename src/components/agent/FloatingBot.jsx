@@ -14,7 +14,7 @@ import MessageBubble, { TypingIndicator } from "@/components/agent/MessageBubble
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
 
-/** Floating intelligent chat robot — customer | admin */
+/** Floating intelligent chat robot — customer | admin (panel on the RIGHT) */
 export default function FloatingBot({
   mode = "customer",
   agentName = "design_consultant",
@@ -102,7 +102,6 @@ export default function FloatingBot({
     if (open) scrollToEnd(true);
   }, [messages, sending, open, scrollToEnd]);
 
-  // auto-grow textarea
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -200,24 +199,24 @@ export default function FloatingBot({
       ? "در حال اتصال…"
       : subtitle || "آنلاین";
 
+  // پنل و دکمه شناور — سمت راست صفحه
   const panelSize = expanded
-    ? "fixed inset-3 z-[90] flex flex-col overflow-hidden rounded-2xl border border-secondary/70 bg-card shadow-2xl md:inset-auto md:bottom-6 md:left-6 md:h-[min(88vh,720px)] md:w-[440px]"
-    : "fixed bottom-20 left-3 right-3 z-[90] flex max-h-[min(78vh,640px)] flex-col overflow-hidden rounded-2xl border border-secondary/70 bg-card shadow-2xl md:bottom-6 md:left-6 md:right-auto md:w-[400px]";
+    ? "fixed inset-3 z-[90] flex flex-col overflow-hidden rounded-2xl border border-secondary/70 bg-card shadow-2xl md:inset-auto md:bottom-6 md:right-6 md:h-[min(88vh,720px)] md:w-[440px]"
+    : "fixed bottom-20 left-3 right-3 z-[90] flex max-h-[min(78vh,640px)] flex-col overflow-hidden rounded-2xl border border-secondary/70 bg-card shadow-2xl md:bottom-6 md:right-6 md:left-auto md:w-[400px]";
 
   return (
     <>
-      {/* FAB */}
       {!open && (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className={`fixed bottom-20 left-4 z-[90] flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition hover:scale-105 active:scale-95 md:bottom-6 md:left-6 ${accentClass}`}
+          className={`fixed bottom-20 right-4 z-[90] flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition hover:scale-105 active:scale-95 md:bottom-6 md:right-6 ${accentClass}`}
           aria-label={title}
         >
           <span className="absolute inset-0 animate-ping rounded-full bg-current opacity-20" />
           <Sparkles className="relative h-6 w-6" />
           {unread > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 font-display text-[10px] font-bold text-destructive-foreground">
+            <span className="absolute -left-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 font-display text-[10px] font-bold text-destructive-foreground">
               {unread > 9 ? "۹+" : unread}
             </span>
           )}
@@ -226,13 +225,12 @@ export default function FloatingBot({
 
       {open && (
         <div className={panelSize} role="dialog" aria-label={title}>
-          {/* Header */}
           <header className="flex shrink-0 items-center gap-3 border-b border-secondary/60 bg-background/95 px-3 py-2.5 backdrop-blur">
             <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${accentClass}`}>
               <MessageCircle className="h-5 w-5" />
-              <span className="absolute bottom-0 left-0 h-2.5 w-2.5 rounded-full border-2 border-card bg-emerald-500" />
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-card bg-emerald-500" />
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 text-right">
               <p className="truncate font-display text-sm font-black text-foreground">{title}</p>
               <p
                 className={`truncate font-body text-[10px] ${
@@ -274,7 +272,6 @@ export default function FloatingBot({
             </div>
           )}
 
-          {/* Messages */}
           <div className="flex-1 space-y-3.5 overflow-y-auto overscroll-contain bg-gradient-to-b from-background/50 to-card px-3 py-3">
             {loading && messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-3 py-14">
@@ -297,9 +294,8 @@ export default function FloatingBot({
             )}
           </div>
 
-          {/* Starters */}
           {showStarters && (
-            <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-secondary/40 bg-background/40 px-3 py-2">
+            <div className="flex shrink-0 flex-wrap justify-end gap-1.5 border-t border-secondary/40 bg-background/40 px-3 py-2">
               {starters.map((s) => (
                 <button
                   key={s}
@@ -317,7 +313,7 @@ export default function FloatingBot({
           {pendingImage && (
             <div className="flex shrink-0 items-center gap-2 border-t border-secondary/40 px-3 py-2">
               <img src={pendingImage} alt="" className="h-12 w-12 rounded-lg object-cover ring-1 ring-secondary" />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 text-right">
                 <p className="truncate font-body text-[11px] text-muted-foreground">آماده ارسال</p>
               </div>
               <button
@@ -330,7 +326,6 @@ export default function FloatingBot({
             </div>
           )}
 
-          {/* Composer */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -372,8 +367,9 @@ export default function FloatingBot({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
               rows={1}
+              dir="rtl"
               placeholder={mode === "admin" ? "دستور یا سوال…" : "پیامت را بنویس…"}
-              className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-xl border border-secondary bg-card px-3 py-2.5 font-body text-sm leading-5 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+              className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-xl border border-secondary bg-card px-3 py-2.5 text-right font-body text-sm leading-5 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
               disabled={loading && messages.length === 0}
             />
             <button
