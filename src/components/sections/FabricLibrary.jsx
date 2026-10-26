@@ -1,134 +1,124 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Phone } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Image } from "@/components/ui/image";
-import { useCurtainCategories, pickVisualCategories } from "@/hooks/useCurtainCategories";
-import { SITE_PHONE_HREF } from "@/lib/siteContact";
+import { useCurtainCategories } from "@/hooks/useCurtainCategories";
+
+/** چهار بافت اصلی هارمونی — نام و تصویر از جدول CurtainCategory */
+const HARMONY_SLUGS = ["cotton", "silk", "sheer", "velvet"];
+
+const FALLBACK_META = {
+  cotton: {
+    name: "کتان",
+    blurb: "بافت طبیعی و مات؛ مناسب فضای روزمره و روشن.",
+    tone: "from-[#c4b59a]/90 via-[#a8926e]/40 to-transparent",
+  },
+  silk: {
+    name: "حریر",
+    blurb: "درخشش نرم و لطیف؛ برای پذیرایی و فضاهای رسمی.",
+    tone: "from-[#d4c4a8]/90 via-[#b89b6a]/35 to-transparent",
+  },
+  sheer: {
+    name: "تور",
+    blurb: "عبور نور و حفظ حریم؛ لایهٔ اول کنار پنجره.",
+    tone: "from-[#e8e4dc]/90 via-[#cfc8bc]/30 to-transparent",
+  },
+  velvet: {
+    name: "مخمل",
+    blurb: "عمق رنگ و حس لوکس؛ برای تاریک‌کردن و جلوهٔ سنگین.",
+    tone: "from-[#3b352c]/95 via-[#2a241c]/50 to-transparent",
+  },
+};
 
 export default function FabricLibrary() {
   const { categories, loading } = useCurtainCategories();
-  const items = pickVisualCategories(categories, 6);
-  const [active, setActive] = useState(0);
 
-  useEffect(() => {
-    if (items.length > 0 && active >= items.length) setActive(0);
-  }, [items.length, active]);
-
-  if (loading && !items.length) {
-    return (
-      <section id="fabrics" className="border-t border-secondary/40 bg-background py-24 lg:py-32">
-        <div className="mx-auto max-w-7xl px-5 lg:px-10">
-          <div className="h-8 w-64 animate-pulse rounded bg-secondary/40" />
-          <div className="mt-10 h-[460px] animate-pulse rounded-2xl bg-secondary/30" />
-        </div>
-      </section>
-    );
-  }
-
-  if (!items.length) return null;
-
-  const current = items[Math.min(active, items.length - 1)] || items[0];
+  const items = useMemo(() => {
+    const bySlug = new Map((categories || []).map((c) => [String(c.slug).toLowerCase(), c]));
+    return HARMONY_SLUGS.map((slug) => {
+      const cat = bySlug.get(slug);
+      const fb = FALLBACK_META[slug];
+      return {
+        slug,
+        name: cat?.name || fb.name,
+        description: (cat?.description && String(cat.description).trim()) || fb.blurb,
+        image: cat?.image || null,
+        tone: fb.tone,
+        href: `/catalog?category=${encodeURIComponent(slug)}`,
+      };
+    });
+  }, [categories]);
 
   return (
-    <section id="fabrics" className="border-t border-secondary/40 bg-background py-24 lg:py-32">
+    <section id="fabrics" className="border-t border-secondary/40 bg-background py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-5 lg:px-10">
-        <div className="mb-14 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+        <div className="mb-12 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <span className="eyebrow mb-4 block">کاتالوگ · هماهنگی</span>
+            <span className="eyebrow mb-3 block">بافت · رنگ</span>
             <h2 className="font-display text-3xl font-bold leading-tight text-foreground lg:text-4xl">
               هارمونی <span className="text-gold-gradient">بافت و رنگ</span>
             </h2>
           </div>
           <p className="max-w-md font-body text-sm leading-7 text-muted-foreground">
-            بافت و رنگ پارچه‌ها را کنار هم ببینید و ترکیب مناسب فضای خود را انتخاب کنید.
+            چهار بافت اصلی را کنار هم ببینید و حس هر پارچه را قبل از انتخاب مدل تجربه کنید.
           </p>
         </div>
 
-        <div className="hidden gap-3 md:flex md:h-[460px]">
-          {items.map((f, i) => (
-            <button
-              key={f.slug}
-              type="button"
-              onMouseEnter={() => setActive(i)}
-              onFocus={() => setActive(i)}
-              className={`group light-leak relative overflow-hidden rounded-2xl border transition-all duration-700 ease-out ${
-                active === i ? "flex-[5] border-primary/50" : "flex-[1] border-secondary/60"
-              }`}
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {loading &&
+            !categories?.length &&
+            HARMONY_SLUGS.map((s) => (
+              <div key={s} className="aspect-[3/4] animate-pulse rounded-3xl bg-secondary/30" />
+            ))}
+
+          {items.map((item) => (
+            <Link
+              key={item.slug}
+              to={item.href}
+              className="group relative flex aspect-[3/4] flex-col overflow-hidden rounded-3xl border border-secondary/50 bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.35)] transition-all duration-500 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_20px_50px_-24px_rgba(201,162,39,0.35)]"
             >
-              {f.image ? (
-                <Image
-                  src={f.image}
-                  alt={f.name}
-                  className="h-full w-full transition-transform duration-700 group-hover:scale-105"
-                  fittingType="fill"
-                />
-              ) : (
-                <div className="h-full w-full bg-secondary/40" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
-              <div className="absolute bottom-0 right-0 left-0 p-5 text-right">
-                <span className="font-display text-[10px] tracking-[0.3em] text-primary">{f.slug}</span>
-                <h3 className="font-display text-xl font-bold text-foreground md:text-2xl">{f.name}</h3>
-                {active === i && (
-                  <div className="mt-3 animate-fade-up">
-                    {f.description && (
-                      <p className="mb-3 line-clamp-2 font-body text-xs leading-6 text-muted-foreground">{f.description}</p>
-                    )}
-                    <div className="flex flex-wrap gap-2">
-                      <Link to={`/catalog?category=${f.slug}`} className="btn-ghost-gold text-xs">
-                        مشاهده کاتالوگ
-                      </Link>
-                      <a href={SITE_PHONE_HREF} className="btn-ghost-gold text-xs">
-                        <Phone className="h-3.5 w-3.5" /> مشاوره
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <div className="grid gap-5 md:hidden">
-          {items.map((f) => (
-            <article key={f.slug} className="light-leak overflow-hidden rounded-2xl border border-secondary/60 bg-card">
-              <div className="relative aspect-[16/10] overflow-hidden">
-                {f.image ? (
-                  <Image src={f.image} alt={f.name} className="h-full w-full" fittingType="fill" />
+              <div className="absolute inset-0">
+                {item.image ? (
+                  <Image
+                    src={item.image}
+                    alt={item.name}
+                    className="h-full w-full transition-transform duration-700 group-hover:scale-105"
+                    fittingType="fill"
+                  />
                 ) : (
-                  <div className="h-full w-full bg-secondary/40" />
+                  <div
+                    className={`h-full w-full bg-gradient-to-br ${
+                      item.slug === "velvet"
+                        ? "from-[#4a4035] via-[#2f2922] to-[#1a1612]"
+                        : item.slug === "sheer"
+                          ? "from-[#f5f2eb] via-[#e8e2d6] to-[#d4cdc0]"
+                          : item.slug === "silk"
+                            ? "from-[#e6d9bf] via-[#c9b48a] to-[#a89068]"
+                            : "from-[#d9cfc0] via-[#b5a48c] to-[#8f7d64]"
+                    }`}
+                  />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
-                <div className="absolute bottom-4 right-5">
-                  <span className="font-display text-[10px] tracking-[0.3em] text-primary">{f.slug}</span>
-                  <h3 className="font-display text-2xl font-bold text-foreground">{f.name}</h3>
-                </div>
+                <div className={`absolute inset-0 bg-gradient-to-t ${item.tone}`} />
+                <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent opacity-90" />
               </div>
-              <div className="p-6">
-                {f.description && (
-                  <p className="font-body text-sm leading-7 text-muted-foreground">{f.description}</p>
-                )}
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link to={`/catalog?category=${f.slug}`} className="btn-ghost-gold text-xs">
-                    کاتالوگ
-                  </Link>
-                  <a href={SITE_PHONE_HREF} className="btn-ghost-gold text-xs">
-                    <Phone className="h-3.5 w-3.5" /> مشاوره
-                  </a>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
 
-        <div className="mt-12 flex items-center justify-center gap-3 text-center">
-          <Link
-            to={current ? `/catalog?category=${current.slug}` : "/catalog"}
-            className="font-body text-sm text-muted-foreground transition-colors hover:text-primary"
-          >
-            مشاهده همه دسته‌ها در کاتالوگ
-          </Link>
-          <ArrowLeft className="h-4 w-4 text-primary" />
+              <div className="relative mt-auto flex flex-1 flex-col justify-end p-6">
+                <span className="mb-2 font-display text-[10px] tracking-[0.35em] text-primary/90">
+                  {item.slug.toUpperCase()}
+                </span>
+                <h3 className="font-display text-2xl font-bold text-foreground drop-shadow-sm lg:text-[1.65rem]">
+                  {item.name}
+                </h3>
+                <p className="mt-2 line-clamp-2 font-body text-xs leading-6 text-muted-foreground">
+                  {item.description}
+                </p>
+                <span className="mt-4 inline-flex items-center gap-1.5 font-display text-xs font-bold text-primary opacity-90 transition-all group-hover:gap-2.5">
+                  مشاهده در کاتالوگ
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                </span>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
     </section>
