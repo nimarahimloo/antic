@@ -12,6 +12,9 @@ export function parseMediaUrl(_src) {
   return null
 }
 
+/** @deprecated alias — kept for image.jsx import compatibility */
+export const parseWixMediaUrl = parseMediaUrl
+
 export function buildTransformUrl() {
   return ""
 }
