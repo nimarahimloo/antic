@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import CategoryCoverCard from "@/components/CategoryCoverCard";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
+import { mosaicGridClass, mosaicItemClass } from "@/lib/mosaicLayout";
 
 export default function Projects() {
   const { categories, loading } = useCurtainCategories();
@@ -28,15 +29,18 @@ export default function Projects() {
             به‌زودی نمونه‌های جدید در این بخش قرار می‌گیرد.
           </p>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map((c) => (
-              <CategoryCoverCard
-                key={c.slug}
-                title={c.name}
-                image={c.image}
-                description={c.description}
-                to={`/projects/category/${c.slug}`}
-              />
+          <div className={mosaicGridClass}>
+            {categories.map((c, i) => (
+              <div key={c.slug} className={`min-h-0 ${mosaicItemClass(i)}`}>
+                <CategoryCoverCard
+                  name={c.name}
+                  image={c.image}
+                  description={c.description}
+                  to={`/projects/category/${c.slug}`}
+                  className="h-full lg:min-h-full"
+                  aspect="aspect-[4/3] lg:aspect-auto lg:h-full lg:min-h-[200px]"
+                />
+              </div>
             ))}
           </div>
         )}

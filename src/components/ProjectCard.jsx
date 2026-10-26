@@ -1,17 +1,17 @@
 import { Link } from "react-router-dom";
 
-export default function ProjectCard({ project }) {
+export default function ProjectCard({ project, className = "" }) {
   return (
-    <Link to={`/projects/${project.id}`} className="group">
-      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-secondary/60 bg-card">
+    <Link to={`/projects/${project.id}`} className={`group block min-h-0 ${className}`}>
+      <div className="relative aspect-[4/3] h-full min-h-[200px] overflow-hidden rounded-2xl border border-secondary/60 bg-card lg:aspect-auto">
         {project.cover_image ? (
           <img
             src={project.cover_image}
             alt={project.title}
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-secondary/40">
+          <div className="absolute inset-0 flex items-center justify-center bg-secondary/40">
             <span className="font-display text-sm font-bold text-muted-foreground">{project.title}</span>
           </div>
         )}
