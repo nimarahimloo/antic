@@ -13,6 +13,7 @@ import {
 import MessageBubble, { TypingIndicator } from "@/components/agent/MessageBubble";
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
+import { playSendSound, playReceiveSound, unlockChatSounds } from "@/lib/chatSounds";
 
 /** Floating intelligent chat robot — customer | admin (panel on the RIGHT) */
 export default function FloatingBot({
@@ -41,6 +42,7 @@ export default function FloatingBot({
   const fileRef = useRef(null);
   const inputRef = useRef(null);
   const wasOpen = useRef(false);
+  const prevMsgCount = useRef(0);
 
   const scrollToEnd = useCallback((smooth = true) => {
     requestAnimationFrame(() => {
@@ -60,6 +62,7 @@ export default function FloatingBot({
             const conv = await api.agents.getConversation(stored);
             setConversationId(conv.id);
             setMessages(conv.messages || []);
+            prevMsgCount.current = (conv.messages || []).length;
             return conv.id;
           } catch {
             localStorage.removeItem(storageKey);
@@ -69,6 +72,7 @@ export default function FloatingBot({
         localStorage.removeItem(storageKey);
         setConversationId(null);
         setMessages([]);
+        prevMsgCount.current = 0;
       }
       const conv = await api.agents.createConversation({
         agent_name: agentName,
@@ -76,6 +80,7 @@ export default function FloatingBot({
       });
       setConversationId(conv.id);
       setMessages(conv.messages || []);
+      prevMsgCount.current = (conv.messages || []).length;
       localStorage.setItem(storageKey, conv.id);
       return conv.id;
     } catch {
@@ -89,6 +94,7 @@ export default function FloatingBot({
   useEffect(() => {
     if (open) {
       setUnread(0);
+      unlockChatSounds();
       ensureConversation().then(() => {
         setTimeout(() => inputRef.current?.focus(), 180);
         scrollToEnd(false);
@@ -101,6 +107,18 @@ export default function FloatingBot({
   useEffect(() => {
     if (open) scrollToEnd(true);
   }, [messages, sending, open, scrollToEnd]);
+
+  // Play receive sound when a new assistant message appears
+  useEffect(() => {
+    const n = messages.length;
+    if (n > prevMsgCount.current) {
+      const last = messages[n - 1];
+      if (last?.role === "assistant" && !last.pending) {
+        playReceiveSound();
+      }
+    }
+    prevMsgCount.current = n;
+  }, [messages]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -129,6 +147,9 @@ export default function FloatingBot({
   const send = async (text) => {
     const content = (text ?? input).trim();
     if ((!content && !pendingImage) || sending) return;
+
+    unlockChatSounds();
+    playSendSound();
 
     const attachments = pendingImage ? [{ type: "image", url: pendingImage }] : undefined;
     const optimistic = {
@@ -209,7 +230,10 @@ export default function FloatingBot({
       {!open && (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            unlockChatSounds();
+            setOpen(true);
+          }}
           className={`fixed bottom-20 right-4 z-[90] flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition hover:scale-105 active:scale-95 md:bottom-6 md:right-6 ${accentClass}`}
           aria-label={title}
         >
