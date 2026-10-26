@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { base44 } from "@/api/base44Client";
-import { getSubOptionsForParent, rootSelectOptions } from "@/lib/categoryTree";
+import { rootSelectOptions } from "@/lib/categoryTree";
 
+/** نمونه‌های اجرا — عنوان، کاور، دسته، توضیح، گالری */
 export default function AdminProjects() {
   const [categories, setCategories] = useState([]);
 
@@ -17,16 +18,9 @@ export default function AdminProjects() {
     { key: "cover_image", label: "کاور", type: "image", required: true },
     {
       key: "category_slug",
-      label: "دسته مادر",
+      label: "دسته",
       type: "select",
       required: true,
-      clearFields: ["subcategory"],
-    },
-    {
-      key: "subcategory",
-      label: "زیردسته",
-      type: "select",
-      getOptions: (form) => getSubOptionsForParent(categories, form.category_slug),
     },
     { key: "description", label: "توضیح", type: "textarea" },
     {
@@ -52,7 +46,7 @@ export default function AdminProjects() {
     {
       key: "category_slug",
       label: "دسته",
-      render: (v, r) => (r.subcategory ? `${v} / ${r.subcategory}` : v || "—"),
+      render: (v) => v || "—",
     },
   ];
 
