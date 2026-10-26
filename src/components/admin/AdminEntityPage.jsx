@@ -211,34 +211,39 @@ export default function AdminEntityPage({
     }
   }
 
-  async function uploadGallery(fieldKey, fileList) {
-    const files = Array.from(fileList || []).filter(Boolean);
-    if (!files.length) return;
-    const current = Array.isArray(form[fieldKey]) ? form[fieldKey] : [];
-    const room = GALLERY_MAX - current.length;
-    if (room <= 0) {
-      setError(`حداکثر ${GALLERY_MAX} تصویر در گالری مجاز است.`);
+  async function uploadGallery(fieldKey, filesInput) {
+    // FileList زنده است — قبل از خالی‌کردن input حتماً Array بساز
+    const files = Array.isArray(filesInput)
+      ? filesInput.filter(Boolean)
+      : Array.from(filesInput || []).filter(Boolean);
+    if (!files.length) {
+      setError("فایلی انتخاب نشد.");
       return;
     }
-    const batch = files.slice(0, room);
     setUploading(true);
     setError("");
+    setHint("");
     try {
       const urls = [];
-      for (const file of batch) {
+      for (const file of files) {
         const compressed = await compressImage(file);
-        const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
-        const url = res?.file_url || res?.url;
+        const uploader = base44?.integrations?.Core?.UploadPublicFile;
+        if (typeof uploader !== "function") {
+          throw new Error("سرویس آپلود در دسترس نیست");
+        }
+        const res = await uploader({ file: compressed });
+        const url = res?.file_url || res?.url || res?.path;
         if (url) urls.push(url);
       }
       if (!urls.length) throw new Error("آپلود پاسخ معتبری نداد");
-      setForm((f) => ({
-        ...f,
-        [fieldKey]: [...(Array.isArray(f[fieldKey]) ? f[fieldKey] : []), ...urls].slice(0, GALLERY_MAX),
-      }));
-      if (files.length > room) {
-        setHint(`فقط ${room} تصویر اضافه شد (سقف ${GALLERY_MAX} تصویر).`);
-      }
+      setForm((f) => {
+        const cur = Array.isArray(f[fieldKey]) ? f[fieldKey] : [];
+        const next = [...cur, ...urls].slice(0, GALLERY_MAX);
+        if (cur.length + urls.length > GALLERY_MAX) {
+          setHint(`حداکثر ${GALLERY_MAX} تصویر؛ فقط ${next.length - cur.length} مورد اضافه شد.`);
+        }
+        return { ...f, [fieldKey]: next };
+      });
     } catch (err) {
       setError(err?.message || "آپلود گالری ناموفق بود.");
     } finally {
@@ -392,7 +397,7 @@ export default function AdminEntityPage({
                         <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary">
                           {uploading || analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                           {uploading ? "آپلود…" : analyzing ? "تحلیل…" : form[f.key] ? "تعویض" : "انتخاب تصویر"}
-                          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" disabled={uploading || analyzing} onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; uploadImage(f.key, file); }} />
+                          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" disabled={uploading || analyzing} onChange={(e) => { const file = e.target.files?.[0] || null; e.target.value = ""; if (file) uploadImage(f.key, file); }} />
                         </label>
                         {form[f.key] && (
                           <button type="button" onClick={() => setForm((s) => ({ ...s, [f.key]: "" }))} className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive">
@@ -439,9 +444,9 @@ export default function AdminEntityPage({
                               className="hidden"
                               disabled={uploading}
                               onChange={(e) => {
-                                const list = e.target.files;
+                                const files = Array.from(e.target.files || []);
                                 e.target.value = "";
-                                uploadGallery(f.key, list);
+                                if (files.length) uploadGallery(f.key, files);
                               }}
                             />
                           </label>
@@ -460,9 +465,9 @@ export default function AdminEntityPage({
                             className="hidden"
                             disabled={uploading || (Array.isArray(form[f.key]) ? form[f.key] : []).length >= GALLERY_MAX}
                             onChange={(e) => {
-                              const list = e.target.files;
+                              const files = Array.from(e.target.files || []);
                               e.target.value = "";
-                              uploadGallery(f.key, list);
+                              if (files.length) uploadGallery(f.key, files);
                             }}
                           />
                         </label>
