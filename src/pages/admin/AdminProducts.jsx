@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { compressImage } from "@/lib/compressImage";
 
 const API = import.meta.env.VITE_API_BASE || "/api";
+const GALLERY_MAX = 20;
 
 function authHeaders() {
   const t = localStorage.getItem("antic_access_token");
@@ -13,12 +14,23 @@ function authHeaders() {
   };
 }
 
+function extractGallery(p) {
+  const items = p?.media?.itemsInfo?.items || [];
+  const main = p?.media?.main?.image?.url || "";
+  const urls = items
+    .map((i) => i?.image?.url || i?.url || (typeof i === "string" ? i : null))
+    .filter(Boolean)
+    .filter((u) => u !== main);
+  return [...new Set(urls)];
+}
+
 const empty = {
   name: "",
   description: "",
   price: "",
   compareAtPrice: "",
   image: "",
+  gallery: [],
   categoryId: "",
   visible: true,
   inStock: true,
@@ -31,7 +43,8 @@ export default function AdminProducts() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(() => {
@@ -68,6 +81,7 @@ export default function AdminProducts() {
           : "",
       compareAtPrice: p.compareAtPriceRange?.minValue?.amount || "",
       image: p.media?.main?.image?.url || "",
+      gallery: extractGallery(p),
       categoryId: p.mainCategoryId || "",
       visible: p.visible !== false,
       inStock: p.inventory?.availabilityStatus === "IN_STOCK",
@@ -76,9 +90,9 @@ export default function AdminProducts() {
     setError("");
   }
 
-  async function uploadImage(file) {
+  async function uploadCover(file) {
     if (!file) return;
-    setUploading(true);
+    setUploadingCover(true);
     setError("");
     try {
       const compressed = await compressImage(file);
@@ -87,9 +101,34 @@ export default function AdminProducts() {
       if (!url) throw new Error("آپلود ناموفق");
       setForm((f) => ({ ...f, image: url }));
     } catch (e) {
-      setError(e.message || "آپلود تصویر ناموفق بود");
+      setError(e.message || "آپلود تصویر کاور ناموفق بود");
     } finally {
-      setUploading(false);
+      setUploadingCover(false);
+    }
+  }
+
+  async function uploadGalleryFiles(filesInput) {
+    const files = Array.from(filesInput || []).filter(Boolean);
+    if (!files.length) return;
+    setUploadingGallery(true);
+    setError("");
+    try {
+      const urls = [];
+      for (const file of files) {
+        const compressed = await compressImage(file);
+        const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+        const url = res?.file_url || res?.url;
+        if (url) urls.push(url);
+      }
+      if (!urls.length) throw new Error("آپلود گالری ناموفق");
+      setForm((f) => ({
+        ...f,
+        gallery: [...(f.gallery || []), ...urls].slice(0, GALLERY_MAX),
+      }));
+    } catch (e) {
+      setError(e.message || "آپلود گالری ناموفق بود");
+    } finally {
+      setUploadingGallery(false);
     }
   }
 
@@ -107,6 +146,7 @@ export default function AdminProducts() {
       price: form.price === "" || form.price == null ? 0 : Number(form.price) || 0,
       compareAtPrice: form.compareAtPrice ? Number(form.compareAtPrice) : null,
       image: form.image || null,
+      gallery: Array.isArray(form.gallery) ? form.gallery.filter(Boolean) : [],
       categoryId: form.categoryId || null,
       visible: form.visible,
       inStock: form.inStock,
@@ -267,7 +307,6 @@ export default function AdminProducts() {
                     value={form.price}
                     onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
                   />
-                  <p className="mt-1 text-[10px] text-muted-foreground">بدون قیمت → دکمه «تماس بگیرید»</p>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground">قیمت قبل</label>
@@ -279,8 +318,9 @@ export default function AdminProducts() {
                   />
                 </div>
               </div>
+
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">تصویر</label>
+                <label className="mb-1 block text-xs text-muted-foreground">تصویر کاور</label>
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
                     {form.image ? (
@@ -290,22 +330,74 @@ export default function AdminProducts() {
                     )}
                   </div>
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 px-3 py-2 text-xs text-primary">
-                    {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                    {uploading ? "آپلود…" : form.image ? "تعویض" : "انتخاب"}
+                    {uploadingCover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    {uploadingCover ? "آپلود…" : form.image ? "تعویض" : "انتخاب"}
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      disabled={uploading}
+                      disabled={uploadingCover}
                       onChange={(e) => {
                         const f = e.target.files?.[0];
                         e.target.value = "";
-                        uploadImage(f);
+                        uploadCover(f);
                       }}
                     />
                   </label>
                 </div>
               </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">گالری (چند تصویر)</label>
+                <div className="flex flex-wrap gap-2">
+                  {(form.gallery || []).map((url, idx) => (
+                    <div key={`${url}-${idx}`} className="relative h-16 w-16 overflow-hidden rounded-xl border border-secondary/60">
+                      <img src={url} alt="" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            gallery: f.gallery.filter((_, i) => i !== idx),
+                          }))
+                        }
+                        className="absolute left-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background/90 text-destructive"
+                        aria-label="حذف"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {(form.gallery || []).length < GALLERY_MAX && (
+                    <label className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 text-primary">
+                      {uploadingGallery ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4" />
+                          <span className="text-[9px] font-bold">افزودن</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        disabled={uploadingGallery}
+                        onChange={(e) => {
+                          const files = e.target.files;
+                          e.target.value = "";
+                          uploadGalleryFiles(files);
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  {(form.gallery || []).length}/{GALLERY_MAX} — در صفحه محصول زیر تصویر اصلی نمایش داده می‌شود
+                </p>
+              </div>
+
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">دسته</label>
                 <select
@@ -350,7 +442,11 @@ export default function AdminProducts() {
               </div>
               {error && <p className="text-xs text-destructive">{error}</p>}
               <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={saving || uploading} className="btn-gold flex-1 justify-center">
+                <button
+                  type="submit"
+                  disabled={saving || uploadingCover || uploadingGallery}
+                  className="btn-gold flex-1 justify-center"
+                >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
                 </button>
                 <button type="button" onClick={() => setEditing(null)} className="btn-ghost-gold">

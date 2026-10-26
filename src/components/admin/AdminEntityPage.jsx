@@ -25,7 +25,8 @@ export default function AdminEntityPage({
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  /** per-field upload spinner — cover vs gallery must not share state */
+  const [uploadingField, setUploadingField] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState("");
   const [tableError, setTableError] = useState("");
@@ -90,6 +91,7 @@ export default function AdminEntityPage({
     setEditing(null);
     setError("");
     setHint("");
+    setUploadingField(null);
   }
 
   async function submit(e) {
@@ -194,7 +196,7 @@ export default function AdminEntityPage({
 
   async function uploadImage(fieldKey, file) {
     if (!file) return;
-    setUploading(true);
+    setUploadingField(fieldKey);
     setError("");
     setHint("");
     try {
@@ -207,12 +209,11 @@ export default function AdminEntityPage({
     } catch (err) {
       setError(err?.message || "آپلود تصویر ناموفق بود.");
     } finally {
-      setUploading(false);
+      setUploadingField(null);
     }
   }
 
   async function uploadGallery(fieldKey, filesInput) {
-    // FileList زنده است — قبل از خالی‌کردن input حتماً Array بساز
     const files = Array.isArray(filesInput)
       ? filesInput.filter(Boolean)
       : Array.from(filesInput || []).filter(Boolean);
@@ -220,7 +221,7 @@ export default function AdminEntityPage({
       setError("فایلی انتخاب نشد.");
       return;
     }
-    setUploading(true);
+    setUploadingField(fieldKey);
     setError("");
     setHint("");
     try {
@@ -247,7 +248,7 @@ export default function AdminEntityPage({
     } catch (err) {
       setError(err?.message || "آپلود گالری ناموفق بود.");
     } finally {
-      setUploading(false);
+      setUploadingField(null);
     }
   }
 
@@ -395,12 +396,36 @@ export default function AdminEntityPage({
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary">
-                          {uploading || analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                          {uploading ? "آپلود…" : analyzing ? "تحلیل…" : form[f.key] ? "تعویض" : "انتخاب تصویر"}
-                          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" disabled={uploading || analyzing} onChange={(e) => { const file = e.target.files?.[0] || null; e.target.value = ""; if (file) uploadImage(f.key, file); }} />
+                          {uploadingField === f.key || (f.key === "image" && analyzing) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Upload className="h-4 w-4" />
+                          )}
+                          {uploadingField === f.key
+                            ? "آپلود…"
+                            : analyzing && f.key === "image"
+                              ? "تحلیل…"
+                              : form[f.key]
+                                ? "تعویض"
+                                : "انتخاب تصویر"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="hidden"
+                            disabled={uploadingField === f.key || analyzing}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              e.target.value = "";
+                              if (file) uploadImage(f.key, file);
+                            }}
+                          />
                         </label>
                         {form[f.key] && (
-                          <button type="button" onClick={() => setForm((s) => ({ ...s, [f.key]: "" }))} className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive">
+                          <button
+                            type="button"
+                            onClick={() => setForm((s) => ({ ...s, [f.key]: "" }))}
+                            className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive"
+                          >
                             حذف
                           </button>
                         )}
@@ -429,7 +454,7 @@ export default function AdminEntityPage({
                         ))}
                         {(Array.isArray(form[f.key]) ? form[f.key] : []).length < GALLERY_MAX && (
                           <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-primary/40 bg-primary/5 text-primary transition-colors hover:bg-primary/10">
-                            {uploading ? (
+                            {uploadingField === f.key ? (
                               <Loader2 className="h-5 w-5 animate-spin" />
                             ) : (
                               <>
@@ -442,7 +467,7 @@ export default function AdminEntityPage({
                               accept="image/jpeg,image/png,image/webp,image/gif"
                               multiple
                               className="hidden"
-                              disabled={uploading}
+                              disabled={uploadingField === f.key}
                               onChange={(e) => {
                                 const files = Array.from(e.target.files || []);
                                 e.target.value = "";
@@ -453,24 +478,9 @@ export default function AdminEntityPage({
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary">
-                          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                          {uploading
-                            ? "آپلود…"
-                            : `انتخاب تصویر (${(Array.isArray(form[f.key]) ? form[f.key] : []).length}/${GALLERY_MAX})`}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp,image/gif"
-                            multiple
-                            className="hidden"
-                            disabled={uploading || (Array.isArray(form[f.key]) ? form[f.key] : []).length >= GALLERY_MAX}
-                            onChange={(e) => {
-                              const files = Array.from(e.target.files || []);
-                              e.target.value = "";
-                              if (files.length) uploadGallery(f.key, files);
-                            }}
-                          />
-                        </label>
+                        <span className="font-body text-[10px] text-muted-foreground">
+                          {(Array.isArray(form[f.key]) ? form[f.key] : []).length}/{GALLERY_MAX} تصویر
+                        </span>
                         {(Array.isArray(form[f.key]) ? form[f.key] : []).length > 0 && (
                           <button
                             type="button"
@@ -515,7 +525,7 @@ export default function AdminEntityPage({
             {error && <p className="mt-4 font-body text-xs text-destructive">{error}</p>}
 
             <div className="mt-7 flex gap-3">
-              <button type="submit" disabled={saving || uploading || analyzing} className="btn-gold flex-1 justify-center disabled:opacity-60">
+              <button type="submit" disabled={saving || !!uploadingField || analyzing} className="btn-gold flex-1 justify-center disabled:opacity-60">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
               </button>
               <button type="button" onClick={closeModal} className="btn-ghost-gold justify-center">
