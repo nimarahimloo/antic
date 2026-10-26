@@ -40,6 +40,8 @@ function parseSubs(raw) {
 
 export function normalizeCategory(row) {
   if (!row) return null;
+  const raw = row.in_catalog ?? row.inCatalog;
+  const inCatalog = !(raw === false || raw === 0 || raw === "false" || raw === "0");
   return {
     id: row.id,
     name: row.name,
@@ -49,7 +51,15 @@ export function normalizeCategory(row) {
     order: Number(row.order) || 0,
     mechanism: row.mechanism || null,
     subcategories: parseSubs(row.subcategories),
+    inCatalog,
+    in_catalog: inCatalog,
   };
+}
+
+/** فقط دسته‌هایی که تیک «کاتالوگ دارد» دارند */
+export function filterCatalogCategories(categories) {
+  if (!categories?.length) return [];
+  return categories.filter((c) => c.inCatalog !== false);
 }
 
 function fetchCategories(force = false) {
@@ -72,8 +82,11 @@ function fetchCategories(force = false) {
   return inflight;
 }
 
-/** دسته‌های پرده از /api/entities/CurtainCategory — تنها منبع غیر‌فروشگاه */
-export function useCurtainCategories() {
+/** دسته‌های پرده از /api/entities/CurtainCategory — تنها منبع غیر‌فروشگاه
+ *  @param {{ catalogOnly?: boolean }} [opts] اگر catalogOnly=true فقط دسته‌های دارای تیک کاتالوگ
+ */
+export function useCurtainCategories(opts = {}) {
+  const catalogOnly = Boolean(opts?.catalogOnly);
   const [categories, setCategories] = useState(cache || []);
   const [loading, setLoading] = useState(!cache);
   const [error, setError] = useState(null);
@@ -107,7 +120,8 @@ export function useCurtainCategories() {
     };
   }, [reload]);
 
-  return { categories, loading, error, reload };
+  const visible = catalogOnly ? filterCatalogCategories(categories) : categories;
+  return { categories: visible, allCategories: categories, loading, error, reload };
 }
 
 export function refreshCurtainCategories() {
@@ -115,7 +129,6 @@ export function refreshCurtainCategories() {
   inflight = null;
 }
 
-/** نقشه slug → mechanism از کش دسته‌ها (برای resolveStyle) */
 export function getCategoryMechanismMap() {
   const list = cache || [];
   const map = {};
@@ -125,13 +138,11 @@ export function getCategoryMechanismMap() {
   return map;
 }
 
-/** برش بر اساس order — بدون لیست slug هاردکد */
 export function pickCategoriesByOrder(categories, limit = 8) {
   if (!categories?.length) return [];
   return categories.slice(0, limit);
 }
 
-/** دسته‌هایی که توضیح دارند؛ در غیر این صورت اول لیست */
 export function pickFeaturedCategories(categories, limit = 6) {
   if (!categories?.length) return [];
   const withDesc = categories.filter((c) => c.description);
@@ -139,7 +150,6 @@ export function pickFeaturedCategories(categories, limit = 6) {
   return pool.slice(0, limit);
 }
 
-/** ترجیح تصویر؛ وگرنه order */
 export function pickVisualCategories(categories, limit = 6) {
   if (!categories?.length) return [];
   const withImage = categories.filter((c) => c.image);
@@ -147,10 +157,6 @@ export function pickVisualCategories(categories, limit = 6) {
   return pool.slice(0, limit);
 }
 
-/**
- * سیستم‌های فنی/شرکتی: mechanism ثبت‌شده در ادمین، یا زیردسته دارد
- * (بدون هاردکد نام دسته)
- */
 const SYSTEM_MECHANISMS = new Set([
   "shade",
   "double",
@@ -174,7 +180,6 @@ export function pickSystemCategories(categories, limit = 6) {
   return pool.slice(0, limit);
 }
 
-/** بقیه بعد از featured — برای سکشن دوم صفحه */
 export function pickSecondaryCategories(categories, limit = 8) {
   if (!categories?.length) return [];
   const featured = pickFeaturedCategories(categories, 6);
