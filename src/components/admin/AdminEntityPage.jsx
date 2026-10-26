@@ -7,7 +7,8 @@ import { analyzeFabric } from "@/components/catalog/photo/fabricAnalyzer";
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
 const labelCls = "mb-1.5 block font-body text-xs text-muted-foreground";
-const WIDE_TYPES = ["textarea", "list", "sublist", "image"];
+const WIDE_TYPES = ["textarea", "list", "sublist", "image", "gallery"];
+const GALLERY_MAX = 20;
 
 export default function AdminEntityPage({
   title,
@@ -48,6 +49,7 @@ export default function AdminEntityPage({
     const initial = {};
     fields.forEach((f) => {
       if (f.type === "boolean") initial[f.key] = f.default !== undefined ? !!f.default : false;
+      else if (f.type === "gallery") initial[f.key] = [];
       else initial[f.key] = "";
     });
     setError("");
@@ -61,7 +63,17 @@ export default function AdminEntityPage({
     fields.forEach((f) => {
       const v = record[f.key];
       if (f.type === "boolean") initial[f.key] = !!v;
-      else if (f.type === "list") initial[f.key] = Array.isArray(v) ? v.join(", ") : "";
+      else if (f.type === "gallery") {
+        if (Array.isArray(v)) initial[f.key] = v.slice(0, GALLERY_MAX);
+        else if (typeof v === "string" && v.trim()) {
+          try {
+            const parsed = JSON.parse(v);
+            initial[f.key] = (Array.isArray(parsed) ? parsed : []).slice(0, GALLERY_MAX);
+          } catch {
+            initial[f.key] = v.split(",").map((s) => s.trim()).filter(Boolean).slice(0, GALLERY_MAX);
+          }
+        } else initial[f.key] = [];
+      } else if (f.type === "list") initial[f.key] = Array.isArray(v) ? v.join(", ") : "";
       else if (f.type === "sublist")
         initial[f.key] = (Array.isArray(v) ? v : [])
           .map((s) => (s.slug && s.slug !== s.name ? `${s.name}:${s.slug}` : s.name))
@@ -82,7 +94,11 @@ export default function AdminEntityPage({
 
   async function submit(e) {
     e.preventDefault();
-    const missing = fields.filter((f) => f.required && !String(form[f.key] ?? "").trim());
+    const missing = fields.filter((f) => {
+      if (!f.required) return false;
+      if (f.type === "gallery") return !(Array.isArray(form[f.key]) && form[f.key].length);
+      return !String(form[f.key] ?? "").trim();
+    });
     if (missing.length) {
       setError("لطفاً فیلدهای الزامی را تکمیل کنید.");
       return;
@@ -90,7 +106,9 @@ export default function AdminEntityPage({
     const payload = {};
     fields.forEach((f) => {
       const v = form[f.key];
-      if (f.type === "list") {
+      if (f.type === "gallery") {
+        payload[f.key] = (Array.isArray(v) ? v : []).filter(Boolean).slice(0, GALLERY_MAX);
+      } else if (f.type === "list") {
         payload[f.key] = String(v || "")
           .split(",")
           .map((s) => s.trim())
@@ -188,6 +206,41 @@ export default function AdminEntityPage({
       if (fieldKey === "image" && autoAnalyzeFabric) await applyFabricAnalysis(url);
     } catch (err) {
       setError(err?.message || "آپلود تصویر ناموفق بود.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function uploadGallery(fieldKey, fileList) {
+    const files = Array.from(fileList || []).filter(Boolean);
+    if (!files.length) return;
+    const current = Array.isArray(form[fieldKey]) ? form[fieldKey] : [];
+    const room = GALLERY_MAX - current.length;
+    if (room <= 0) {
+      setError(`حداکثر ${GALLERY_MAX} تصویر در گالری مجاز است.`);
+      return;
+    }
+    const batch = files.slice(0, room);
+    setUploading(true);
+    setError("");
+    try {
+      const urls = [];
+      for (const file of batch) {
+        const compressed = await compressImage(file);
+        const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+        const url = res?.file_url || res?.url;
+        if (url) urls.push(url);
+      }
+      if (!urls.length) throw new Error("آپلود پاسخ معتبری نداد");
+      setForm((f) => ({
+        ...f,
+        [fieldKey]: [...(Array.isArray(f[fieldKey]) ? f[fieldKey] : []), ...urls].slice(0, GALLERY_MAX),
+      }));
+      if (files.length > room) {
+        setHint(`فقط ${room} تصویر اضافه شد (سقف ${GALLERY_MAX} تصویر).`);
+      }
+    } catch (err) {
+      setError(err?.message || "آپلود گالری ناموفق بود.");
     } finally {
       setUploading(false);
     }
@@ -344,6 +397,82 @@ export default function AdminEntityPage({
                         {form[f.key] && (
                           <button type="button" onClick={() => setForm((s) => ({ ...s, [f.key]: "" }))} className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive">
                             حذف
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : f.type === "gallery" ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {(Array.isArray(form[f.key]) ? form[f.key] : []).map((url, idx) => (
+                          <div key={`${url}-${idx}`} className="relative h-20 w-20 overflow-hidden rounded-xl border border-secondary/60 bg-background">
+                            <img src={url} alt="" className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setForm((s) => ({
+                                  ...s,
+                                  [f.key]: (Array.isArray(s[f.key]) ? s[f.key] : []).filter((_, i) => i !== idx),
+                                }))
+                              }
+                              className="absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-destructive shadow"
+                              aria-label="حذف تصویر"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {(Array.isArray(form[f.key]) ? form[f.key] : []).length < GALLERY_MAX && (
+                          <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-primary/40 bg-primary/5 text-primary transition-colors hover:bg-primary/10">
+                            {uploading ? (
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <>
+                                <Upload className="h-5 w-5" />
+                                <span className="font-body text-[9px] font-bold">افزودن</span>
+                              </>
+                            )}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              multiple
+                              className="hidden"
+                              disabled={uploading}
+                              onChange={(e) => {
+                                const list = e.target.files;
+                                e.target.value = "";
+                                uploadGallery(f.key, list);
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary">
+                          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                          {uploading
+                            ? "آپلود…"
+                            : `انتخاب تصویر (${(Array.isArray(form[f.key]) ? form[f.key] : []).length}/${GALLERY_MAX})`}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            multiple
+                            className="hidden"
+                            disabled={uploading || (Array.isArray(form[f.key]) ? form[f.key] : []).length >= GALLERY_MAX}
+                            onChange={(e) => {
+                              const list = e.target.files;
+                              e.target.value = "";
+                              uploadGallery(f.key, list);
+                            }}
+                          />
+                        </label>
+                        {(Array.isArray(form[f.key]) ? form[f.key] : []).length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setForm((s) => ({ ...s, [f.key]: [] }))}
+                            className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive"
+                          >
+                            پاک کردن همه
                           </button>
                         )}
                       </div>
