@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
 import { Bot, Check, Copy, ExternalLink, User } from "lucide-react";
 
-function InternalLink({ href, children }) {
+function InternalLink({ href, children, onNavigate }) {
   if (!href) return <span>{children}</span>;
   if (href.startsWith("http") || href.startsWith("//")) {
     return (
@@ -19,13 +19,17 @@ function InternalLink({ href, children }) {
     );
   }
   return (
-    <Link to={href} className="font-semibold text-primary underline-offset-2 hover:underline">
+    <Link
+      to={href}
+      onClick={() => onNavigate?.()}
+      className="font-semibold text-primary underline-offset-2 hover:underline"
+    >
       {children}
     </Link>
   );
 }
 
-function ModelCards({ items }) {
+function ModelCards({ items, onNavigate }) {
   if (!items?.length) return null;
   return (
     <div className="mt-2.5 grid grid-cols-2 gap-2">
@@ -33,6 +37,7 @@ function ModelCards({ items }) {
         <Link
           key={it.id || it.href}
           to={it.href || "#"}
+          onClick={() => onNavigate?.()}
           className="group overflow-hidden rounded-xl border border-secondary/60 bg-background/80 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
         >
           <div className="aspect-[4/3] overflow-hidden bg-secondary/30">
@@ -61,7 +66,7 @@ function ModelCards({ items }) {
   );
 }
 
-function LinkButtons({ items }) {
+function LinkButtons({ items, onNavigate }) {
   if (!items?.length) return null;
   return (
     <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -79,7 +84,7 @@ function LinkButtons({ items }) {
           );
         }
         return (
-          <Link key={i} to={it.href || "/"}>
+          <Link key={i} to={it.href || "/"} onClick={() => onNavigate?.()}>
             {inner}
           </Link>
         );
@@ -106,7 +111,7 @@ function QuickReplies({ items, onPick }) {
   );
 }
 
-function Blocks({ blocks, onQuickReply, onlyQuick }) {
+function Blocks({ blocks, onQuickReply, onlyQuick, onNavigate }) {
   if (!blocks?.length) return null;
   const list = onlyQuick
     ? blocks.filter((b) => b.type === "quick_replies")
@@ -114,8 +119,10 @@ function Blocks({ blocks, onQuickReply, onlyQuick }) {
   return (
     <div>
       {list.map((b, i) => {
-        if (b.type === "model_cards") return <ModelCards key={`c-${i}`} items={b.items} />;
-        if (b.type === "link_buttons") return <LinkButtons key={`l-${i}`} items={b.items} />;
+        if (b.type === "model_cards")
+          return <ModelCards key={`c-${i}`} items={b.items} onNavigate={onNavigate} />;
+        if (b.type === "link_buttons")
+          return <LinkButtons key={`l-${i}`} items={b.items} onNavigate={onNavigate} />;
         if (b.type === "quick_replies")
           return <QuickReplies key={`q-${i}`} items={b.items} onPick={onQuickReply} />;
         return null;
@@ -124,16 +131,21 @@ function Blocks({ blocks, onQuickReply, onlyQuick }) {
   );
 }
 
-function MarkdownBody({ content }) {
+function MarkdownBody({ content, onNavigate }) {
   return (
-    <ReactMarkdown
-      className="max-w-none whitespace-pre-wrap break-words text-right font-body text-[13px] leading-7 text-foreground/90 [&_a]:text-primary [&_li]:mb-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_strong]:text-foreground [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pr-5"
-      components={{
-        a: ({ href, children }) => <InternalLink href={href}>{children}</InternalLink>,
-      }}
-    >
-      {content}
-    </ReactMarkdown>
+    <div className="max-w-none whitespace-pre-wrap break-words text-right font-body text-[13px] leading-7 text-foreground/90 [&_a]:text-primary [&_li]:mb-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_strong]:text-foreground [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pr-5">
+      <ReactMarkdown
+        components={{
+          a: ({ href, children }) => (
+            <InternalLink href={href} onNavigate={onNavigate}>
+              {children}
+            </InternalLink>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   );
 }
 
@@ -144,7 +156,8 @@ function CopyBtn({ text }) {
     <button
       type="button"
       title="کپی متن"
-      onClick={async () => {
+      onClick={async (e) => {
+        e.stopPropagation();
         try {
           await navigator.clipboard.writeText(text);
           setOk(true);
@@ -160,10 +173,10 @@ function CopyBtn({ text }) {
   );
 }
 
-/** Typing dots — bot on the LEFT (messaging style) */
+/** Typing dots — bot on the LEFT */
 export function TypingIndicator({ mode = "customer" }) {
   return (
-    <div className="flex items-end justify-start gap-2">
+    <div className="flex items-end justify-start gap-2" aria-label="در حال نوشتن">
       <div
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
           mode === "admin" ? "bg-foreground text-background" : "bg-primary/15 text-primary"
@@ -181,17 +194,17 @@ export function TypingIndicator({ mode = "customer" }) {
 }
 
 /**
- * جهت پیام‌ها (حس پیام‌رسان RTL مثل واتساپ/تلگرام):
- * - کاربر / ادمین → سمت راست
- * - ربات → سمت چپ
+ * Messaging layout (RTL):
+ * - User / admin → RIGHT
+ * - Bot → LEFT
  */
-export default function MessageBubble({ message, onQuickReply, mode = "customer" }) {
+export default function MessageBubble({ message, onQuickReply, mode = "customer", onNavigate }) {
   const isUser = message.role === "user";
 
   if (isUser) {
     return (
-      <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-end gap-2 duration-300">
-        <div className="max-w-[85%] space-y-1">
+      <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-end gap-2 duration-200">
+        <div className="max-w-[min(85%,320px)] space-y-1 sm:max-w-[85%]">
           {message.attachments?.length > 0 && (
             <div className="flex flex-wrap justify-end gap-1.5">
               {message.attachments.map((a, i) =>
@@ -200,17 +213,17 @@ export default function MessageBubble({ message, onQuickReply, mode = "customer"
                     key={i}
                     src={a.url}
                     alt=""
-                    className="max-h-44 rounded-2xl rounded-bl-md border border-primary/20 object-cover shadow-sm"
+                    className="max-h-44 max-w-full rounded-2xl rounded-bl-md border border-primary/20 object-cover shadow-sm"
                   />
                 ) : null
               )}
             </div>
           )}
-          {message.content && (
-            <div className="relative rounded-2xl rounded-bl-md bg-primary px-3.5 py-2.5 text-right font-body text-[13px] leading-7 text-primary-foreground shadow-md shadow-primary/10">
+          {message.content ? (
+            <div className="rounded-2xl rounded-bl-md bg-primary px-3.5 py-2.5 text-right font-body text-[13px] leading-7 text-primary-foreground shadow-md shadow-primary/10">
               {message.content}
             </div>
-          )}
+          ) : null}
           {message.pending && (
             <p className="text-left font-body text-[9px] text-muted-foreground">در حال ارسال…</p>
           )}
@@ -223,7 +236,7 @@ export default function MessageBubble({ message, onQuickReply, mode = "customer"
   }
 
   return (
-    <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-start gap-2 duration-300">
+    <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-start gap-2 duration-200">
       <div
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
           mode === "admin" ? "bg-foreground text-background" : "bg-primary/15 text-primary"
@@ -231,15 +244,25 @@ export default function MessageBubble({ message, onQuickReply, mode = "customer"
       >
         <Bot className="h-3.5 w-3.5" />
       </div>
-      <div className="w-full max-w-[88%]">
-        <div className="relative rounded-2xl rounded-br-md border border-secondary/50 bg-card px-3.5 py-3 text-right shadow-sm">
-          <div className="absolute left-2 top-2">
+      <div className="w-full max-w-[min(88%,360px)] sm:max-w-[88%]">
+        <div className="relative rounded-2xl rounded-br-md border border-secondary/50 bg-card px-3.5 py-3 pl-9 text-right shadow-sm">
+          <div className="absolute left-1.5 top-1.5">
             <CopyBtn text={message.content} />
           </div>
-          {message.content && <MarkdownBody content={message.content} />}
-          <Blocks blocks={message.blocks} onQuickReply={onQuickReply} onlyQuick={false} />
+          {message.content ? <MarkdownBody content={message.content} onNavigate={onNavigate} /> : null}
+          <Blocks
+            blocks={message.blocks}
+            onQuickReply={onQuickReply}
+            onlyQuick={false}
+            onNavigate={onNavigate}
+          />
         </div>
-        <Blocks blocks={message.blocks} onQuickReply={onQuickReply} onlyQuick />
+        <Blocks
+          blocks={message.blocks}
+          onQuickReply={onQuickReply}
+          onlyQuick
+          onNavigate={onNavigate}
+        />
       </div>
     </div>
   );
