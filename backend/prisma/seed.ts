@@ -1,3 +1,9 @@
+/**
+ * Seed ایمن — هرگز دادهٔ موجود ادمین را پاک یا بازنویسی نمی‌کند.
+ * - بدون deleteMany روی محتوا
+ * - فقط رکوردهای غایب ساخته می‌شوند
+ * - update فقط فیلدهای خالی را پر می‌کند
+ */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -31,7 +37,7 @@ const SLUG_MECHANISM: Record<string, string> = {
   office: "zebra",
 };
 
-/** یک جدول مادر برای کاتالوگ + نمونه‌های اجرا */
+/** فقط برای پر کردن دیتابیس خالی — مرجع بعدی همیشه جدول CurtainCategory است */
 const CURTAIN_ROOTS: CatDef[] = [
   { name: "شید", slug: "shade", order: 1 },
   { name: "رومن", slug: "roman", order: 2 },
@@ -48,79 +54,21 @@ const CURTAIN_ROOTS: CatDef[] = [
   { name: "تور", slug: "sheer", order: 13 },
   { name: "پرده آشپزخانه", slug: "kitchen", order: 14 },
   { name: "پرده اداری", slug: "office", order: 15 },
-  // فضاهای نمونه اجرا (بدون mechanism فنی — فقط پروژه)
-  {
-    name: "پذیرایی",
-    slug: "living-room",
-    order: 20,
-    description: "نمونه‌های اجرا در فضای پذیرایی و نشیمن",
-    subs: [
-      { name: "کلاسیک", slug: "classic" },
-      { name: "مدرن", slug: "modern" },
-      { name: "نئوکلاسیک", slug: "neo-classic" },
-    ],
-  },
-  {
-    name: "اتاق خواب",
-    slug: "bedroom",
-    order: 21,
-    description: "پرده‌های اتاق خواب و فضای خصوصی",
-    subs: [
-      { name: "مستر", slug: "master" },
-      { name: "کودک", slug: "kids" },
-    ],
-  },
-  {
-    name: "هتل و اقامتگاه",
-    slug: "hotel",
-    order: 22,
-    description: "پروژه‌های هتل، سوئیت و اقامتگاه",
-    subs: [
-      { name: "اتاق مهمان", slug: "guest-room" },
-      { name: "لابی", slug: "lobby" },
-    ],
-  },
-  {
-    name: "ویلا و حیاط",
-    slug: "villa",
-    order: 23,
-    description: "اجرا در ویلا و فضاهای باز",
-    subs: [
-      { name: "سالن", slug: "hall" },
-      { name: "تراس", slug: "terrace" },
-    ],
-  },
+  { name: "پذیرایی", slug: "living-room", order: 20, description: "نمونه‌های اجرا در فضای پذیرایی و نشیمن" },
+  { name: "اتاق خواب", slug: "bedroom", order: 21, description: "پرده‌های اتاق خواب و فضای خصوصی" },
+  { name: "هتل و اقامتگاه", slug: "hotel", order: 22, description: "پروژه‌های هتل، سوئیت و اقامتگاه" },
+  { name: "ویلا و حیاط", slug: "villa", order: 23, description: "اجرا در ویلا و فضاهای باز" },
 ];
 
-const CURTAIN_SUBS: CatDef[] = [
-  { name: "شید بلک اوت", slug: "shade-blackout", order: 101, parentSlug: "shade" },
-  { name: "شید اسکرین", slug: "shade-screen", order: 102, parentSlug: "shade" },
-  { name: "دبل شید", slug: "double-shade", order: 103, parentSlug: "shade" },
-  { name: "مینی شید", slug: "mini-shade", order: 104, parentSlug: "shade" },
-  { name: "شید رومن", slug: "shade-roman", order: 201, parentSlug: "roman" },
-  { name: "پلیسه دستی", slug: "pleated-manual", order: 301, parentSlug: "pleated" },
-  { name: "پلیسه زنجیری", slug: "pleated-chain", order: 302, parentSlug: "pleated" },
-  { name: "پلیسه تاچ", slug: "pleated-touch", order: 303, parentSlug: "pleated" },
-  { name: "پلیسه شب و روز", slug: "pleated-day-night", order: 304, parentSlug: "pleated" },
-  { name: "توری پلیسه", slug: "pleated-mesh", order: 305, parentSlug: "pleated" },
-  { name: "کرکره چوبی", slug: "wooden-blind", order: 401, parentSlug: "roller" },
-  { name: "کرکره فلزی / آلومینیومی", slug: "metal-blind", order: 402, parentSlug: "roller" },
-  { name: "هازان چاپی", slug: "printed-hazan", order: 501, parentSlug: "printed" },
-  { name: "زبرا چاپی", slug: "zebra-printed", order: 601, parentSlug: "zebra" },
+const SHOP_ACCESSORY_CATS = [
+  { name: "اکسسوری", slug: "accessories", order: 0 },
+  { name: "فینیال", slug: "finial", order: 1 },
+  { name: "حاشیه", slug: "border", order: 2 },
+  { name: "میخ‌سر", slug: "nailhead", order: 3 },
+  { name: "منگوله", slug: "tassel", order: 4 },
+  { name: "ریشه / فرینج", slug: "fringe", order: 5 },
+  { name: "بند نگهدارنده", slug: "tieback", order: 6 },
 ];
-
-const SHOP_ACCESSORY_CATS: CatDef[] = [
-  { name: "اکسسوری پرده", slug: "accessories", order: 1 },
-  { name: "ریسه چرمی", slug: "leather-cord", order: 2, parentSlug: "accessories" },
-  { name: "فینیال / سرمیله", slug: "finial", order: 3, parentSlug: "accessories" },
-  { name: "نوار حاشیه", slug: "border", order: 4, parentSlug: "accessories" },
-  { name: "میخ‌سر / نگین", slug: "nailhead", order: 5, parentSlug: "accessories" },
-  { name: "منگوله", slug: "tassel", order: 6, parentSlug: "accessories" },
-  { name: "ریشه / فرینج", slug: "fringe", order: 7, parentSlug: "accessories" },
-  { name: "بند نگهدارنده", slug: "tieback", order: 8, parentSlug: "accessories" },
-];
-
-const ACCESSORY_SLUGS = new Set(SHOP_ACCESSORY_CATS.map((c) => c.slug));
 
 const SAMPLE_ACCESSORY_PRODUCTS = [
   {
@@ -137,35 +85,11 @@ const SAMPLE_ACCESSORY_PRODUCTS = [
     price: 280000,
     description: "نوار حاشیه مخملی برای لبه‌دوزی پرده",
   },
-  {
-    name: "میخ‌سر تزئینی",
-    slug: "decorative-nailhead",
-    categorySlug: "nailhead",
-    price: 120000,
-    description: "ست میخ‌سر تزئینی برای نصب و دکور",
-  },
-  {
-    name: "حلقه فلزی طلایی",
-    slug: "gold-metal-ring",
-    categorySlug: "accessories",
-    price: 95000,
-    description: "حلقه فلزی طلایی برای ریل پرده",
-  },
-  {
-    name: "میله پرده استیل",
-    slug: "steel-curtain-rod",
-    categorySlug: "accessories",
-    price: 890000,
-    description: "میله پرده استیل مات",
-  },
-  {
-    name: "بند نگهدارنده مخمل",
-    slug: "velvet-tieback",
-    categorySlug: "tieback",
-    price: 210000,
-    description: "بند نگهدارنده مخملی با گیره فلزی",
-  },
 ];
+
+function empty(v: unknown): boolean {
+  return v == null || v === "";
+}
 
 async function seedAdmin() {
   const email = process.env.ADMIN_EMAIL || "admin@antic.local";
@@ -180,143 +104,105 @@ async function seedAdmin() {
         role: "admin",
       },
     });
-    console.log(`Admin created: ${email} / ${password}`);
+    console.log(`Admin created: ${email}`);
   } else {
-    console.log(`Admin exists: ${email}`);
+    console.log(`Admin exists: ${email} — unchanged`);
   }
-}
-
-async function purgeNonAccessoryShopData() {
-  const allShopCats = await prisma.shopCategory.findMany();
-  const nonAccessory = allShopCats.filter((c) => !ACCESSORY_SLUGS.has(c.slug));
-  const nonIds = nonAccessory.map((c) => c.id);
-
-  if (nonIds.length) {
-    await prisma.product.updateMany({
-      where: { categoryId: { in: nonIds } },
-      data: { categoryId: null },
-    });
-    await prisma.shopCategory.deleteMany({ where: { id: { in: nonIds } } });
-    console.log(`Removed ${nonIds.length} non-accessory shop categories`);
-  }
-
-  await prisma.product.deleteMany({
-    where: {
-      slug: {
-        in: [
-          "pleated-manual-curtain",
-          "avin-sheer-braid",
-          "jonas-sheer-turkey",
-          "benis-sheer-turkey",
-        ],
-      },
-    },
-  });
-
-  await prisma.curtainCategory.deleteMany({
-    where: { slug: { in: [...ACCESSORY_SLUGS] } },
-  });
 }
 
 async function seedCurtainCategories() {
+  let created = 0;
+  let skipped = 0;
   for (const root of CURTAIN_ROOTS) {
-    const childrenFromSubs = CURTAIN_SUBS.filter((s) => s.parentSlug === root.slug).map((ch) => ({
-      name: ch.name,
-      slug: ch.slug,
-    }));
-    const children = root.subs?.length ? root.subs : childrenFromSubs;
-
-    await prisma.curtainCategory.upsert({
-      where: { slug: root.slug },
-      create: {
+    const existing = await prisma.curtainCategory.findUnique({ where: { slug: root.slug } });
+    if (existing) {
+      const data: Record<string, unknown> = {};
+      if (empty(existing.mechanism) && SLUG_MECHANISM[root.slug]) {
+        data.mechanism = SLUG_MECHANISM[root.slug];
+      }
+      if (empty(existing.description) && root.description) {
+        data.description = root.description;
+      }
+      if (Object.keys(data).length) {
+        await prisma.curtainCategory.update({ where: { slug: root.slug }, data });
+      }
+      skipped++;
+      continue;
+    }
+    await prisma.curtainCategory.create({
+      data: {
         name: root.name,
         slug: root.slug,
         order: root.order,
         description: root.description || null,
         mechanism: SLUG_MECHANISM[root.slug] || null,
-        subcategories: JSON.stringify(children),
-      },
-      update: {
-        name: root.name,
-        order: root.order,
-        description: root.description || undefined,
-        mechanism: SLUG_MECHANISM[root.slug] || null,
-        subcategories: JSON.stringify(children),
+        subcategories: "[]",
+        inCatalog: true,
       },
     });
+    created++;
   }
 
-  // مهاجرت: هر PortfolioCategory قدیمی را به CurtainCategory منتقل کن
   try {
     const old = await prisma.portfolioCategory.findMany();
     for (const p of old) {
-      await prisma.curtainCategory.upsert({
-        where: { slug: p.slug },
-        create: {
+      const exists = await prisma.curtainCategory.findUnique({ where: { slug: p.slug } });
+      if (exists) continue;
+      await prisma.curtainCategory.create({
+        data: {
           name: p.name,
           slug: p.slug,
           order: p.order + 50,
           description: p.description,
           image: p.image,
-          subcategories: p.subcategories,
-        },
-        update: {
-          name: p.name,
-          description: p.description ?? undefined,
-          image: p.image ?? undefined,
-          subcategories: p.subcategories ?? undefined,
+          subcategories: p.subcategories || "[]",
+          inCatalog: false,
         },
       });
+      created++;
     }
-    if (old.length) console.log(`Migrated ${old.length} PortfolioCategory → CurtainCategory`);
   } catch {
-    /* جدول خالی یا مدل حذف‌شده */
+    /* optional table */
   }
 
-  console.log(`Curtain categories (unified): ${CURTAIN_ROOTS.length} roots`);
+  console.log(`CurtainCategory: created=${created}, preserved=${skipped}`);
 }
 
-async function seedShopAccessoryCategories() {
-  const sorted = [...SHOP_ACCESSORY_CATS].sort((a, b) => {
-    if (!a.parentSlug && b.parentSlug) return -1;
-    if (a.parentSlug && !b.parentSlug) return 1;
-    return a.order - b.order;
-  });
-
+async function seedShopAccessoryCategories(): Promise<Map<string, string>> {
   const slugToId = new Map<string, string>();
-
-  for (const c of sorted) {
-    const description = c.parentSlug ? `زیرمجموعه: اکسسوری` : "اکسسوری قابل خرید در فروشگاه";
-    const row = await prisma.shopCategory.upsert({
-      where: { slug: c.slug },
-      create: {
+  let created = 0;
+  for (const c of SHOP_ACCESSORY_CATS) {
+    const existing = await prisma.shopCategory.findUnique({ where: { slug: c.slug } });
+    if (existing) {
+      slugToId.set(c.slug, existing.id);
+      continue;
+    }
+    const row = await prisma.shopCategory.create({
+      data: {
         name: c.name,
         slug: c.slug,
-        description,
+        description: c.slug === "accessories" ? "اکسسوری قابل خرید در فروشگاه" : null,
         visible: true,
         order: c.order,
-      },
-      update: {
-        name: c.name,
-        description,
-        order: c.order,
-        visible: true,
       },
     });
     slugToId.set(c.slug, row.id);
+    created++;
   }
-
-  console.log(`Shop categories (accessories only): ${sorted.length}`);
+  const all = await prisma.shopCategory.findMany();
+  for (const r of all) slugToId.set(r.slug, r.id);
+  console.log(`ShopCategory: created=${created}, total=${all.length}`);
   return slugToId;
 }
 
 async function seedAccessoryProducts(slugToId: Map<string, string>) {
-  let n = 0;
+  let created = 0;
   for (const p of SAMPLE_ACCESSORY_PRODUCTS) {
+    const exists = await prisma.product.findUnique({ where: { slug: p.slug } });
+    if (exists) continue;
     const categoryId = slugToId.get(p.categorySlug) || slugToId.get("accessories") || null;
-    await prisma.product.upsert({
-      where: { slug: p.slug },
-      create: {
+    await prisma.product.create({
+      data: {
         name: p.name,
         slug: p.slug,
         description: p.description,
@@ -326,28 +212,17 @@ async function seedAccessoryProducts(slugToId: Map<string, string>) {
         visible: true,
         inStock: true,
         stock: 50,
-        sortOrder: ++n,
-      },
-      update: {
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        categoryId,
-        visible: true,
+        sortOrder: created + 1,
       },
     });
+    created++;
   }
-  console.log(`Shop accessory products: ${SAMPLE_ACCESSORY_PRODUCTS.length}`);
+  console.log(`Products: created=${created} (existing untouched)`);
 }
 
-/** مدل نمونه فقط اگر جدول کاملاً خالی باشد — بدون داده جعلی وقتی مدل واقعی هست */
 async function seedModelsIfEmpty() {
   const count = await prisma.curtainModel.count();
-  if (count > 0) {
-    console.log(`Curtain models present (${count}) — skip seed models`);
-    return;
-  }
-  console.log("No curtain models — admin should add real catalog data");
+  console.log(`Curtain models: ${count} (never auto-deleted)`);
 }
 
 async function seedVirtualWindow() {
@@ -360,18 +235,19 @@ async function seedVirtualWindow() {
         railColor: "#C9A227",
       },
     });
+    console.log("VirtualWindowSetting created once");
   }
 }
 
 async function main() {
+  console.log("Safe seed — no deletes, no overwrite of existing content");
   await seedAdmin();
-  await purgeNonAccessoryShopData();
   await seedCurtainCategories();
   const slugToId = await seedShopAccessoryCategories();
   await seedAccessoryProducts(slugToId);
   await seedModelsIfEmpty();
   await seedVirtualWindow();
-  console.log("Seed complete (unified categories).");
+  console.log("Seed complete (data preserved).");
 }
 
 main()
