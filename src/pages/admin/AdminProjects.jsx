@@ -3,7 +3,7 @@ import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { base44 } from "@/api/base44Client";
 import { allCategorySelectOptions } from "@/lib/categoryTree";
 
-/** نمونه‌های اجرا — گالری چندتصویری با انتخاب فایل */
+/** نمونه‌های اجرا — گالری چندتصویری (تا ۲۰ تصویر) مثل کاور */
 export default function AdminProjects() {
   const [categories, setCategories] = useState([]);
 
@@ -27,7 +27,7 @@ export default function AdminProjects() {
       key: "images",
       label: "گالری (اختیاری)",
       type: "gallery",
-      help: "چند تصویر را یکجا یا جداگانه انتخاب کنید",
+      help: "مانند کاور — تا ۲۰ تصویر، انتخاب چندتایی از دستگاه",
     },
   ];
 
