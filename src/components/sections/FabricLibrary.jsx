@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Phone } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { useCurtainCategories, pickVisualCategories } from "@/hooks/useCurtainCategories";
+import { SITE_PHONE_HREF } from "@/lib/siteContact";
 
 export default function FabricLibrary() {
   const { categories, loading } = useCurtainCategories();
@@ -39,7 +40,7 @@ export default function FabricLibrary() {
             </h2>
           </div>
           <p className="max-w-md font-body text-sm leading-7 text-muted-foreground">
-            همه از یک منبع: دسته‌بندی کاتالوگ در پنل ادمین (`CurtainCategory`).
+            دسته‌بندی‌های کاتالوگ را مرور کنید و مدل مناسب فضای خود را انتخاب کنید.
           </p>
         </div>
 
@@ -58,32 +59,26 @@ export default function FabricLibrary() {
                 <Image
                   src={f.image}
                   alt={f.name}
-                  className="absolute inset-0 h-full w-full transition-transform duration-[1.4s] ease-out group-hover:scale-105"
+                  className="h-full w-full transition-transform duration-700 group-hover:scale-105"
                   fittingType="fill"
                 />
               ) : (
-                <div className="absolute inset-0 bg-secondary/40" />
+                <div className="h-full w-full bg-secondary/40" />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 p-6 text-right">
+              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
+              <div className="absolute bottom-0 right-0 left-0 p-5 text-right">
                 <span className="font-display text-[10px] tracking-[0.3em] text-primary">{f.slug}</span>
-                <h3
-                  className={`font-display font-bold text-foreground transition-all duration-500 ${
-                    active === i ? "text-3xl" : "text-xl"
-                  }`}
-                >
-                  {f.name}
-                </h3>
+                <h3 className="font-display text-xl font-bold text-foreground md:text-2xl">{f.name}</h3>
                 {active === i && (
                   <div className="mt-3 animate-fade-up">
                     {f.description && (
-                      <p className="font-body text-sm leading-7 text-foreground/75">{f.description}</p>
+                      <p className="mb-3 line-clamp-2 font-body text-xs leading-6 text-muted-foreground">{f.description}</p>
                     )}
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Link to={`/catalog?category=${f.slug}`} className="btn-ghost-gold text-xs">
                         مشاهده کاتالوگ
                       </Link>
-                      <a href="tel:02112345678" className="btn-ghost-gold text-xs">
+                      <a href={SITE_PHONE_HREF} className="btn-ghost-gold text-xs">
                         <Phone className="h-3.5 w-3.5" /> مشاوره
                       </a>
                     </div>
@@ -117,7 +112,7 @@ export default function FabricLibrary() {
                   <Link to={`/catalog?category=${f.slug}`} className="btn-ghost-gold text-xs">
                     کاتالوگ
                   </Link>
-                  <a href="tel:02112345678" className="btn-ghost-gold text-xs">
+                  <a href={SITE_PHONE_HREF} className="btn-ghost-gold text-xs">
                     <Phone className="h-3.5 w-3.5" /> مشاوره
                   </a>
                 </div>
