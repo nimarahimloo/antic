@@ -10,6 +10,7 @@ import orderRoutes from "./routes/orders.js";
 import agentRoutes from "./routes/agents.js";
 import mcpRoutes from "./routes/mcp.js";
 import renderRoutes from "./routes/render.js";
+import searchRoutes from "./routes/search.js";
 import { HttpError, sendError } from "./lib/errors.js";
 
 const app = express();
@@ -56,6 +57,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/agents", agentRoutes);
 app.use("/api/mcp", mcpRoutes);
 app.use("/api/render", renderRoutes);
+app.use("/api/search", searchRoutes);
 
 app.use((_req, _res, next) => {
   next(new HttpError(404, "Not found"));
