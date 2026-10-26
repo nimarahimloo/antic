@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Phone, ArrowLeft } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { useCurtainCategories, pickSystemCategories } from "@/hooks/useCurtainCategories";
+import { SITE_PHONE_HREF } from "@/lib/siteContact";
 
 export default function CorporateCurtains() {
   const { categories, loading } = useCurtainCategories();
@@ -79,7 +80,7 @@ export default function CorporateCurtains() {
         </div>
 
         <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
-          <a href="tel:02112345678" className="btn-gold">
+          <a href={SITE_PHONE_HREF} className="btn-gold">
             <Phone className="h-4 w-4" /> مشاوره پروژه
           </a>
           <Link to="/catalog" className="btn-ghost-gold">
