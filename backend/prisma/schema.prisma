@@ -53,6 +53,8 @@ model CurtainCategory {
   order         Int      @default(0)
   mechanism     String?
   subcategories String?
+  /// نمایش در کاتالوگ سایت (تیک «کاتالوگ دارد»)
+  inCatalog     Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
