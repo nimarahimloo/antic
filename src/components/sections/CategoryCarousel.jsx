@@ -10,7 +10,7 @@ import { useCurtainCategories } from "@/hooks/useCurtainCategories";
  * - حرکت خودکار آهسته (با توقف هنگام تعامل)
  */
 export default function CategoryCarousel() {
-  const { categories, loading } = useCurtainCategories();
+  const { categories, loading } = useCurtainCategories({ catalogOnly: true });
   const scrollerRef = useRef(null);
   const dragRef = useRef({
     active: false,
@@ -34,7 +34,6 @@ export default function CategoryCarousel() {
     };
   }, []);
 
-  // حرکت خودکار افقی
   useEffect(() => {
     if (!categories.length || paused) return;
     const id = setInterval(() => {
@@ -63,7 +62,6 @@ export default function CategoryCarousel() {
   const onPointerDown = (e) => {
     const el = scrollerRef.current;
     if (!el) return;
-    // فقط دکمه اصلی ماوس / لمس
     if (e.pointerType === "mouse" && e.button !== 0) return;
     dragRef.current = {
       active: true,
@@ -163,7 +161,6 @@ export default function CategoryCarousel() {
         </div>
       </div>
 
-      {/* dir=ltr برای رفتار یکنواخت scrollLeft در درگ */}
       <div
         ref={scrollerRef}
         dir="ltr"
