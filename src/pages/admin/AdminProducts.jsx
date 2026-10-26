@@ -5,7 +5,8 @@ import { compressImage } from "@/lib/compressImage";
 
 const API = import.meta.env.VITE_API_BASE || "/api";
 const GALLERY_MAX = 20;
-const ACCEPT = "image/jpeg,image/png,image/webp,image/gif,image/*";
+/** همان accept نمونه‌های اجرا — بدون image/* تا HEIC رد نشود */
+const ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
 
 function authHeaders() {
   const t = localStorage.getItem("antic_access_token");
@@ -25,7 +26,7 @@ function extractGallery(p) {
   return [...new Set(urls)];
 }
 
-/** همان مسیر آپلود نمونه‌های اجرا — فشرده‌سازی با fallback روی فایل اصلی */
+/** فشرده‌سازی + fallback روی فایل اصلی — مثل AdminEntityPage */
 async function uploadOne(file) {
   if (!file) throw new Error("فایلی انتخاب نشد");
   let toSend = file;
@@ -139,8 +140,11 @@ export default function AdminProducts() {
     }
   }
 
-  async function uploadGalleryFiles(filesInput) {
-    const files = Array.from(filesInput || []).filter(Boolean);
+  async function uploadGalleryFiles(fileList) {
+    // fileList باید آرایهٔ کپی‌شده باشد (نه FileList زنده)
+    const files = Array.isArray(fileList)
+      ? fileList.filter(Boolean)
+      : Array.from(fileList || []).filter(Boolean);
     if (!files.length) {
       setError("فایلی انتخاب نشد");
       return;
@@ -161,11 +165,12 @@ export default function AdminProducts() {
       setForm((f) => {
         const cur = Array.isArray(f.gallery) ? f.gallery : [];
         const next = [...cur, ...urls].slice(0, GALLERY_MAX);
-        if (cur.length + urls.length > GALLERY_MAX) {
-          setHint(`حداکثر ${GALLERY_MAX} تصویر؛ فقط ${next.length - cur.length} مورد اضافه شد.`);
-        }
         return { ...f, gallery: next };
       });
+      const curLen = Array.isArray(form.gallery) ? form.gallery.length : 0;
+      if (curLen + urls.length > GALLERY_MAX) {
+        setHint(`حداکثر ${GALLERY_MAX} تصویر؛ فقط بخشی اضافه شد.`);
+      }
     } catch (e) {
       setError(e?.message || "آپلود گالری ناموفق بود");
     } finally {
@@ -395,6 +400,7 @@ export default function AdminProducts() {
                         className="hidden"
                         disabled={uploadingCover}
                         onChange={(e) => {
+                          // File تکی را قبل از پاک کردن input بردار
                           const f = e.target.files?.[0] || null;
                           e.target.value = "";
                           if (f) uploadCover(f);
@@ -460,16 +466,18 @@ export default function AdminProducts() {
                         className="hidden"
                         disabled={uploadingGallery}
                         onChange={(e) => {
-                          const files = e.target.files;
+                          // مهم: FileList زنده است — قبل از value="" باید Array.from شود
+                          // (در غیر این صورت بعد از clear لیست خالی می‌شود و گالری آپلود نمی‌شود)
+                          const list = e.target.files ? Array.from(e.target.files) : [];
                           e.target.value = "";
-                          if (files?.length) uploadGalleryFiles(files);
+                          if (list.length) uploadGalleryFiles(list);
                         }}
                       />
                     </label>
                   )}
                 </div>
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  {(form.gallery || []).length}/{GALLERY_MAX} — در صفحه محصول زیر تصویر اصلی نمایش داده می‌شود
+                  {(form.gallery || []).length}/{GALLERY_MAX} — JPG/PNG/WebP — در صفحه محصول زیر تصویر اصلی
                 </p>
               </div>
 
@@ -518,11 +526,7 @@ export default function AdminProducts() {
               {error && <p className="text-xs text-destructive">{error}</p>}
               {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
               <div className="flex gap-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="btn-gold flex-1 justify-center"
-                >
+                <button type="submit" disabled={busy} className="btn-gold flex-1 justify-center">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
                 </button>
                 <button type="button" onClick={closeModal} className="btn-ghost-gold">
