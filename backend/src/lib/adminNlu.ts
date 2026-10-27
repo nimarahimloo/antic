@@ -1,6 +1,5 @@
 /**
- * تشخیص آزاد دستور ادمین — نه فقط چند الگوی ثابت.
- * خروجی: action + entity + target token + fields
+ * تشخیص آزاد دستور ادمین — هر لحن، نه فقط چند الگوی ثابت.
  */
 
 export type EntityKind =
@@ -143,17 +142,24 @@ export function detectAction(t: string): { action: Action | null; score: number 
     scores[a] += n;
   };
 
-  if (/حذف|پاک\s*کن|پاکش|بنداز\s*دور|از\s*بین\s*ببر|دیلیت|پاک\s*کنید|بکش\s*کن|بزن\s*بیرون|نداشته\s*باش|delete|remove|drop\b/.test(t))
+  if (
+    /حذف|پاک\s*کن|پاکش|بنداز\s*دور|از\s*بین\s*ببر|دیلیت|پاک\s*کنید|بکش\s*کن|بزن\s*بیرون|نداشته\s*باش|برش\s*دار|delete|remove|drop\b/.test(
+      t
+    )
+  )
     add("delete", 3);
-  if (/حذفش|پاکش\s*کن|دیلیت|برش\s*دار|ببر\s*دور/.test(t)) add("delete", 2);
+  if (/حذفش|پاکش\s*کن|دیلیت|ببر\s*دور/.test(t)) add("delete", 2);
   if (/رو\s+پاک|را\s+پاک|رو\s+حذف|را\s+حذف/.test(t)) add("delete", 3);
 
-  if (/افزودن|اضافه|بساز|بسازید|ثبت\s*کن|ایجاد|بذار\s*تو\s*سیستم|وارد\s*کن|create|add\b|new\b|insert/.test(t))
+  if (
+    /افزودن|اضافه|بساز|بسازید|ثبت\s*کن|ایجاد|بذار\s*تو\s*سیستم|وارد\s*کن|بزن\s*تو\s*سایت|create|add\b|insert/.test(
+      t
+    )
+  )
     add("create", 3);
   if (/یه\s+.+(بساز|اضافه|ثبت)/.test(t)) add("create", 2);
   if (/میخوام\s+.+(اضافه|بسازم|ثبت)/.test(t)) add("create", 2);
   if (/دارم\s+.+(جدید|تازه)/.test(t) && /مدل|دسته|محصول|پروژه/.test(t)) add("create", 2);
-  if (/بزن\s+تو\s+(سایت|دیتابیس|سیستم)/.test(t)) add("create", 2);
 
   if (/ویرایش|بروز|آپدیت|تغییر|عوض\s*کن|عوضش|درستش\s*کن|اصلاح|rename|update|edit|set\b|modify/.test(t))
     add("update", 3);
@@ -161,15 +167,17 @@ export function detectAction(t: string): { action: Action | null; score: number 
   if (/رو\s+بکن|را\s+بکن|بشه\s+|بشود\s+/.test(t) && /قیمت|رنگ|نام|وضعیت/.test(t)) add("update", 2);
   if (/از\s+.+\s+به\s+/.test(t)) add("update", 2);
 
-  if (/لیست|فهرست|نشان\s*بده|نشون\s*بده|بیار|بده\s*ببینم|list|show|display|همه\s*ی|نمایش\s*بده/.test(t))
+  if (
+    /لیست|فهرست|نشان\s*بده|نشون\s*بده|بیار|بده\s*ببینم|list|show|display|همه\s*ی|نمایش\s*بده|ببینم/.test(t)
+  )
     add("list", 3);
-  if (/چی\s*داریم|چه\s*.+هایی|ببینم|چیا\s*داریم|چی\s*هست|چی\s*داری/.test(t)) add("list", 3);
+  if (/چی\s*داریم|چه\s*.+هایی|چیا\s*داریم|چی\s*هست|چی\s*داری|اوضاع/.test(t)) add("list", 3);
   if (/همه\s*(مدل|دسته|محصول|سفارش|درخواست|پروژه|ها)/.test(t)) add("list", 3);
-  if (/مدل.?ها|دسته.?ها|سفارش.?ها|محصول.?ها|درخواست.?ها/.test(t) && !/حذف|ویرایش|افزودن/.test(t))
-    add("list", 2);
+  if (/مدل.?ها|دسته.?ها|سفارش.?ها|محصول.?ها|درخواست.?ها/.test(t) && !/حذف|ویرایش|افزودن|بساز/.test(t))
+    add("list", 3);
 
   if (/تعداد|چندتا|چند\s*تا|count|how\s*many/.test(t)) add("count", 3);
-  if (/جستجو|پیدا\s*کن|search|find\b/.test(t)) add("search", 2);
+  if (/جستجو|پیدا\s*کن|search|find\b|کجاست|داریم\s*یا\s*نه/.test(t)) add("search", 2);
   if (/راهنما|چطور|چگونه|کمک|help|دستورات/.test(t)) add("help", 2);
 
   let best: Action | null = null;
@@ -198,22 +206,22 @@ export function detectEntity(t: string, pathHint?: string): { entity: EntityKind
   if (/دسته\s*کاتالوگ|دسته.?بندی|دسته.?ها|categor|کاتالوگ.?دسته/.test(t) && !/فروشگاه/.test(t))
     bump("category", 3);
   if (/دسته/.test(t) && !/فروشگاه/.test(t) && !scores["category"]) bump("category", 2);
-  if (/سفارش|order\b/.test(t)) bump("order", 3);
-  if (/درخواست|مشاوره|request\b/.test(t)) bump("request", 3);
+  if (/سفارش|order\b|سفارش.?ها/.test(t)) bump("order", 3);
+  if (/درخواست|مشاوره|request\b|درخواست.?ها/.test(t)) bump("request", 3);
   if (/قالب|template|chroma/.test(t)) bump("template", 3);
   if (/مرجع\s*نصب|install\s*ref/.test(t)) bump("install_ref", 3);
   if (/طراحی\s*ذخیره|saved\s*design/.test(t)) bump("saved_design", 3);
   if (/پنجره\s*مجازی|window\s*setting/.test(t)) bump("window", 3);
 
   if (pathHint) {
-    if (pathHint.includes("models")) bump("model", 2);
-    if (pathHint.includes("categories") && !pathHint.includes("portfolio")) bump("category", 2);
-    if (pathHint.includes("portfolio")) bump("category", 1);
-    if (pathHint.includes("projects")) bump("project", 2);
-    if (pathHint.includes("products")) bump("product", 2);
-    if (pathHint.includes("orders")) bump("order", 2);
-    if (pathHint.includes("requests")) bump("request", 2);
-    if (pathHint.includes("window")) bump("template", 2);
+    if (pathHint.includes("models")) bump("model", 3);
+    if (pathHint.includes("categories") && !pathHint.includes("portfolio")) bump("category", 3);
+    if (pathHint.includes("portfolio")) bump("category", 2);
+    if (pathHint.includes("projects")) bump("project", 3);
+    if (pathHint.includes("products")) bump("product", 3);
+    if (pathHint.includes("orders")) bump("order", 3);
+    if (pathHint.includes("requests")) bump("request", 3);
+    if (pathHint.includes("window")) bump("template", 3);
   }
 
   let best: EntityKind | null = null;
@@ -230,7 +238,7 @@ export function detectEntity(t: string, pathHint?: string): { entity: EntityKind
 
 const STOP = new Set(
   normalize(
-    "را رو به با که از در برای یه یک این اون حذف کن پاک بساز اضافه ثبت ویرایش تغییر عوض لیست نشان بده تعداد مدل دسته محصول سفارش درخواست پروژه نمونه اجرا پرده لطفا خواهشا میخوام می‌خوام بکن بگذار بذار باشه است هست"
+    "را رو به با که از در برای یه یک این اون حذف کن پاک بساز اضافه ثبت ویرایش تغییر عوض لیست نشان بده تعداد مدل دسته محصول سفارش درخواست پروژه نمونه اجرا پرده لطفا خواهشا میخوام می‌خوام بکن بگذار بذار باشه است هست چی داریم ببینم نشون"
   ).split(" ")
 );
 
@@ -243,11 +251,11 @@ export function extractTarget(text: string, fields: Record<string, string>): str
   const cuid = text.match(/\b(c[a-z0-9]{20,})\b/i);
   if (cuid) return cuid[1];
 
-  const code = text.match(/\b([A-Za-z]{1,6}-?\d{2,6})\b/);
+  const code = text.match(/\b([A-Za-z]{1,10}-?\d{1,8})\b/);
   if (code) return code[1];
 
   const after = text.match(
-    /(?:حذف|پاک|ویرایش|تغییر|عوض|delete|remove|update|edit)\s+(?:مدل|دسته|محصول|سفارش|درخواست|پروژه|نمونه)?\s*[«"]?([\u0600-\u06FFa-zA-Z0-9_-]{2,})/i
+    /(?:حذف|پاک|ویرایش|تغییر|عوض|delete|remove|update|edit|جستجو|پیدا)\s+(?:مدل|دسته|محصول|سفارش|درخواست|پروژه|نمونه)?\s*[«"]?([\u0600-\u06FFa-zA-Z0-9_-]{2,})/i
   );
   if (after?.[1] && !STOP.has(normalize(after[1]))) return after[1];
 
@@ -290,12 +298,27 @@ export function parseAdminCommand(
   if (!finalAction && target && (fields.price || fields.color || fields.status || fields.name || fields.title)) {
     finalAction = "update";
   }
-  if (!finalAction && entity && /ها\b|ها$/.test(t)) finalAction = "list";
+  // جمع / لیست آزاد
+  if (!finalAction && entity && (/ها\b|ها$|لیست|نشون|نشان|ببین|چی/.test(t) || t.length < 24)) {
+    finalAction = "list";
+  }
+  // فقط کد → جستجو/لیست
+  if (!finalAction && target && /^[A-Za-z0-9_-]+$/.test(target) && t.length < 40) {
+    finalAction = "search";
+  }
+  // روی صفحه ادمین بدون فعل واضح → list همان موجودیت path
+  if (!finalAction && opts?.path && opts.path.includes("/admin") && t.length > 0 && t.length < 48) {
+    finalAction = "list";
+  }
 
   let finalEntity = entity;
   if (!finalEntity && finalAction && opts?.path) {
     const { entity: pathEnt, score: ps } = detectEntity("", opts.path);
     if (ps >= 1) finalEntity = pathEnt;
+  }
+  if (!finalEntity && finalAction === "list" && opts?.path) {
+    const { entity: pathEnt } = detectEntity("", opts.path);
+    finalEntity = pathEnt || "model";
   }
 
   const confidence = Math.min(1, ((finalAction ? 2 : 0) + (finalEntity ? 2 : 0) + aScore + eScore) / 8);
