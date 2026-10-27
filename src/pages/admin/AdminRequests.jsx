@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { Trash2, Loader2 } from "lucide-react";
+import { adminToast } from "@/lib/adminToast";
 
 const STATUS_OPTIONS = [
   { value: "new", label: "جدید" },
@@ -24,14 +25,27 @@ export default function AdminRequests() {
   useEffect(load, [load]);
 
   async function setStatus(record, status) {
+    const prev = record.status;
     setRequests((rs) => rs.map((r) => (r.id === record.id ? { ...r, status } : r)));
-    await base44.entities.ConsultationRequest.update(record.id, { status });
+    try {
+      await base44.entities.ConsultationRequest.update(record.id, { status });
+      const label = STATUS_OPTIONS.find((s) => s.value === status)?.label || status;
+      adminToast("update", "درخواست", `${record.name || ""} — ${label}`);
+    } catch {
+      setRequests((rs) => rs.map((r) => (r.id === record.id ? { ...r, status: prev } : r)));
+      adminToast("error", "درخواست", "تغییر وضعیت ناموفق بود");
+    }
   }
 
   async function remove(record) {
     if (!window.confirm(`حذف درخواست «${record.name}»؟`)) return;
-    await base44.entities.ConsultationRequest.delete(record.id);
-    setRequests((rs) => rs.filter((r) => r.id !== record.id));
+    try {
+      await base44.entities.ConsultationRequest.delete(record.id);
+      setRequests((rs) => rs.filter((r) => r.id !== record.id));
+      adminToast("delete", "درخواست", record.name || "");
+    } catch {
+      adminToast("error", "درخواست", "حذف ناموفق بود");
+    }
   }
 
   const filtered =
