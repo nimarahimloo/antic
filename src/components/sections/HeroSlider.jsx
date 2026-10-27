@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDown, ChevronRight, ChevronLeft } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
 
-const SLIDES = [
+const FALLBACK_SLIDES = [
   {
     space: "پذیرایی",
     title: "فضای پذیرایی",
@@ -31,23 +32,50 @@ const SLIDES = [
 ];
 
 export default function HeroSlider() {
+  const { appPublicSettings } = useAuth();
+  const slides = useMemo(() => {
+    const raw =
+      appPublicSettings?.public_settings?.hero_slides ||
+      appPublicSettings?.public_settings?.heroSlides;
+    if (Array.isArray(raw) && raw.length) {
+      const normalized = raw
+        .map((s) => ({
+          space: String(s.space || s.title || ""),
+          title: String(s.title || s.space || ""),
+          subtitle: String(s.subtitle || ""),
+          image: String(s.image || ""),
+        }))
+        .filter((s) => s.image);
+      if (normalized.length) return normalized;
+    }
+    return FALLBACK_SLIDES;
+  }, [appPublicSettings]);
+
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(1);
 
-  const paginate = useCallback((dir) => {
-    setDirection(dir);
-    setIndex((prev) => (prev + dir + SLIDES.length) % SLIDES.length);
-  }, []);
+  useEffect(() => {
+    setIndex(0);
+  }, [slides.length]);
+
+  const paginate = useCallback(
+    (dir) => {
+      setDirection(dir);
+      setIndex((prev) => (prev + dir + slides.length) % slides.length);
+    },
+    [slides.length]
+  );
 
   useEffect(() => {
+    if (slides.length < 2) return;
     const timer = setInterval(() => {
       setDirection(1);
-      setIndex((prev) => (prev + 1) % SLIDES.length);
+      setIndex((prev) => (prev + 1) % slides.length);
     }, 6000);
     return () => clearInterval(timer);
-  }, []);
+  }, [slides.length]);
 
-  const slide = SLIDES[index];
+  const slide = slides[index] || slides[0];
 
   return (
     <section className="relative h-[100svh] min-h-[600px] w-full overflow-hidden bg-background">
@@ -97,39 +125,43 @@ export default function HeroSlider() {
         </Link>
       </motion.div>
 
-      <button
-        type="button"
-        onClick={() => paginate(-1)}
-        className="absolute right-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-secondary/60 bg-background/70 text-foreground backdrop-blur md:right-8"
-        aria-label="اسلاید قبلی"
-      >
-        <ChevronRight className="h-5 w-5" />
-      </button>
-      <button
-        type="button"
-        onClick={() => paginate(1)}
-        className="absolute left-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-secondary/60 bg-background/70 text-foreground backdrop-blur md:left-8"
-        aria-label="اسلاید بعدی"
-      >
-        <ChevronLeft className="h-5 w-5" />
-      </button>
-
-      <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 gap-2">
-        {SLIDES.map((_, i) => (
+      {slides.length > 1 && (
+        <>
           <button
-            key={i}
             type="button"
-            onClick={() => {
-              setDirection(i > index ? 1 : -1);
-              setIndex(i);
-            }}
-            className={`h-1.5 rounded-full transition-all ${
-              i === index ? "w-8 bg-primary" : "w-2 bg-secondary"
-            }`}
-            aria-label={`اسلاید ${i + 1}`}
-          />
-        ))}
-      </div>
+            onClick={() => paginate(-1)}
+            className="absolute right-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-secondary/60 bg-background/70 text-foreground backdrop-blur md:right-8"
+            aria-label="اسلاید قبلی"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => paginate(1)}
+            className="absolute left-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-secondary/60 bg-background/70 text-foreground backdrop-blur md:left-8"
+            aria-label="اسلاید بعدی"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+
+          <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 gap-2">
+            {slides.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => {
+                  setDirection(i > index ? 1 : -1);
+                  setIndex(i);
+                }}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === index ? "w-8 bg-primary" : "w-2 bg-secondary"
+                }`}
+                aria-label={`اسلاید ${i + 1}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
 }
