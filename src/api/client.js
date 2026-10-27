@@ -131,6 +131,7 @@ const ENTITY_NAMES = [
   "Project",
   "RenderTemplate",
   "SavedDesign",
+  "SiteSetting",
   "User",
   "VirtualWindowSetting",
 ];
