@@ -46,12 +46,16 @@ function expandVariants(userText: string, history: ChatMessage[], path: string):
   if (/نداشته\s*باش|نمیخوامش|بکش\s*کن|ببر\s*دور/.test(n) && histTarget) {
     variants.add(`حذف ${histTarget}`);
   }
-  if (path.includes("/models") && /لیست|همه|چی\s*داریم/.test(n)) variants.add("لیست مدل‌ها");
-  if (path.includes("/orders") && /لیست|همه|چی\s*داریم/.test(n)) variants.add("لیست سفارش‌ها");
-  if (path.includes("/requests") && /لیست|همه|چی\s*داریم/.test(n)) variants.add("لیست درخواست‌ها");
-  if (path.includes("/products") && /لیست|همه|چی\s*داریم/.test(n)) variants.add("لیست محصول");
-  if (path.includes("/categories") && /لیست|همه|چی\s*داریم/.test(n)) variants.add("لیست دسته کاتالوگ");
-  if (path.includes("/projects") && /لیست|همه|چی\s*داریم/.test(n)) variants.add("لیست نمونه اجرا");
+  if (path.includes("/models") && /لیست|همه|چی\s*داریم|نشون|نشان|مدل/.test(n)) variants.add("لیست مدل‌ها");
+  if (path.includes("/orders") && /لیست|همه|چی\s*داریم|نشون|نشان|سفارش/.test(n)) variants.add("لیست سفارش‌ها");
+  if (path.includes("/requests") && /لیست|همه|چی\s*داریم|نشون|نشان|درخواست/.test(n)) variants.add("لیست درخواست‌ها");
+  if (path.includes("/products") && /لیست|همه|چی\s*داریم|نشون|نشان|محصول/.test(n)) variants.add("لیست محصول");
+  if (path.includes("/categories") && /لیست|همه|چی\s*داریم|نشون|نشان|دسته/.test(n)) variants.add("لیست دسته کاتالوگ");
+  if (path.includes("/projects") && /لیست|همه|چی\s*داریم|نشون|نشان|نمونه|پروژه/.test(n)) variants.add("لیست نمونه اجرا");
+  if (/مدل.?ها\s*(رو|را)?\s*(نشون|نشان|بده|بیار)/.test(n) || n === "لیست مدل‌ها" || n === "مدل‌ها")
+    variants.add("لیست مدل‌ها");
+  if (/سفارش.?ها/.test(n) && /لیست|نشون|نشان|چی/.test(n)) variants.add("لیست سفارش‌ها");
+  if (/دسته/.test(n) && /لیست|نشون|نشان|چی/.test(n)) variants.add("لیست دسته کاتالوگ");
   if (/چند\s*تا|تعداد/.test(n) && !/مدل|دسته|محصول|سفارش/.test(n)) {
     if (path.includes("/models")) variants.add("تعداد مدل");
     else variants.add("تعداد");
@@ -74,7 +78,6 @@ export async function buildAdminAssistantReply(
     conversationId: options?.conversationId,
   };
 
-  // تایید / انصراف را مستقیم بفرست
   const bare = userText.trim();
   if (/^(تایید|تاید|تائید|انصراف|لغو|رد|confirm|cancel|آره|باشه|نه)$/i.test(bare)) {
     const executed = await executeAdminCommand(bare, execOpts);
@@ -159,14 +162,25 @@ export async function buildAdminAssistantReply(
     );
   }
 
+  if (/مدل/.test(t) && !/حذف|ویرایش|افزودن|بساز/.test(t)) {
+    const executed = await executeAdminCommand("لیست مدل‌ها", execOpts);
+    if (executed)
+      return {
+        text: executed.text,
+        blocks: executed.blocks as RichBlock[] | undefined,
+        meta: executed.meta,
+      };
+  }
+
   return pack(
-    `دستور را کامل متوجه نشدم.\nروی **${page}** هستم — بگو چه کاری روی کدام مورد.\nمثال: «مدل TEST-1 را حذف کن».`,
+    `دستور را کامل متوجه نشدم.\nروی **${page}** هستم — بگو چه کاری روی کدام مورد.\n\nمثال‌های دقیق:\n• «لیست مدل‌ها» یا «مدل‌ها رو نشون بده»\n• «مدل ZB-001 را حذف کن»\n• «خلاصه وضعیت»`,
     [
       {
         type: "quick_replies",
         items: [
+          { label: "خلاصه وضعیت", message: "خلاصه وضعیت" },
+          { label: "لیست مدل‌ها", message: "لیست مدل‌ها" },
           { label: "راهنما", message: "راهنمای دستورات" },
-          { label: "خلاصه", message: "خلاصه وضعیت" },
         ],
       },
     ]
