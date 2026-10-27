@@ -12,6 +12,7 @@ import mcpRoutes from "./routes/mcp.js";
 import renderRoutes from "./routes/render.js";
 import searchRoutes from "./routes/search.js";
 import { HttpError, sendError } from "./lib/errors.js";
+import { prisma } from "./lib/prisma.js";
 
 const app = express();
 
@@ -32,12 +33,71 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "antic-backend" });
 });
 
-app.get("/api/app/public-settings", (_req, res) => {
+const DEFAULT_HERO = [
+  {
+    space: "پذیرایی",
+    title: "فضای پذیرایی",
+    subtitle: "پرده‌های شیک برای فضای پذیرایی",
+    image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/2be489b62_generated_image.png",
+  },
+  {
+    space: "آشپزخانه",
+    title: "آشپزخانه",
+    subtitle: "کنترل نور و هماهنگی با دکوراسیون آشپزخانه",
+    image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/e29f4aed1_generated_image.png",
+  },
+  {
+    space: "اتاق خواب",
+    title: "اتاق خواب",
+    subtitle: "حریم خصوصی و آرامش برای اتاق خواب",
+    image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/58350d5ba_generated_image.png",
+  },
+  {
+    space: "فضاهای ویژه",
+    title: "فضاهای ویژه",
+    subtitle: "راهکار اختصاصی برای فضاهای خاص",
+    image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/7480c6599_generated_image.png",
+  },
+];
+
+app.get("/api/app/public-settings", async (_req, res) => {
+  let logo_url: string | null = null;
+  let hero_slides = DEFAULT_HERO;
+
+  try {
+    const row = await prisma.siteSetting.findFirst({
+      where: { key: "main" },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (row?.logoUrl) logo_url = row.logoUrl;
+    if (row?.heroSlides) {
+      try {
+        const parsed = JSON.parse(row.heroSlides);
+        if (Array.isArray(parsed) && parsed.length) {
+          hero_slides = parsed
+            .filter((s) => s && (s.image || s.title))
+            .map((s) => ({
+              space: String(s.space || s.title || ""),
+              title: String(s.title || s.space || ""),
+              subtitle: String(s.subtitle || ""),
+              image: String(s.image || ""),
+            }));
+        }
+      } catch {
+        /* keep default */
+      }
+    }
+  } catch {
+    /* db offline — defaults */
+  }
+
   res.json({
     id: "antic",
     public_settings: {
       app_name: "پرده آنتیک",
       locale: "fa",
+      logo_url,
+      hero_slides,
       ai: {
         design_consultant: "local-catalog",
         mcp: true,
