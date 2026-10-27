@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
-import { MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
-import { mechanismSelectOptions } from "@/lib/categoryTree";
+import { allCategorySelectOptions } from "@/lib/categoryTree";
 import { base44 } from "@/api/base44Client";
 
 export default function AdminCategories() {
@@ -13,6 +12,10 @@ export default function AdminCategories() {
       .catch(() => setCategories([]));
   }, []);
 
+  const categoryBySlug = Object.fromEntries(
+    categories.filter((c) => c?.slug).map((c) => [String(c.slug).toLowerCase(), c])
+  );
+
   const fields = [
     { key: "name", label: "نام دسته", required: true, placeholder: "مثلاً: شید" },
     {
@@ -23,7 +26,7 @@ export default function AdminCategories() {
     },
     {
       key: "mechanism",
-      label: "سازوکار نصب",
+      label: "دسته بندی",
       type: "select",
     },
     { key: "order", label: "ترتیب", type: "number", placeholder: "1" },
@@ -52,8 +55,12 @@ export default function AdminCategories() {
     { key: "slug", label: "شناسه" },
     {
       key: "mechanism",
-      label: "سازوکار",
-      render: (v) => (v ? MECHANISM_LABELS[v] || v : "—"),
+      label: "دسته بندی",
+      render: (v) => {
+        if (!v) return "—";
+        const cat = categoryBySlug[String(v).toLowerCase()];
+        return cat?.name || v;
+      },
     },
     {
       key: "in_catalog",
@@ -76,7 +83,7 @@ export default function AdminCategories() {
       columns={columns}
       sortBy="order"
       options={{
-        mechanism: mechanismSelectOptions(categories, MECHANISM_LABELS),
+        mechanism: allCategorySelectOptions(categories),
       }}
     />
   );
