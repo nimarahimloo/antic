@@ -21,6 +21,8 @@ const FIELD_MAP: Record<string, string> = {
   frameColor: "frame_color",
   railColor: "rail_color",
   viewImage: "view_image",
+  logoUrl: "logo_url",
+  heroSlides: "hero_slides",
   createdAt: "created_date",
   updatedAt: "updated_date",
   inCatalog: "in_catalog",
@@ -31,6 +33,8 @@ const JSON_FIELDS = new Set([
   "images",
   "productsUsed",
   "products_used",
+  "heroSlides",
+  "hero_slides",
 ]);
 
 const ALLOWED: Record<string, Set<string>> = {
@@ -100,6 +104,7 @@ const ALLOWED: Record<string, Set<string>> = {
     "designerName",
   ]),
   VirtualWindowSetting: new Set(["wallColor", "frameColor", "railColor", "viewImage"]),
+  SiteSetting: new Set(["key", "logoUrl", "heroSlides"]),
   User: new Set([]),
 };
 
