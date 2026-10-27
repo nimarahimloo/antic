@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { adminToast } from "@/lib/adminToast";
 
 const API = import.meta.env.VITE_API_BASE || "/api";
 
@@ -33,12 +34,18 @@ export default function AdminOrders() {
   }, [load]);
 
   async function setStatus(id, status) {
-    await fetch(`${API}/orders/${id}/status`, {
-      method: "PATCH",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    load();
+    try {
+      const res = await fetch(`${API}/orders/${id}/status`, {
+        method: "PATCH",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("به‌روزرسانی وضعیت ناموفق بود");
+      adminToast("update", "سفارش", STATUS_LABEL[status] || status);
+      load();
+    } catch (e) {
+      adminToast("error", "سفارش", e?.message || "خطا در تغییر وضعیت");
+    }
   }
 
   return (
