@@ -2,10 +2,18 @@ import { Link } from "react-router-dom";
 import { Phone, Mail, MapPin, Instagram, ShieldCheck, BadgeCheck } from "lucide-react";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { SITE_PHONE_HREF, SITE_PHONE_DISPLAY, SITE_EMAIL } from "@/lib/siteContact";
+import { useAuth } from "@/lib/AuthContext";
+
+const DEFAULT_LOGO = "/brand/mark.svg";
 
 export default function Footer() {
   const { categories } = useCurtainCategories({ catalogOnly: true });
   const topCats = (categories || []).slice(0, 6);
+  const { appPublicSettings } = useAuth();
+  const logoSrc =
+    appPublicSettings?.public_settings?.logo_url ||
+    appPublicSettings?.public_settings?.logoUrl ||
+    DEFAULT_LOGO;
 
   return (
     <footer className="border-t border-secondary/60 bg-background">
@@ -13,7 +21,7 @@ export default function Footer() {
         <div className="grid gap-12 md:grid-cols-4">
           <div className="md:col-span-1">
             <div className="flex items-center gap-3">
-              <img src="/brand/mark.svg" alt="Antic Curtain" className="h-11 w-11 object-contain" width={44} height={44} />
+              <img src={logoSrc} alt="Antic Curtain" className="h-11 w-11 object-contain" width={44} height={44} />
               <div className="flex flex-col leading-none">
                 <span className="font-display text-lg font-bold text-foreground">پرده آنتیک</span>
                 <span className="mt-1 font-body text-[10px] tracking-wider text-primary">ANTIC CURTAIN</span>
