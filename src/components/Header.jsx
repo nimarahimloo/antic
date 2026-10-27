@@ -13,12 +13,18 @@ const NAV = [
   { label: "تماس", to: "/contact" },
 ];
 
+const DEFAULT_LOGO = "/brand/mark.svg";
+
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const location = useLocation();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, appPublicSettings } = useAuth();
   const isAdmin = Boolean(isAuthenticated && user?.role === "admin");
+  const logoSrc =
+    appPublicSettings?.public_settings?.logo_url ||
+    appPublicSettings?.public_settings?.logoUrl ||
+    DEFAULT_LOGO;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -42,7 +48,7 @@ export default function Header() {
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-3 px-5 lg:px-10">
         <Link to="/" className="group flex shrink-0 items-center gap-3">
           <img
-            src="/brand/mark.svg"
+            src={logoSrc}
             alt="Antic Curtain"
             className="h-11 w-11 object-contain transition-transform group-hover:scale-105"
             width={44}
