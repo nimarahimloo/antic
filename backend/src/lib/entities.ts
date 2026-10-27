@@ -46,6 +46,11 @@ export const ENTITY_MAP = {
     publicRead: true,
     publicCreate: false,
   },
+  SiteSetting: {
+    model: prisma.siteSetting,
+    publicRead: true,
+    publicCreate: false,
+  },
   User: {
     model: prisma.user,
     publicRead: false,
@@ -71,6 +76,7 @@ const SORTABLE: Record<string, true> = {
   status: true,
   style: true,
   email: true,
+  key: true,
 };
 
 export function parseSort(sortBy?: string): Record<string, "asc" | "desc"> {
