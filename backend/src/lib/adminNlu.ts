@@ -161,10 +161,12 @@ export function detectAction(t: string): { action: Action | null; score: number 
   if (/رو\s+بکن|را\s+بکن|بشه\s+|بشود\s+/.test(t) && /قیمت|رنگ|نام|وضعیت/.test(t)) add("update", 2);
   if (/از\s+.+\s+به\s+/.test(t)) add("update", 2);
 
-  if (/لیست|فهرست|نشان\s*بده|نشون\s*بده|بیار|بده\s*ببینم|list|show|display|همه\s*ی/.test(t))
+  if (/لیست|فهرست|نشان\s*بده|نشون\s*بده|بیار|بده\s*ببینم|list|show|display|همه\s*ی|نمایش\s*بده/.test(t))
+    add("list", 3);
+  if (/چی\s*داریم|چه\s*.+هایی|ببینم|چیا\s*داریم|چی\s*هست|چی\s*داری/.test(t)) add("list", 3);
+  if (/همه\s*(مدل|دسته|محصول|سفارش|درخواست|پروژه|ها)/.test(t)) add("list", 3);
+  if (/مدل.?ها|دسته.?ها|سفارش.?ها|محصول.?ها|درخواست.?ها/.test(t) && !/حذف|ویرایش|افزودن/.test(t))
     add("list", 2);
-  if (/چی\s*داریم|چه\s*.+هایی|ببینم|چیا\s*داریم|چی\s*هست/.test(t)) add("list", 2);
-  if (/همه\s*(مدل|دسته|محصول|سفارش|درخواست|پروژه)/.test(t)) add("list", 2);
 
   if (/تعداد|چندتا|چند\s*تا|count|how\s*many/.test(t)) add("count", 3);
   if (/جستجو|پیدا\s*کن|search|find\b/.test(t)) add("search", 2);
@@ -188,12 +190,14 @@ export function detectEntity(t: string, pathHint?: string): { entity: EntityKind
     scores[e] = (scores[e] || 0) + n;
   };
 
-  if (/مدل|curtain\s*model|پارچه.?مدل|کاتالوگ.?مدل/.test(t)) bump("model", 3);
+  if (/مدل|curtain\s*model|پارچه.?مدل|کاتالوگ.?مدل|مدل.?ها/.test(t)) bump("model", 3);
   if (/\bmodel\b/.test(t)) bump("model", 2);
   if (/نمونه\s*اجرا|پروژه|project\b|نمونه.?کار/.test(t)) bump("project", 3);
-  if (/محصول|product\b|فروشگاه.?آیتم/.test(t)) bump("product", 3);
+  if (/محصول|product\b|فروشگاه.?آیتم|محصول.?ها/.test(t)) bump("product", 3);
   if (/دسته\s*فروشگاه|shop\s*categor|اکسسوری.?دسته/.test(t)) bump("shop_category", 4);
-  if (/دسته|categor|کاتالوگ.?دسته/.test(t) && !/فروشگاه/.test(t)) bump("category", 2);
+  if (/دسته\s*کاتالوگ|دسته.?بندی|دسته.?ها|categor|کاتالوگ.?دسته/.test(t) && !/فروشگاه/.test(t))
+    bump("category", 3);
+  if (/دسته/.test(t) && !/فروشگاه/.test(t) && !scores["category"]) bump("category", 2);
   if (/سفارش|order\b/.test(t)) bump("order", 3);
   if (/درخواست|مشاوره|request\b/.test(t)) bump("request", 3);
   if (/قالب|template|chroma/.test(t)) bump("template", 3);
