@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, LayoutDashboard, LogIn } from "lucide-react";
+import { Menu, X, LayoutDashboard, LogIn, User } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import GlobalSearch from "@/components/GlobalSearch";
 
@@ -21,6 +21,7 @@ export default function Header() {
   const location = useLocation();
   const { user, isAuthenticated, appPublicSettings } = useAuth();
   const isAdmin = Boolean(isAuthenticated && user?.role === "admin");
+  const isUser = Boolean(isAuthenticated && user && user.role !== "admin");
   const logoSrc =
     appPublicSettings?.public_settings?.logo_url ||
     appPublicSettings?.public_settings?.logoUrl ||
@@ -84,6 +85,15 @@ export default function Header() {
               پنل مدیریت
             </Link>
           )}
+          {isUser && (
+            <Link
+              to="/account"
+              className="hidden items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground sm:inline-flex"
+            >
+              <User className="h-3.5 w-3.5" />
+              حساب من
+            </Link>
+          )}
           {!isAuthenticated && (
             <Link
               to="/login"
@@ -118,6 +128,11 @@ export default function Header() {
             {isAdmin && (
               <Link to="/admin" className="font-display text-sm font-bold text-primary">
                 پنل مدیریت
+              </Link>
+            )}
+            {isUser && (
+              <Link to="/account" className="font-display text-sm font-bold text-primary">
+                حساب کاربری
               </Link>
             )}
             {!isAuthenticated && (
