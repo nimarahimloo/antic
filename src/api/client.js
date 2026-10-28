@@ -280,6 +280,39 @@ export const api = {
     },
   },
 
+  account: {
+    overview() {
+      return request("/account/overview");
+    },
+    updateProfile(body) {
+      return request("/account/profile", { method: "PATCH", body: body || {} });
+    },
+    changePassword(body) {
+      return request("/account/password", { method: "POST", body: body || {} });
+    },
+    orders() {
+      return request("/account/orders");
+    },
+    order(id) {
+      return request("/account/orders/" + id);
+    },
+    addresses() {
+      return request("/account/addresses");
+    },
+    createAddress(body) {
+      return request("/account/addresses", { method: "POST", body: body || {} });
+    },
+    updateAddress(id, body) {
+      return request("/account/addresses/" + id, { method: "PUT", body: body || {} });
+    },
+    deleteAddress(id) {
+      return request("/account/addresses/" + id, { method: "DELETE" });
+    },
+    requests() {
+      return request("/account/requests");
+    },
+  },
+
   functions: {
     async invoke(name, payload) {
       return request("/functions/" + name, {
