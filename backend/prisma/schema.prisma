@@ -8,15 +8,34 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String?  @unique
-  phone        String?  @unique
-  googleId     String?  @unique
+  id           String    @id @default(cuid())
+  email        String?   @unique
+  phone        String?   @unique
+  googleId     String?   @unique
   passwordHash String?
   fullName     String?
-  role         String   @default("user")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role         String    @default("user")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  addresses    Address[]
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String?
+  fullName   String?
+  phone      String?
+  province   String?
+  city       String?
+  address    String
+  postalCode String?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model CurtainModel {
@@ -52,14 +71,12 @@ model CurtainCategory {
   image         String?
   order         Int      @default(0)
   subcategories String?
-  /// نمایش در کاتالوگ سایت (تیک «کاتالوگ دارد»)
   inCatalog     Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   mechanism     String?
 }
 
-/// دسته‌بندی نمونه‌های اجرا شده — جدا از CurtainCategory
 model PortfolioCategory {
   id            String   @id @default(cuid())
   name          String
@@ -72,7 +89,6 @@ model PortfolioCategory {
   updatedAt     DateTime @updatedAt
 }
 
-/// نمونه کار اجرا شده — فقط عنوان، توضیح، کاور، گالری + لینک دسته
 model Project {
   id           String   @id @default(cuid())
   title        String
@@ -147,7 +163,6 @@ model VirtualWindowSetting {
   updatedAt  DateTime @updatedAt
 }
 
-/// تنظیمات سایت: لوگو و اسلایدهای هیرو صفحه اصلی
 model SiteSetting {
   id         String   @id @default(cuid())
   key        String   @unique @default("main")
@@ -196,6 +211,7 @@ model ShopCategory {
 
 model Order {
   id              String   @id @default(cuid())
+  userId          String?
   status          String   @default("pending")
   customerName    String
   customerPhone   String
@@ -213,4 +229,5 @@ model Order {
 
   @@index([status])
   @@index([customerPhone])
+  @@index([userId])
 }
