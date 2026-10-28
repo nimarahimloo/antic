@@ -34,6 +34,12 @@ import AdminWindowSettings from '@/pages/admin/AdminWindowSettings';
 import AdminSettings from '@/pages/admin/AdminSettings';
 import AdminProducts from '@/pages/admin/AdminProducts';
 import AdminOrders from '@/pages/admin/AdminOrders';
+import AccountLayout from '@/pages/account/AccountLayout';
+import AccountDashboard from '@/pages/account/AccountDashboard';
+import AccountOrders from '@/pages/account/AccountOrders';
+import AccountProfile from '@/pages/account/AccountProfile';
+import AccountAddresses from '@/pages/account/AccountAddresses';
+import AccountRequests from '@/pages/account/AccountRequests';
 import { useSmoothScroll } from '@/hooks/useSmoothScroll';
 
 const AuthenticatedApp = () => {
@@ -74,6 +80,14 @@ const AuthenticatedApp = () => {
           <Route path="/curtain/:id" element={<CurtainDetail />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/checkout/result" element={<CheckoutResult />} />
+        </Route>
+        <Route path="/account" element={<AccountLayout />}>
+          <Route index element={<AccountDashboard />} />
+          <Route path="orders" element={<AccountOrders />} />
+          <Route path="orders/:id" element={<AccountOrders />} />
+          <Route path="addresses" element={<AccountAddresses />} />
+          <Route path="requests" element={<AccountRequests />} />
+          <Route path="profile" element={<AccountProfile />} />
         </Route>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
