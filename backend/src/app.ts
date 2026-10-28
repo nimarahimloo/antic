@@ -11,6 +11,7 @@ import agentRoutes from "./routes/agents.js";
 import mcpRoutes from "./routes/mcp.js";
 import renderRoutes from "./routes/render.js";
 import searchRoutes from "./routes/search.js";
+import accountRoutes from "./routes/account.js";
 import { HttpError, sendError } from "./lib/errors.js";
 import { prisma } from "./lib/prisma.js";
 
@@ -109,6 +110,7 @@ app.get("/api/app/public-settings", async (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/account", accountRoutes);
 app.use("/api/entities", entityRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/functions", functionRoutes);
