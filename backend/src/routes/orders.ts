@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { HttpError, sendError } from "../lib/errors.js";
-import { requireAdmin, type AuthedRequest } from "../middleware/auth.js";
+import { requireAdmin, optionalAuth, type AuthedRequest } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -56,7 +56,7 @@ const checkoutSchema = z.object({
     .min(1),
 });
 
-router.post("/checkout", async (req, res) => {
+router.post("/checkout", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const body = checkoutSchema.parse(req.body);
     const amountToman = body.items.reduce(
@@ -71,6 +71,7 @@ router.post("/checkout", async (req, res) => {
     const order = await prisma.order.create({
       data: {
         status: "pending",
+        userId: req.user?.sub || null,
         customerName: body.customerName,
         customerPhone: body.customerPhone,
         customerEmail: body.customerEmail || null,
@@ -84,7 +85,6 @@ router.post("/checkout", async (req, res) => {
     });
 
     if (!MERCHANT) {
-      // Unique authority per order (schema has @unique on authority)
       const demoAuth = `DEMO-${order.id}`;
       await prisma.order.update({
         where: { id: order.id },
