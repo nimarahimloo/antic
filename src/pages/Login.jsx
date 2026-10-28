@@ -11,7 +11,8 @@ import { safeReturnTo } from "@/lib/authReturnTo";
 
 function postLoginPath(user, returnTo) {
   if (user?.role === "admin") return "/admin";
-  return returnTo || "/";
+  if (returnTo && returnTo !== "/") return returnTo;
+  return "/account";
 }
 
 export default function Login() {
@@ -42,7 +43,7 @@ export default function Login() {
   };
 
   const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", returnTo);
+    base44.auth.loginWithProvider("google", returnTo === "/" ? "/account" : returnTo);
   };
 
   return (
