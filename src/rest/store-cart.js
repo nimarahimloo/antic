@@ -39,10 +39,19 @@ function uid() {
 }
 
 async function fetchProduct(id) {
-  const res = await fetch(`${API}/catalog/products?limit=100`);
+  try {
+    const byId = await fetch(`${API}/catalog/products/id/${encodeURIComponent(id)}`);
+    if (byId.ok) {
+      const data = await byId.json();
+      if (data.product) return data.product;
+    }
+  } catch {
+    /* fallback */
+  }
+  const res = await fetch(`${API}/catalog/products?limit=200`);
   if (!res.ok) return null;
   const data = await res.json();
-  return (data.products || []).find((p) => p.id === id) || null;
+  return (data.products || []).find((p) => p.id === id || p.slug === id) || null;
 }
 
 export async function getCurrentCart() {
@@ -133,8 +142,7 @@ export function clearCart() {
 }
 
 /**
- * Start checkout: requires customer info. Returns payment URL (Zarinpal or demo).
- * @param {{ customerName: string, customerPhone: string, customerEmail?: string, customerAddress?: string, note?: string }}
+ * Start checkout → /api/orders/checkout (Zarinpal or demo).
  */
 export async function checkout(customer = {}) {
   const cart = loadCart();
