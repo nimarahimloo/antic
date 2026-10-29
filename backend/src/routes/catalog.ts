@@ -186,9 +186,18 @@ router.get("/products/slug/:slug", async (req, res) => {
   }
 });
 
+router.get("/products/id/:id", async (req, res) => {
+  try {
+    const row = await prisma.product.findUnique({ where: { id: req.params.id } });
+    if (!row || !row.visible) return res.json({ product: null });
+    res.json({ product: toStoreProduct(row) });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
 router.get("/categories", async (_req, res) => {
   try {
-    // دسته‌های اصلی (CurtainCategory) برای محصولات فروشگاه
     const rows = await prisma.curtainCategory.findMany({
       orderBy: { order: "asc" },
     });
