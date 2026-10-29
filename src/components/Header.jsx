@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Menu, X, LayoutDashboard, LogIn, User, ChevronLeft } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import GlobalSearch from "@/components/GlobalSearch";
+import CartButton from "@/components/CartButton";
 import {
   Sheet,
   SheetContent,
@@ -124,6 +125,10 @@ export default function Header() {
               ورود
             </Link>
           )}
+
+          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-secondary text-foreground transition-colors hover:border-primary/50 hover:text-primary">
+            <CartButton />
+          </div>
 
           <button
             type="button"
