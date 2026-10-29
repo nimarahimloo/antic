@@ -1,8 +1,28 @@
 node_modules/
 dist/
+
+# Uploaded media (keep folder)
 uploads/*
 !uploads/.gitkeep
+
+# Secrets
 .env
+.env.*
+!.env.example
+
+# SQLite / local DB
 *.db
 *.db-journal
-.prisma
+*.db-shm
+*.db-wal
+dev.db
+prisma/dev.db
+prisma/*.db
+
+# Prisma generate cache (inside node_modules)
+.prisma/
+
+# Logs / temp
+*.log
+tmp/
+temp/
