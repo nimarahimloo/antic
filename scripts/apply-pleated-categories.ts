@@ -1,10 +1,26 @@
 /**
  * اعمال ایمن زیر‌دسته‌های پلیسه — بدون حذف دادهٔ موجود
- * اجرا: cd backend && npx tsx ../scripts/apply-pleated-categories.ts
+ * اجرا: cd /var/www/antic/backend && npx tsx ../scripts/apply-pleated-categories.ts
  */
-import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { createRequire } from "module";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+import { existsSync } from "fs";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const backendDir = resolve(__dirname, "../backend");
+const require = createRequire(resolve(backendDir, "package.json"));
+
+try {
+  const dotenv = require("dotenv");
+  const envPath = resolve(backendDir, ".env");
+  if (existsSync(envPath)) dotenv.config({ path: envPath });
+  else dotenv.config();
+} catch {
+  /* optional */
+}
+
+const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 const PLEATED_SUBS = [
@@ -40,12 +56,12 @@ const PLEATED_SUBS = [
   },
 ];
 
-function empty(v: unknown) {
+function empty(v) {
   return v == null || v === "";
 }
 
-function parseSubs(raw: string | null | undefined) {
-  if (!raw) return [] as { name: string; slug: string; description?: string }[];
+function parseSubs(raw) {
+  if (!raw) return [];
   try {
     const p = JSON.parse(raw);
     if (!Array.isArray(p)) return [];
@@ -65,17 +81,7 @@ function parseSubs(raw: string | null | undefined) {
   }
 }
 
-async function upsert(
-  slug: string,
-  data: {
-    name: string;
-    order: number;
-    description?: string | null;
-    mechanism?: string | null;
-    subcategories?: string | null;
-    inCatalog?: boolean;
-  }
-) {
+async function upsert(slug, data) {
   const existing = await prisma.curtainCategory.findUnique({ where: { slug } });
   if (!existing) {
     await prisma.curtainCategory.create({
@@ -92,7 +98,7 @@ async function upsert(
     console.log("created", slug);
     return;
   }
-  const patch: Record<string, unknown> = {};
+  const patch = {};
   if (empty(existing.description) && data.description) patch.description = data.description;
   if (empty(existing.mechanism) && data.mechanism) patch.mechanism = data.mechanism;
   if (data.subcategories) {
