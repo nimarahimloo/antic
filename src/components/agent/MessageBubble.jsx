@@ -32,7 +32,7 @@ function InternalLink({ href, children, onNavigate }) {
 function ModelCards({ items, onNavigate }) {
   if (!items?.length) return null;
   return (
-    <div className="mt-2.5 grid grid-cols-2 gap-2">
+    <div className="mt-2.5 grid grid-cols-2 gap-2" dir="rtl">
       {items.map((it) => (
         <Link
           key={it.id || it.href}
@@ -69,7 +69,7 @@ function ModelCards({ items, onNavigate }) {
 function LinkButtons({ items, onNavigate }) {
   if (!items?.length) return null;
   return (
-    <div className="mt-2.5 flex flex-wrap gap-1.5">
+    <div className="mt-2.5 flex flex-wrap gap-1.5" dir="rtl">
       {items.map((it, i) => {
         const inner = (
           <span className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/5 px-3 py-1.5 font-body text-[11px] font-bold text-primary transition hover:bg-primary/15 active:scale-95">
@@ -96,13 +96,13 @@ function LinkButtons({ items, onNavigate }) {
 function QuickReplies({ items, onPick }) {
   if (!items?.length || !onPick) return null;
   return (
-    <div className="mt-2 flex flex-wrap justify-start gap-1.5">
+    <div className="mt-2 flex flex-wrap gap-1.5" dir="rtl">
       {items.map((item, i) => (
         <button
           key={i}
           type="button"
           onClick={() => onPick(item.message || item.label)}
-          className="rounded-full border border-primary/45 bg-card px-3 py-1.5 font-body text-[11px] font-bold text-primary shadow-sm transition hover:bg-primary hover:text-primary-foreground active:scale-95"
+          className="rounded-full border border-primary/40 bg-card px-3 py-1.5 font-body text-[11px] font-medium text-primary shadow-sm transition hover:bg-primary hover:text-primary-foreground active:scale-[0.98]"
         >
           {item.label}
         </button>
@@ -133,7 +133,10 @@ function Blocks({ blocks, onQuickReply, onlyQuick, onNavigate }) {
 
 function MarkdownBody({ content, onNavigate }) {
   return (
-    <div className="max-w-none whitespace-pre-wrap break-words text-right font-body text-[13px] leading-7 text-foreground/90 [&_a]:text-primary [&_li]:mb-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_strong]:text-foreground [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pr-5">
+    <div
+      dir="rtl"
+      className="max-w-none whitespace-pre-wrap break-words text-right font-body text-[13.5px] leading-[1.75] text-foreground/90 [&_a]:text-primary [&_li]:mb-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_strong]:text-foreground [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pr-5"
+    >
       <ReactMarkdown
         components={{
           a: ({ href, children }) => (
@@ -155,7 +158,7 @@ function CopyBtn({ text }) {
   return (
     <button
       type="button"
-      title="کپی متن"
+      title="کپی"
       onClick={async (e) => {
         e.stopPropagation();
         try {
@@ -163,48 +166,49 @@ function CopyBtn({ text }) {
           setOk(true);
           setTimeout(() => setOk(false), 1200);
         } catch {
-          /* ignore */
+          /* */
         }
       }}
-      className="rounded-md p-1 text-muted-foreground/70 opacity-0 transition hover:bg-secondary/60 hover:text-foreground group-hover:opacity-100"
+      className="rounded-md p-1 text-muted-foreground/50 opacity-0 transition hover:bg-black/5 hover:text-foreground group-hover:opacity-100"
     >
       {ok ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
     </button>
   );
 }
 
-/** Typing dots — bot on the LEFT */
+/** Typing — bot LEFT (messenger) */
 export function TypingIndicator({ mode = "customer" }) {
   return (
-    <div className="flex items-end justify-start gap-2" aria-label="در حال نوشتن">
+    <div dir="ltr" className="flex items-end justify-start gap-2" aria-label="در حال نوشتن">
       <div
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
           mode === "admin" ? "bg-foreground text-background" : "bg-primary/15 text-primary"
         }`}
       >
         <Bot className="h-3.5 w-3.5" />
       </div>
-      <div className="flex items-center gap-1.5 rounded-2xl rounded-br-md border border-secondary/50 bg-card px-4 py-3 shadow-sm">
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:-0.3s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:-0.15s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/70" />
+      <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md border border-secondary/40 bg-card px-4 py-3 shadow-sm">
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/55 [animation-delay:-0.3s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/55 [animation-delay:-0.15s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/55" />
       </div>
     </div>
   );
 }
 
 /**
- * Messaging layout (RTL):
- * - User / admin → RIGHT
+ * Messenger layout (physical directions):
+ * - User → RIGHT
  * - Bot → LEFT
+ * Row uses dir=ltr so flex side is stable under page RTL.
  */
 export default function MessageBubble({ message, onQuickReply, mode = "customer", onNavigate }) {
   const isUser = message.role === "user";
 
   if (isUser) {
     return (
-      <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-end gap-2 duration-200">
-        <div className="max-w-[min(85%,320px)] space-y-1 sm:max-w-[85%]">
+      <div dir="ltr" className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-end gap-2 duration-200">
+        <div className="max-w-[min(82%,300px)] space-y-1 sm:max-w-[78%]">
           {message.attachments?.length > 0 && (
             <div className="flex flex-wrap justify-end gap-1.5">
               {message.attachments.map((a, i) =>
@@ -213,22 +217,25 @@ export default function MessageBubble({ message, onQuickReply, mode = "customer"
                     key={i}
                     src={a.url}
                     alt=""
-                    className="max-h-44 max-w-full rounded-2xl rounded-bl-md border border-primary/20 object-cover shadow-sm"
+                    className="max-h-44 max-w-full rounded-2xl rounded-br-md border border-primary/15 object-cover shadow-sm"
                   />
                 ) : null
               )}
             </div>
           )}
           {message.content ? (
-            <div className="rounded-2xl rounded-bl-md bg-primary px-3.5 py-2.5 text-right font-body text-[13px] leading-7 text-primary-foreground shadow-md shadow-primary/10">
+            <div
+              dir="rtl"
+              className="rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-right font-body text-[13.5px] leading-[1.7] text-primary-foreground shadow-md shadow-primary/15"
+            >
               {message.content}
             </div>
           ) : null}
           {message.pending && (
-            <p className="text-left font-body text-[9px] text-muted-foreground">در حال ارسال…</p>
+            <p className="text-left font-body text-[9px] text-muted-foreground/80">در حال ارسال…</p>
           )}
         </div>
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
           <User className="h-3.5 w-3.5" />
         </div>
       </div>
@@ -236,16 +243,16 @@ export default function MessageBubble({ message, onQuickReply, mode = "customer"
   }
 
   return (
-    <div className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-start gap-2 duration-200">
+    <div dir="ltr" className="group flex animate-in fade-in slide-in-from-bottom-1 items-end justify-start gap-2 duration-200">
       <div
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
           mode === "admin" ? "bg-foreground text-background" : "bg-primary/15 text-primary"
         }`}
       >
         <Bot className="h-3.5 w-3.5" />
       </div>
-      <div className="w-full max-w-[min(88%,360px)] sm:max-w-[88%]">
-        <div className="relative rounded-2xl rounded-br-md border border-secondary/50 bg-card px-3.5 py-3 pl-9 text-right shadow-sm">
+      <div className="w-full max-w-[min(88%,340px)] sm:max-w-[82%]">
+        <div className="relative rounded-2xl rounded-bl-md border border-secondary/40 bg-card px-3.5 py-2.5 pl-8 text-right shadow-sm">
           <div className="absolute left-1.5 top-1.5">
             <CopyBtn text={message.content} />
           </div>
