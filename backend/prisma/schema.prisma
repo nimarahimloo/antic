@@ -105,13 +105,10 @@ model Project {
 
 model ConsultationRequest {
   id        String   @id @default(cuid())
-  name      String
+  fullName  String
   phone     String
   email     String?
-  city      String?
-  spaceType String?
   message   String?
-  reference String?
   status    String   @default("new")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -119,21 +116,21 @@ model ConsultationRequest {
   @@index([status])
 }
 
-model RenderTemplate {
+model McpServer {
   id        String   @id @default(cuid())
-  style     String
-  image     String
+  name      String
+  url       String?
+  apiKey    String?
+  status    String   @default("inactive")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([style])
 }
 
-model InstallReference {
+model FabricStyle {
   id        String   @id @default(cuid())
-  style     String
-  image     String
-  note      String?
+  name      String
+  style     String?
+  image     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -168,6 +165,7 @@ model SiteSetting {
   key        String   @unique @default("main")
   logoUrl    String?
   heroSlides String?
+  pageHeroes String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
