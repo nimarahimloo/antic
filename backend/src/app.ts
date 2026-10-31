@@ -64,6 +64,7 @@ const DEFAULT_HERO = [
 app.get("/api/app/public-settings", async (_req, res) => {
   let logo_url: string | null = null;
   let hero_slides = DEFAULT_HERO;
+  let page_heroes: Record<string, unknown> = {};
 
   try {
     const row = await prisma.siteSetting.findFirst({
@@ -71,6 +72,14 @@ app.get("/api/app/public-settings", async (_req, res) => {
       orderBy: { updatedAt: "desc" },
     });
     if (row?.logoUrl) logo_url = row.logoUrl;
+    if (row?.pageHeroes) {
+      try {
+        const ph = JSON.parse(row.pageHeroes);
+        if (ph && typeof ph === "object") page_heroes = ph;
+      } catch {
+        /* */
+      }
+    }
     if (row?.heroSlides) {
       try {
         const parsed = JSON.parse(row.heroSlides);
@@ -98,6 +107,7 @@ app.get("/api/app/public-settings", async (_req, res) => {
       app_name: "پرده آنتیک",
       locale: "fa",
       logo_url,
+      page_heroes,
       hero_slides,
       ai: {
         design_consultant: "local-catalog",
