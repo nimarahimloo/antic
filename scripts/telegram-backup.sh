@@ -8,7 +8,12 @@ set -euo pipefail
 ROOT="${ANTIC_ROOT:-/var/www/antic}"
 ENV_FILE="${ANTIC_BACKUP_ENV:-/etc/antic-backup.env}"
 BACKUP_DIR="${ANTIC_BACKUP_DIR:-/var/backups/antic}"
+# زمان تهران برای نمایش
+export TZ="${ANTIC_BACKUP_TZ:-Asia/Tehran}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+HUMAN_DATE="$(date '+%Y/%m/%d')"
+HUMAN_TIME="$(date '+%H:%M:%S')"
+HUMAN_FULL="$(date '+%Y/%m/%d %H:%M:%S')"
 NAME="antic-backup-${STAMP}"
 WORK="${BACKUP_DIR}/${NAME}"
 ZIP="${BACKUP_DIR}/${NAME}.zip"
@@ -63,7 +68,7 @@ fi
 ) >"$WORK/meta/git.txt" || true
 
 hostname >"$WORK/meta/hostname.txt"
-date -Is >"$WORK/meta/created_at.txt"
+echo "$HUMAN_FULL (Asia/Tehran)" >"$WORK/meta/created_at.txt"
 df -h "$ROOT" >"$WORK/meta/disk.txt" 2>/dev/null || true
 
 if [[ -d "$ROOT/backend/uploads" ]]; then
@@ -87,6 +92,15 @@ rm -rf "$WORK"
 SIZE=$(stat -c%s "$ZIP" 2>/dev/null || echo 0)
 echo "zip=$ZIP size=$SIZE"
 
+CAPTION=$(cat <<EOF
+بک‌آپ روزانه آنتیک
+تاریخ: ${HUMAN_DATE}
+ساعت: ${HUMAN_TIME} (تهران)
+حجم: $((SIZE / 1024)) KB
+فایل: ${NAME}.zip
+EOF
+)
+
 send_msg() {
   local text="$1"
   curl -fsS -X POST "${API_ROOT}/sendMessage" \
@@ -99,16 +113,26 @@ if (( SIZE > 0 && SIZE <= MAX_SEND_BYTES )); then
   if curl -fsS -X POST "${API_ROOT}/sendDocument" \
     -F "chat_id=${CHAT_ID}" \
     -F "document=@${ZIP}" \
-    -F "caption=بک‌آپ آنتیک ${STAMP} | $((SIZE / 1024)) KB" \
+    -F "caption=${CAPTION}" \
     >/dev/null; then
-    echo "bale: document sent"
+    echo "bale: document sent at ${HUMAN_FULL}"
+    send_msg "✅ بک‌آپ موفق
+تاریخ: ${HUMAN_DATE}
+ساعت: ${HUMAN_TIME} (تهران)
+حجم: $((SIZE / 1024)) KB"
   else
     echo "ERROR: sendDocument failed"
-    send_msg "بک‌آپ ساخته شد ولی ارسال فایل ناموفق بود.\n${ZIP}\nحجم: $((SIZE / 1024)) KB"
+    send_msg "❌ بک‌آپ ساخته شد ولی ارسال فایل ناموفق بود
+تاریخ: ${HUMAN_FULL}
+${ZIP}
+حجم: $((SIZE / 1024)) KB"
     exit 1
   fi
 else
-  send_msg "بک‌آپ آنتیک ${STAMP}\nحجم zip بزرگ است ($((SIZE / 1024 / 1024)) MB).\nمسیر روی سرور:\n${ZIP}"
+  send_msg "⚠️ بک‌آپ آنتیک ${HUMAN_FULL}
+حجم zip بزرگ است ($((SIZE / 1024 / 1024)) MB).
+مسیر روی سرور:
+${ZIP}"
   echo "bale: size notice sent"
 fi
 
