@@ -4,6 +4,11 @@ import { base44 } from "@/api/base44Client";
 import { compressImage } from "@/lib/compressImage";
 import { useAuth } from "@/lib/AuthContext";
 import { adminToast } from "@/lib/adminToast";
+import AdminPageHeroes, {
+  buildDefaultPageHeroes,
+  normalizePageHeroes,
+  serializePageHeroes,
+} from "@/components/admin/AdminPageHeroes";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -26,6 +31,7 @@ export default function AdminSettings() {
   const [settingId, setSettingId] = useState(null);
   const [logoUrl, setLogoUrl] = useState("");
   const [slides, setSlides] = useState(DEFAULT_SLIDES);
+  const [pageHeroes, setPageHeroes] = useState(buildDefaultPageHeroes);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -58,6 +64,10 @@ export default function AdminSettings() {
                 image: s.image || "",
               }))
             );
+          }
+          const ph = main.page_heroes || main.pageHeroes;
+          if (ph && typeof ph === "object") {
+            setPageHeroes(normalizePageHeroes(ph));
           }
         }
       } catch {
@@ -136,6 +146,7 @@ export default function AdminSettings() {
           subtitle: (s.subtitle || "").trim(),
           image: (s.image || "").trim(),
         })),
+      page_heroes: serializePageHeroes(pageHeroes),
     };
     try {
       if (settingId) {
@@ -258,6 +269,8 @@ export default function AdminSettings() {
             </div>
           )}
         </div>
+
+        <AdminPageHeroes value={pageHeroes} onChange={setPageHeroes} loading={loading} />
 
         {(error || hint) && (
           <p className={`font-body text-xs ${error ? "text-destructive" : "text-primary"}`}>{error || hint}</p>
