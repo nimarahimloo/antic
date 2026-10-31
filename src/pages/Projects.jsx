@@ -2,24 +2,19 @@ import { Link } from "react-router-dom";
 import CategoryCoverCard from "@/components/CategoryCoverCard";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { mosaicGridClass, mosaicItemClass } from "@/lib/mosaicLayout";
+import PageHero from "@/components/PageHero";
 
 export default function Projects() {
   const { categories, loading } = useCurtainCategories();
 
   return (
     <div className="bg-background">
-      <section className="border-b border-secondary/50 bg-card/40">
-        <div className="mx-auto max-w-7xl px-5 py-14 lg:px-10 lg:py-20">
-          <span className="eyebrow mb-4 block">نمونه کارها</span>
-          <h1 className="font-display text-3xl font-black leading-tight text-foreground lg:text-5xl">
-            نمونه‌های اجرا شده
-          </h1>
-          <p className="mt-4 max-w-2xl font-body text-sm leading-8 text-muted-foreground lg:text-base">
-            نگاهی به پروژه‌های نصب‌شده در فضاهای مسکونی و اداری. هر دسته را باز کنید تا نمونه‌های
-            مرتبط را ببینید.
-          </p>
-        </div>
-      </section>
+      <PageHero
+        pageKey="projects"
+        eyebrow="نمونه کارها"
+        title="نمونه‌های اجرا شده"
+        description="نگاهی به پروژه‌های نصب‌شده در فضاهای مسکونی و اداری."
+      />
 
       <section className="mx-auto max-w-7xl px-5 py-12 lg:px-10 lg:py-16">
         {loading ? (
