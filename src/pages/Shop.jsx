@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useShop, SORTS } from "@/hooks/useShop";
 import ProductGrid from "@/components/ProductGrid";
 import { Search, SlidersHorizontal } from "lucide-react";
+import PageHero from "@/components/PageHero";
 
 export default function Shop() {
   const s = useShop({ pageSize: 24 });
@@ -12,18 +13,12 @@ export default function Shop() {
 
   return (
     <div className="bg-background">
-      <section className="border-b border-secondary/50 bg-card/40">
-        <div className="mx-auto max-w-7xl px-5 py-16 lg:px-10 lg:py-20">
-          <span className="eyebrow mb-4 block">فروشگاه</span>
-          <h1 className="font-display text-3xl font-bold leading-tight text-foreground lg:text-5xl">
-            محصولات
-          </h1>
-          <p className="mt-5 max-w-xl font-body text-sm leading-7 text-muted-foreground">
-            محصولات فروشگاه — از یراق و اکسسوری تا مدل‌های آماده. هر محصولی که در ادمین اضافه شود
-            اینجا نمایش داده می‌شود. برای سفارش سفارشی پرده از کاتالوگ یا تماس استفاده کنید.
-          </p>
-        </div>
-      </section>
+      <PageHero
+        pageKey="shop"
+        eyebrow="فروشگاه"
+        title="محصولات"
+        description="محصولات فروشگاه — از یراق و اکسسوری تا مدل‌های آماده."
+      />
 
       <section className="sticky top-20 z-30 border-b border-secondary/50 bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:px-10">
