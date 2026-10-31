@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Award, Ruler, Scissors, ArrowLeft } from "lucide-react";
+import PageHero from "@/components/PageHero";
 
 const STATS = [
   { value: "+۱۵", label: "سال تجربه" },
@@ -53,18 +54,12 @@ const STEPS = [
 export default function About() {
   return (
     <div className="bg-background">
-      <section className="border-b border-secondary/50 bg-card/40">
-        <div className="mx-auto max-w-7xl px-5 py-16 lg:px-10 lg:py-24">
-          <span className="eyebrow mb-4 block">درباره پرده آنتیک</span>
-          <h1 className="font-display text-3xl font-black leading-tight text-foreground lg:text-6xl">
-            طراحی و اجرای <span className="text-gold-gradient">پرده</span>
-          </h1>
-          <p className="mt-5 max-w-2xl font-body text-sm leading-8 text-muted-foreground">
-            پرده آنتیک در زمینه مشاوره، تأمین پارچه، دوخت و نصب پرده برای فضاهای مسکونی و اداری
-            فعالیت می‌کند. هدف ما نتیجه‌ای تمیز، هماهنگ با فضا و قابل اتکا است.
-          </p>
-        </div>
-      </section>
+      <PageHero
+        pageKey="about"
+        eyebrow="درباره پرده آنتیک"
+        title="طراحی و اجرای پرده"
+        description="از مشاوره تا نصب؛ با تمرکز روی کیفیت پارچه، دقت دوخت و اجرای مرتب در محل."
+      />
 
       <section className="mx-auto max-w-7xl px-5 py-16 lg:px-10 lg:py-24">
         <div className="grid items-center gap-12 lg:grid-cols-2">
