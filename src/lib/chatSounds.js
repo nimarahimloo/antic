@@ -1,6 +1,6 @@
 /**
- * Chat notification sounds — Web Audio only (reliable, offline, no 404).
- * Optional files under /sounds/ are attempted only if they load successfully.
+ * صدای نوتیف چت — شبیه پیام‌رسان (ارسال کوتاه / دریافت دو‌نت)
+ * Web Audio؛ بدون وابستگی به فایل (اختیاری /sounds/*.mp3)
  */
 
 let unlocked = false;
@@ -18,13 +18,12 @@ function getCtx() {
 }
 
 export function unlockChatSounds() {
-  if (unlocked) return;
   unlocked = true;
   try {
     const ctx = getCtx();
     if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
   } catch {
-    /* ignore */
+    /* */
   }
 }
 
@@ -36,31 +35,45 @@ export function isChatSoundsMuted() {
   return muted;
 }
 
-function playOsc(freqs, duration = 0.1, volume = 0.14) {
+function tone(ctx, { freq, start, dur, vol = 0.18, type = "sine" }) {
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, start);
+  g.gain.setValueAtTime(0.0001, start);
+  g.gain.exponentialRampToValueAtTime(vol, start + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  osc.connect(g);
+  g.connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.03);
+}
+
+function playSendSynth() {
   if (muted) return;
   try {
     const ctx = getCtx();
     if (!ctx) return;
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
-    const now = ctx.currentTime;
-    const master = ctx.createGain();
-    master.gain.setValueAtTime(0, now);
-    master.gain.linearRampToValueAtTime(volume, now + 0.006);
-    master.gain.exponentialRampToValueAtTime(0.0008, now + duration);
-    master.connect(ctx.destination);
-    for (const [f, amp] of freqs) {
-      const osc = ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(f, now);
-      const g = ctx.createGain();
-      g.gain.value = amp;
-      osc.connect(g);
-      g.connect(master);
-      osc.start(now);
-      osc.stop(now + duration + 0.02);
-    }
+    const t = ctx.currentTime;
+    tone(ctx, { freq: 720, start: t, dur: 0.07, vol: 0.16, type: "triangle" });
+    tone(ctx, { freq: 1080, start: t + 0.04, dur: 0.06, vol: 0.12, type: "sine" });
   } catch {
-    /* ignore */
+    /* */
+  }
+}
+
+function playReceiveSynth() {
+  if (muted) return;
+  try {
+    const ctx = getCtx();
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const t = ctx.currentTime;
+    tone(ctx, { freq: 660, start: t, dur: 0.1, vol: 0.17, type: "sine" });
+    tone(ctx, { freq: 880, start: t + 0.09, dur: 0.14, vol: 0.14, type: "sine" });
+  } catch {
+    /* */
   }
 }
 
@@ -86,9 +99,7 @@ function tryPlayFile(key, url, volume) {
           fileOk[key] = false;
           resolve(false);
         });
-      } else {
-        resolve(false);
-      }
+      } else resolve(false);
     } catch {
       fileOk[key] = false;
       resolve(false);
@@ -98,32 +109,14 @@ function tryPlayFile(key, url, volume) {
 
 export function playSendSound() {
   unlockChatSounds();
-  tryPlayFile("send", "/sounds/message-send.wav", 0.35).then((ok) => {
-    if (!ok) {
-      playOsc(
-        [
-          [880, 0.65],
-          [1320, 0.3],
-        ],
-        0.08,
-        0.12
-      );
-    }
+  tryPlayFile("send", "/sounds/message-send.mp3", 0.45).then((ok) => {
+    if (!ok) playSendSynth();
   });
 }
 
 export function playReceiveSound() {
   unlockChatSounds();
-  tryPlayFile("receive", "/sounds/message-receive.wav", 0.4).then((ok) => {
-    if (!ok) {
-      playOsc(
-        [
-          [523, 0.5],
-          [784, 0.45],
-        ],
-        0.14,
-        0.12
-      );
-    }
+  tryPlayFile("receive", "/sounds/message-receive.mp3", 0.5).then((ok) => {
+    if (!ok) playReceiveSynth();
   });
 }
