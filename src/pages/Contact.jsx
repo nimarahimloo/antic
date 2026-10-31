@@ -1,6 +1,7 @@
 import { Phone, Mail, MapPin, Clock, Instagram } from "lucide-react";
 import ConsultationForm from "@/components/ConsultationForm";
 import { SITE_PHONE, SITE_PHONE_DISPLAY, SITE_PHONE_HREF, SITE_EMAIL } from "@/lib/siteContact";
+import PageHero from "@/components/PageHero";
 
 const INFO = [
   { icon: Phone, title: "تماس تلفنی", value: SITE_PHONE_DISPLAY, href: SITE_PHONE_HREF },
@@ -12,17 +13,12 @@ const INFO = [
 export default function Contact() {
   return (
     <div className="bg-background">
-      <section className="border-b border-secondary/50 bg-card/40">
-        <div className="mx-auto max-w-7xl px-5 py-16 lg:px-10 lg:py-24">
-          <span className="eyebrow mb-4 block">ارتباط با ما</span>
-          <h1 className="font-display text-3xl font-black leading-tight text-foreground lg:text-6xl">
-            گفت‌وگو را <span className="text-gold-gradient">آغاز</span> کنیم
-          </h1>
-          <p className="mt-5 max-w-2xl font-body text-sm leading-8 text-muted-foreground">
-            برای مشاوره، بازدید حضوری از شوروم یا سفارش طراحی اختصاصی، از هر مسیری که راحت‌ترید با ما در تماس باشید.
-          </p>
-        </div>
-      </section>
+      <PageHero
+        pageKey="contact"
+        eyebrow="ارتباط با ما"
+        title="گفت‌وگو را آغاز کنیم"
+        description="برای مشاوره، بازدید حضوری از شوروم یا سفارش طراحی اختصاصی با ما در تماس باشید."
+      />
 
       <section className="mx-auto max-w-7xl px-5 py-14 lg:px-10 lg:py-20">
         <div className="grid gap-10 lg:grid-cols-5">
