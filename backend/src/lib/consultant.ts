@@ -1,6 +1,5 @@
 /**
- * Customer assistant — free-form NLU over catalog/projects/shop.
- * Natural conversational tone; accepts any phrasing; answers from real catalog data.
+ * مشاور چت — لحن خودمونی، بدون قالب رباتی خشک
  */
 import { prisma } from "./prisma.js";
 import { buildAdminAssistantReply as buildAdminReply } from "./consultantAdmin.js";
@@ -58,20 +57,12 @@ function pack(text: string, blocks?: RichBlock[], meta?: Record<string, unknown>
 function expandText(raw: string) {
   let t = normalize(raw);
   const pairs: [RegExp, string][] = [
-    [/میخوام|میخام|می خام|میخاه|می خوام|میخوامم|دلم میخواد|دوست دارم/g, "میخوام"],
-    [/چیه|چیست|چیزی|چی هست|چی بود/g, "چیست"],
-    [/کدوم|کدام|کدومه|کدومش/g, "کدام"],
-    [/گرون|گرانه|گران/g, "گران"],
-    [/ارزون|ارزان/g, "ارزان"],
-    [/بفرست|بفرستین|بده|بدهید|برام بفرست|نشون بده|نشان بده|بیار|بیارین/g, "بده"],
-    [/دارین|دارید|داری|داریم|موجوده|موجود هست/g, "دارید"],
-    [/نمیخوام|نمی خام|نمیخوامش/g, "نمیخوام"],
-    [/لطفا|خواهشا|خواهش میکنم|ممنون میشم/g, "لطفا"],
-    [/آخه|اخه/g, " "],
-    [/والا|والله/g, " "],
-    [/اتاق خواب|خوابگاه|اتاقخواب/g, "اتاق خواب"],
-    [/نشیمن|هال|پذیرایی|سالن پذیرایی/g, "نشیمن"],
-    [/بلک اوت|بلک‌اوت|black out|blackout/g, "بلک اوت"],
+    [/میخوام|میخام|می خام|می خوام|دوست دارم/g, "میخوام"],
+    [/چیه|چیست|چی هست/g, "چیست"],
+    [/کدوم|کدام|کدومه/g, "کدام"],
+    [/نشیمن|هال|پذیرایی/g, "نشیمن"],
+    [/اتاق خواب|خوابگاه/g, "اتاق خواب"],
+    [/بلک اوت|بلک‌اوت|blackout/g, "بلک اوت"],
   ];
   for (const [re, rep] of pairs) t = t.replace(re, rep);
   return t;
@@ -80,9 +71,9 @@ function expandText(raw: string) {
 type Tone = "warm" | "formal" | "playful" | "short";
 function detectTone(raw: string): Tone {
   const t = normalize(raw);
-  if (/[؟!?]{2,}|😂|😅|😆|خخخ|ههه|جدی|والا/.test(raw) || /جوک|شوخی/.test(t)) return "playful";
-  if (/لطفاً|خواهشمند|جناب|با سلام|احتراما/.test(t) || raw.length > 120) return "formal";
-  if (raw.length < 18 || /^(آره|نه|باشه|اوکی|ok|بله|نخیر)$/i.test(t)) return "short";
+  if (/[؟!?]{2,}|😂|😅|خخخ|ههه/.test(raw) || /جوک|شوخی/.test(t)) return "playful";
+  if (/لطفاً|خواهشمند|با سلام|احتراما/.test(t) || raw.length > 120) return "formal";
+  if (raw.length < 18 || /^(آره|نه|باشه|اوکی|ok|بله)$/i.test(t)) return "short";
   return "warm";
 }
 
@@ -117,29 +108,17 @@ export async function buildAssistantReply(
 
 export async function buildConsultantReply(
   userText: string,
-  history: ChatMessage[] = []
+  _history: ChatMessage[] = []
 ): Promise<AssistantResult> {
   const tone = detectTone(userText);
-  const t = expandText(userText);
+  const n = expandText(userText);
 
-  // Lightweight open reply when full NLU data path is not loaded in this slim restore
-  // Prefer full catalog logic on server via restore-consultant-full if needed
-  try {
-    const { buildConsultantReplyFull } = await import("./consultantFull.js").catch(() => ({ buildConsultantReplyFull: null }));
-    if (typeof buildConsultantReplyFull === "function") {
-      return buildConsultantReplyFull(userText, history);
-    }
-  } catch {
-    /* use open reply below */
-  }
-
-  const n = t;
   if (/^(سلام|درود|hi|hello|hey)/i.test(n)) {
     return pack(
       voice(
         tone,
-        "سلام 👋 خوش اومدی.\n\nمنم دستیار آنتیک. هر جور راحتی بگو — فضا، نور، سبک، یا هر سوالی درباره پرده. از روی کاتالوگ واقعی سایت کمکت می‌کنم.",
-        "سلام. مشاور پرده آنتیک هستم. فضا و نور را بفرمایید.",
+        "سلام 👋 خوش اومدی.\n\nمن اینجام که مثل یه مشاور واقعی کمکت کنم. هر جور راحتی حرف بزن — نشیمن، خواب، نور زیاد، بلک‌اوت، هر چی.",
+        "سلام، وقت بخیر. بفرمایید برای چه فضایی پرده می‌خواهید.",
         "سلام! بگو برای کدوم اتاق و نورش چطوره 😊",
         "سلام، بگو چی می‌خوای."
       ),
@@ -149,7 +128,7 @@ export async function buildConsultantReply(
           items: [
             { label: "نشیمن روشن", message: "نشیمن روشن و دلباز می‌خوام" },
             { label: "خواب بلک‌اوت", message: "اتاق خواب بلک‌اوت" },
-            { label: "قیمت چطور؟", message: "قیمت پرده چطور حساب می‌شود؟" },
+            { label: "قیمت چطور؟", message: "قیمت پرده چطور حساب می‌شه؟" },
           ],
         },
         {
@@ -166,7 +145,7 @@ export async function buildConsultantReply(
 
   if (/^(ممنون|مرسی|تشکر)/i.test(n)) {
     return pack(
-      voice(tone, "خواهش می‌کنم 🙏 هر چیزی که به ذهنت می‌رسه همین‌جا بپرس.", "خواهش می‌کنم.", "مرسی، هر وقت خواستی بپرس 😊")
+      voice(tone, "خواهش می‌کنم 🙏 هر وقت چیزی به ذهنت رسید بپرس.", "خواهش می‌کنم.", "مرسی، هر وقت خواستی بپرس 😊")
     );
   }
 
@@ -174,7 +153,7 @@ export async function buildConsultantReply(
     return pack(
       voice(
         tone,
-        "قیمت دقیق از روی چت اعلام نمی‌شه چون به ابعاد، پارچه و مکانیزم بستگی داره.\n\nمدل رو انتخاب کن، بعد از **صفحه تماس** اسم و موبایل و حدود ابعاد رو بفرست تا برات برآورد بفرستن.",
+        "قیمت دقیق از روی چت نمی‌تونم بگم — به ابعاد و پارچه و مکانیزم بستگی داره.\n\nمدل رو انتخاب کن، بعد از صفحه تماس اسم و موبایل و حدود ابعاد رو بفرست تا برات برآورد بفرستن.",
         "برای اعلام قیمت به ابعاد و مدل نیاز است. از صفحه تماس اقدام فرمایید.",
         "قیمت قطعی تو چت نمی‌دم — مدل بگو بعد برو تماس 😊"
       ),
@@ -190,14 +169,33 @@ export async function buildConsultantReply(
     );
   }
 
-  // Default: open, flexible, point to catalog without rigid patterns
+  if (/شید|زبرا|رومن|پلیسه|ترک|تفاوت|فرق/.test(n)) {
+    return pack(
+      voice(
+        tone,
+        "راستش بستگی به فضا داره:\n\n• **شید** — سطح صاف، جمع می‌شه بالا، برای کنترل نور خیلی خوبه\n• **زبرا** — نوار شفاف و مات، هم نور می‌ده هم حریم\n• **رومن** — چین افقی، یه کم رسمی‌تر\n• **پلیسه** — چین‌های ریز آکاردئونی\n\nبگو اتاق کدومه تا دقیق‌تر بگم کدوم به دردت می‌خوره.",
+        "شید، زبرا، رومن و پلیسه هر کدام کاربرد متفاوتی دارند. فضا را بفرمایید تا پیشنهاد دهم.",
+        "شید ساده و کاربردی، زبرا هم نور هم حریم، رومن شیک‌تر. بگو اتاقت چیه 😊"
+      ),
+      [
+        {
+          type: "quick_replies",
+          items: [
+            { label: "نشیمن", message: "برای نشیمن کدوم بهتره" },
+            { label: "خواب", message: "برای اتاق خواب کدوم بهتره" },
+          ],
+        },
+      ]
+    );
+  }
+
   return pack(
     voice(
       tone,
-      `باشه، فهمیدم منظورت رو.\n\nهر جور بگی سعی می‌کنم کمکت کنم — از سبک و نور گرفته تا تفاوت شید و زبرا یا مسیر سفارش.\n\nاگر فضا یا نور رو کمی دقیق‌تر بگی (مثلاً نشیمن روشن / خواب تاریک)، از کاتالوگ نزدیک‌تر پیشنهاد می‌دم. یا مستقیم برو کاتالوگ و مدل‌ها رو ببین.`,
-      "درخواست شما دریافت شد. برای پیشنهاد دقیق‌تر فضا و نور را مشخص کنید یا از کاتالوگ مدل‌ها را ببینید.",
-      "اوکی 👍 یه کم بیشتر بگو اتاق و نورش چیه، یا برو کاتالوگ بگرد.",
-      "بگو اتاق و نور، یا برو کاتالوگ."
+      "باشه، فهمیدم.\n\nهر چی بپرسی سعی می‌کنم جواب بدم — نور، سبک، تفاوت شید و زبرا، نصب، هر چی.\n\nاگه بگی اتاق کدومه و نورش روشنه یا تاریک، از کاتالوگ نزدیک‌تر برات می‌چینم. وگرنه خودت یه سر به کاتالوگ بزن.",
+      "متوجه شدم. فضا و نور را بگویید تا پیشنهاد دقیق‌تری بدهم، یا از کاتالوگ مدل‌ها را ببینید.",
+      "اوکی 👍 بگو اتاق و نورش، یا برو کاتالوگ بگرد.",
+      "بگو اتاق و نور چیه."
     ),
     [
       {
@@ -205,8 +203,8 @@ export async function buildConsultantReply(
         items: [
           { label: "نشیمن", message: "برای نشیمن پیشنهاد بده" },
           { label: "اتاق خواب", message: "برای اتاق خواب پیشنهاد بده" },
-          { label: "تفاوت شید و زبرا", message: "تفاوت شید و زبرا چیست؟" },
-          { label: "کاتالوگ", message: "کاتالوگ را نشان بده" },
+          { label: "تفاوت شید و زبرا", message: "تفاوت شید و زبرا چیه؟" },
+          { label: "کاتالوگ", message: "کاتالوگ رو نشون بده" },
         ],
       },
       {
