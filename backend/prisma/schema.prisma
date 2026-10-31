@@ -116,21 +116,21 @@ model ConsultationRequest {
   @@index([status])
 }
 
-model McpServer {
+model RenderTemplate {
   id        String   @id @default(cuid())
-  name      String
-  url       String?
-  apiKey    String?
-  status    String   @default("inactive")
+  style     String
+  image     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([style])
 }
 
-model FabricStyle {
+model InstallReference {
   id        String   @id @default(cuid())
-  name      String
-  style     String?
-  image     String?
+  style     String
+  image     String
+  note      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
