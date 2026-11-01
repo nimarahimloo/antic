@@ -65,9 +65,9 @@ const ALLOWED: Record<string, Set<string>> = {
     "description",
     "image",
     "order",
-    "mechanism",
     "subcategories",
     "inCatalog",
+    "mechanism",
   ]),
   PortfolioCategory: new Set([
     "name",
@@ -86,7 +86,8 @@ const ALLOWED: Record<string, Set<string>> = {
     "subcategory",
   ]),
   ConsultationRequest: new Set([
-    "name",
+    "name", // API alias → mapped to fullName in fromApi
+    "fullName",
     "phone",
     "email",
     "city",
@@ -133,6 +134,13 @@ export function toApi(row: AnyRec | null | undefined): AnyRec | null {
       out[key] = v;
     }
   }
+  // ConsultationRequest: expose `name` for admin UI + form consumers
+  if (out.full_name != null && out.name == null) {
+    out.name = out.full_name;
+  }
+  if (row.fullName != null && out.name == null) {
+    out.name = row.fullName;
+  }
   return out;
 }
 
@@ -172,8 +180,15 @@ export function fromApi(body: AnyRec, entity: string): AnyRec {
     }
   }
 
-  if (entity === "ConsultationRequest" && (out.status == null || out.status === "")) {
-    out.status = "new";
+  if (entity === "ConsultationRequest") {
+    // Frontend / admin send `name`; Prisma column is `fullName`
+    if (out.name != null && (out.fullName == null || out.fullName === "")) {
+      out.fullName = out.name;
+    }
+    delete out.name;
+    if (out.status == null || out.status === "") {
+      out.status = "new";
+    }
   }
 
   return out;
