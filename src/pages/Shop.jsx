@@ -3,6 +3,8 @@ import { useShop, SORTS } from "@/hooks/useShop";
 import ProductGrid from "@/components/ProductGrid";
 import { Search, SlidersHorizontal } from "lucide-react";
 import PageHero from "@/components/PageHero";
+import { storeImage } from "@/lib/storeImage";
+import { mediaUrl } from "@/lib/mediaUrl";
 
 export default function Shop() {
   const s = useShop({ pageSize: 24 });
@@ -21,8 +23,8 @@ export default function Shop() {
       />
 
       <section className="sticky top-20 z-30 border-b border-secondary/50 bg-background/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:px-10">
-          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-3 lg:px-10">
+          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-0.5">
             <button
               type="button"
               onClick={() => s.setActiveCategory(null)}
@@ -36,6 +38,7 @@ export default function Shop() {
             </button>
             {s.categories.map((c) => {
               const active = s.activeCategory?.id === c.id;
+              const imgSrc = mediaUrl(storeImage(c.image) || "");
               return (
                 <button
                   type="button"
@@ -47,8 +50,8 @@ export default function Shop() {
                       : "border-secondary/70 hover:border-primary/50"
                   }`}
                 >
-                  {c.image ? (
-                    <img src={c.image} alt={c.name} className="h-full w-full object-cover" />
+                  {imgSrc ? (
+                    <img src={imgSrc} alt={c.name} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-secondary/40 px-1">
                       <span className="font-display text-[10px] font-bold text-muted-foreground">{c.name}</span>
@@ -105,21 +108,9 @@ export default function Shop() {
             products={s.products}
             loading={s.loading}
             emptyMessage={s.error ? "" : "در حال حاضر محصولی برای نمایش نیست."}
-            emptyHint={s.error ? "" : "محصولات جدید به‌زودی اضافه می‌شوند."}
+            onLoadMore={s.hasMore ? s.loadMore : undefined}
+            loadingMore={s.loadingMore}
           />
-        )}
-
-        {s.hasMore && !s.error && (
-          <div className="mt-12 flex justify-center">
-            <button
-              type="button"
-              onClick={s.loadMore}
-              disabled={s.loadingMore}
-              className="btn-ghost-gold disabled:opacity-50"
-            >
-              {s.loadingMore ? "در حال بارگذاری…" : "مشاهده بیشتر"}
-            </button>
-          </div>
         )}
       </section>
     </div>
