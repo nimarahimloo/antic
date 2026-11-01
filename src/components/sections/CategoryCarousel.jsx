@@ -1,16 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
+import { getRootCategories } from "@/lib/categoryTree";
 
 /**
  * اسلایدر دسته‌های کاتالوگ زیر هیرو:
+ * فقط دسته‌های مادر (بدون زیردسته‌ها)
  * - کشیدن با ماوس/لمس
  * - دکمه‌های چپ و راست
  * - حرکت خودکار آهسته (با توقف هنگام تعامل)
  */
 export default function CategoryCarousel() {
-  const { categories, loading } = useCurtainCategories({ catalogOnly: true });
+  const { categories: allCats, loading } = useCurtainCategories({ catalogOnly: true });
+  const categories = useMemo(
+    () => getRootCategories(allCats, { includeSpace: false }),
+    [allCats]
+  );
   const scrollerRef = useRef(null);
   const dragRef = useRef({
     active: false,
@@ -83,7 +89,7 @@ export default function CategoryCarousel() {
     const el = scrollerRef.current;
     if (!el) return;
     const dx = e.clientX - dragRef.current.startX;
-    if (Math.abs(dx) > 5) dragRef.current.moved = true;
+    if (Math.abs(dx) > 4) dragRef.current.moved = true;
     el.scrollLeft = dragRef.current.scrollLeft - dx;
   };
 
@@ -98,7 +104,7 @@ export default function CategoryCarousel() {
       }
     }
     dragRef.current.active = false;
-    pauseAuto();
+    dragRef.current.pointerId = null;
   };
 
   const onClickCapture = (e) => {
@@ -111,17 +117,11 @@ export default function CategoryCarousel() {
 
   if (loading && categories.length === 0) {
     return (
-      <section className="py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl px-5 lg:px-10">
-          <div className="h-8 w-48 animate-pulse rounded bg-secondary/40" />
-          <div className="mt-8 flex gap-5 overflow-hidden">
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="h-44 w-44 shrink-0 animate-pulse rounded-2xl bg-secondary/30 lg:h-56 lg:w-56"
-              />
-            ))}
-          </div>
+      <section className="border-b border-secondary/40 bg-background py-10">
+        <div className="mx-auto flex max-w-7xl gap-5 overflow-hidden px-5 lg:px-10">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-44 w-44 shrink-0 animate-pulse rounded-2xl bg-secondary/40 lg:h-56 lg:w-56" />
+          ))}
         </div>
       </section>
     );
@@ -130,18 +130,13 @@ export default function CategoryCarousel() {
   if (!categories.length) return null;
 
   return (
-    <section className="relative bg-background py-16 lg:py-20">
-      <div className="mx-auto mb-8 flex max-w-7xl items-end justify-between gap-4 px-5 lg:px-10">
+    <section className="border-b border-secondary/40 bg-background py-10 lg:py-14">
+      <div className="mx-auto mb-6 flex max-w-7xl items-center justify-between px-5 lg:mb-8 lg:px-10">
         <div>
-          <span className="eyebrow mb-3 block">دسته‌بندی پرده</span>
-          <h2 className="font-display text-2xl font-black text-foreground lg:text-3xl">
-            انواع <span className="text-gold-gradient">پرده</span> و کالکشن
-          </h2>
-          <p className="mt-2 font-body text-xs text-muted-foreground">
-            بکشید یا با دکمه‌ها جابه‌جا کنید
-          </p>
+          <span className="eyebrow mb-2 block">کاتالوگ</span>
+          <h2 className="font-display text-xl font-bold text-foreground lg:text-2xl">دسته‌بندی‌ها</h2>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={() => scrollByDir(-1)}
