@@ -9,11 +9,10 @@ datasource db {
 
 model User {
   id           String    @id @default(cuid())
-  email        String?   @unique
-  phone        String?   @unique
-  googleId     String?   @unique
+  email        String    @unique
   passwordHash String?
   fullName     String?
+  phone        String?
   role         String    @default("user")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -29,7 +28,7 @@ model Address {
   phone      String?
   province   String?
   city       String?
-  address    String
+  address    String?
   postalCode String?
   isDefault  Boolean  @default(false)
   createdAt  DateTime @default(now())
@@ -40,22 +39,20 @@ model Address {
 
 model CurtainModel {
   id             String   @id @default(cuid())
-  code           String
+  code           String   @unique
   name           String
-  categorySlug   String
+  categorySlug   String   @default("")
   subcategory    String?
   fabric         String?
   color          String?
   colorCode      String?
-  material       String?
-  texture        String?
   image          String?
+  description    String?
   installImage   String?
   installStatus  String?
-  installScore   Float?
+  installScore   Int?
   installReview  String?
-  installPending String?
-  description    String?
+  installPending Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -108,7 +105,10 @@ model ConsultationRequest {
   fullName  String
   phone     String
   email     String?
+  city      String?
+  spaceType String?
   message   String?
+  reference String?
   status    String   @default("new")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -139,8 +139,8 @@ model InstallReference {
 
 model SavedDesign {
   id               String   @id @default(cuid())
-  title            String
-  image            String
+  title            String?
+  image            String?
   curtainStyle     String?
   curtainModelId   String?
   curtainModelCode String?
@@ -151,18 +151,18 @@ model SavedDesign {
 }
 
 model VirtualWindowSetting {
-  id         String   @id @default(cuid())
-  wallColor  String?
+  id        String   @id @default(cuid())
+  wallColor String?
   frameColor String?
-  railColor  String?
-  viewImage  String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  railColor String?
+  viewImage String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model SiteSetting {
   id         String   @id @default(cuid())
-  key        String   @unique @default("main")
+  key        String   @unique
   logoUrl    String?
   heroSlides String?
   pageHeroes String?
@@ -226,6 +226,4 @@ model Order {
   updatedAt       DateTime @updatedAt
 
   @@index([status])
-  @@index([customerPhone])
-  @@index([userId])
 }
