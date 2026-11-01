@@ -34,8 +34,11 @@ export default function ConsultationForm({ reference = "", submitLabel = "ثبت
         status: "new",
       });
       setSent(true);
-    } catch {
-      setError("ثبت درخواست ناموفق بود؛ لطفاً دوباره تلاش کنید یا تلفنی تماس بگیرید.");
+    } catch (err) {
+      const msg =
+        (err && typeof err === "object" && "message" in err && String(err.message)) ||
+        "ثبت درخواست ناموفق بود؛ لطفاً دوباره تلاش کنید یا تلفنی تماس بگیرید.";
+      setError(msg.includes("Failed") || msg.includes("fetch") ? "ثبت درخواست ناموفق بود؛ لطفاً دوباره تلاش کنید یا تلفنی تماس بگیرید." : msg);
     } finally {
       setSending(false);
     }
