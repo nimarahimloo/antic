@@ -9,10 +9,11 @@ datasource db {
 
 model User {
   id           String    @id @default(cuid())
-  email        String    @unique
+  email        String?   @unique
+  phone        String?   @unique
+  googleId     String?   @unique
   passwordHash String?
   fullName     String?
-  phone        String?
   role         String    @default("user")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -28,7 +29,7 @@ model Address {
   phone      String?
   province   String?
   city       String?
-  address    String?
+  address    String
   postalCode String?
   isDefault  Boolean  @default(false)
   createdAt  DateTime @default(now())
@@ -39,20 +40,22 @@ model Address {
 
 model CurtainModel {
   id             String   @id @default(cuid())
-  code           String   @unique
+  code           String
   name           String
-  categorySlug   String   @default("")
+  categorySlug   String
   subcategory    String?
   fabric         String?
   color          String?
   colorCode      String?
+  material       String?
+  texture        String?
   image          String?
-  description    String?
   installImage   String?
   installStatus  String?
-  installScore   Int?
+  installScore   Float?
   installReview  String?
-  installPending Boolean  @default(false)
+  installPending String?
+  description    String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -139,8 +142,8 @@ model InstallReference {
 
 model SavedDesign {
   id               String   @id @default(cuid())
-  title            String?
-  image            String?
+  title            String
+  image            String
   curtainStyle     String?
   curtainModelId   String?
   curtainModelCode String?
@@ -151,18 +154,18 @@ model SavedDesign {
 }
 
 model VirtualWindowSetting {
-  id        String   @id @default(cuid())
-  wallColor String?
+  id         String   @id @default(cuid())
+  wallColor  String?
   frameColor String?
-  railColor String?
-  viewImage String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  railColor  String?
+  viewImage  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model SiteSetting {
   id         String   @id @default(cuid())
-  key        String   @unique
+  key        String   @unique @default("main")
   logoUrl    String?
   heroSlides String?
   pageHeroes String?
