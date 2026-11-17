@@ -18,8 +18,19 @@ function prismaCode(err: unknown): string | undefined {
   return undefined;
 }
 
+function resourceMetadataUrl(): string {
+  const base = process.env.PUBLIC_BASE_URL || "https://pardehantic.ir";
+  return base.replace(/\/$/, "") + "/.well-known/oauth-protected-resource";
+}
+
 export function sendError(res: Response, err: unknown) {
   if (err instanceof HttpError) {
+    if (err.status === 401) {
+      res.set(
+        "WWW-Authenticate",
+        `Bearer realm="pardehantic", resource_metadata="${resourceMetadataUrl()}"`
+      );
+    }
     return res.status(err.status).json({
       error: err.message,
       extra_data: err.data,
