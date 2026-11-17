@@ -58,7 +58,7 @@ export async function getCurrentCart() {
   return loadCart();
 }
 
-export async function addToCart(catalogItemId, variantId, quantity = 1) {
+export async function addToCart(catalogItemId, variantId, quantity = 1, extras = {}) {
   const product = await fetchProduct(catalogItemId);
   if (!product) throw new Error("محصول پیدا نشد.");
 
@@ -78,12 +78,31 @@ export async function addToCart(catalogItemId, variantId, quantity = 1) {
   const unitFormatted = product.actualPriceRange?.minValue?.formattedAmount || String(unitAmount);
   const imageUrl = product.media?.main?.image?.url || null;
 
+  const modifierChoices =
+    extras && extras.modifierChoices ? { ...extras.modifierChoices } : undefined;
+  const customTextFields =
+    extras && extras.customTextFields ? { ...extras.customTextFields } : undefined;
+
   if (existing) {
     existing.quantityInfo.confirmedQuantity += quantity;
     existing.pricing.totalPrice = {
       amount: String(unitAmount * existing.quantityInfo.confirmedQuantity),
       convertedAmount: String(unitAmount * existing.quantityInfo.confirmedQuantity),
     };
+    if (modifierChoices) {
+      existing.attributes = existing.attributes || {};
+      existing.attributes.modifierChoices = {
+        ...(existing.attributes.modifierChoices || {}),
+        ...modifierChoices,
+      };
+    }
+    if (customTextFields) {
+      existing.attributes = existing.attributes || {};
+      existing.attributes.customTextFields = {
+        ...(existing.attributes.customTextFields || {}),
+        ...customTextFields,
+      };
+    }
   } else {
     cart.lineItems.push({
       id: uid(),
@@ -106,6 +125,8 @@ export async function addToCart(catalogItemId, variantId, quantity = 1) {
       attributes: {
         image: imageUrl ? { url: imageUrl, altText: product.name } : undefined,
         descriptionLines: [],
+        ...(modifierChoices ? { modifierChoices } : {}),
+        ...(customTextFields ? { customTextFields } : {}),
       },
       status: "IN_STOCK",
     });

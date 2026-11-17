@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useCart } from "@/context/CartContext";
-import { checkout as apiCheckout, clearCart } from "@/rest/wix-store-cart";
+import { checkout as apiCheckout, clearCart } from "@/rest/store-cart";
 import { Loader2 } from "lucide-react";
 
 export default function Checkout() {

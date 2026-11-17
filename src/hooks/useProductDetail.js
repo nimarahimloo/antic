@@ -4,7 +4,7 @@
 // modifier keys, stock gating) are the bug-prone part — keep them verbatim; the PDP page only
 // renders what this returns.
 import { useState, useEffect, useMemo } from "react";
-import { getProductBySlug } from "@/rest/wix-store-catalog";
+import { getProductBySlug } from "@/rest/store-catalog";
 import { choiceImage, variantImage } from "@/lib/storeImage";
 import { useCart } from "@/context/CartContext";
 

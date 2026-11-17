@@ -237,10 +237,20 @@ router.get("/", requireAdmin, async (_req: AuthedRequest, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const order = await prisma.order.findUnique({ where: { id: req.params.id } });
     if (!order) throw new HttpError(404, "سفارش پیدا نشد");
+
+    // If authenticated, verify ownership; unauthenticated access allowed
+    // for checkout-result page (order IDs are unguessable cuid).
+    if (req.user) {
+      const owns =
+        order.userId === req.user.sub ||
+        (req.user.email && order.customerEmail === req.user.email);
+      if (!owns) throw new HttpError(403, "دسترسی به این سفارش ندارید");
+    }
+
     let items: unknown[] = [];
     try {
       items = JSON.parse(order.itemsJson);

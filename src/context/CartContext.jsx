@@ -4,7 +4,7 @@ import {
   addToCart as apiAdd,
   removeFromCart as apiRemove,
   updateCartItemQuantity as apiQty,
-} from "@/rest/wix-store-cart";
+} from "@/rest/store-cart";
 
 const CartContext = createContext(null);
 

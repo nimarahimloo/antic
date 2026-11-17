@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 
 /**
  * منبع واحد دسته‌های کاتالوگ پرده (غیر از فروشگاه).
@@ -65,7 +65,7 @@ export function filterCatalogCategories(categories) {
 function fetchCategories(force = false) {
   if (!force && cache) return Promise.resolve(cache);
   if (!force && inflight) return inflight;
-  inflight = base44.entities.CurtainCategory.list("order", 200)
+  inflight = api.entities.CurtainCategory.list("order", 200)
     .then((rows) => {
       const list = (Array.isArray(rows) ? rows : [])
         .map(normalizeCategory)

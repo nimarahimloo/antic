@@ -1,6 +1,6 @@
 // Catalog queries run on Wix before pagination. A changed selection starts a fresh cursor chain.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { searchProducts, queryCategories, CATALOG_SORTS } from "@/rest/wix-store-catalog";
+import { searchProducts, queryCategories, CATALOG_SORTS } from "@/rest/store-catalog";
 
 export const SORTS = CATALOG_SORTS;
 const SYSTEM_CATEGORY_SLUG = "all-products";

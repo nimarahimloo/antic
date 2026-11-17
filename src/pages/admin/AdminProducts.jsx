@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, X, Loader2, Upload } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
 
 const API = import.meta.env.VITE_API_BASE || "/api";
@@ -35,7 +35,7 @@ async function uploadOne(file) {
   } catch {
     toSend = file;
   }
-  const uploader = base44?.integrations?.Core?.UploadPublicFile;
+  const uploader = api?.integrations?.Core?.UploadPublicFile;
   if (typeof uploader !== "function") {
     throw new Error("سرویس آپلود در دسترس نیست");
   }
@@ -76,7 +76,12 @@ export default function AdminProducts() {
         if (!r.ok) throw new Error("load");
         return r.json();
       }),
-      base44.entities.CurtainCategory.list("order", 500).catch(() => []),
+      fetch(`${API}/catalog/categories?limit=200`)
+        .then((r) => {
+          if (!r.ok) throw new Error("load categories");
+          return r.json();
+        })
+        .then((data) => data?.categories ?? []),
     ])
       .then(([products, categories]) => {
         setRows(Array.isArray(products) ? products : []);
