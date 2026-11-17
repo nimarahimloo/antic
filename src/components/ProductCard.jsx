@@ -2,7 +2,8 @@ import { Link } from "react-router-dom";
 import { useProductCard } from "@/hooks/useProductCard";
 import { useCart } from "@/context/CartContext";
 import { storeImage } from "@/lib/storeImage";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingBag, Phone } from "lucide-react";
+import { SITE_PHONE_HREF } from "@/lib/siteContact";
 
 export default function ProductCard({ product }) {
   const { addToCart, loading } = useCart();
@@ -10,6 +11,7 @@ export default function ProductCard({ product }) {
     isSoldOut,
     priceDisplay,
     compareAtDisplay,
+    contactForPrice,
     colors,
     optionLabel,
     isQuickAddable,
@@ -79,7 +81,7 @@ export default function ProductCard({ product }) {
             </div>
           )}
 
-          <div className="mt-4 flex items-end justify-between">
+          <div className="mt-4 flex items-end justify-between gap-2">
             <div>
               {priceDisplay ? (
                 <div className="flex items-baseline gap-2">
@@ -89,17 +91,28 @@ export default function ProductCard({ product }) {
                   )}
                 </div>
               ) : (
-                <span className="font-body text-xs text-muted-foreground">تماس برای قیمت</span>
+                <span className="font-body text-xs text-muted-foreground">قیمت با ابعاد</span>
               )}
             </div>
-            <button
-              onClick={handleAdd}
-              disabled={loading || isSoldOut || !isQuickAddable || hasOptions}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/50 text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="افزودن به سبد"
-            >
-              <ShoppingBag className="h-4 w-4" />
-            </button>
+            {contactForPrice ? (
+              <a
+                href={SITE_PHONE_HREF}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-[11px] font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+              >
+                <Phone className="h-3.5 w-3.5" />
+                تماس بگیرید
+              </a>
+            ) : (
+              <button
+                onClick={handleAdd}
+                disabled={loading || isSoldOut || !isQuickAddable || hasOptions}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/50 text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="افزودن به سبد"
+              >
+                <ShoppingBag className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </article>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 600" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F5D78E"/>
+      <stop offset="45%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#A67C00"/>
+    </linearGradient>
+  </defs>
+  <path d="M40 120 Q320 40 600 120" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="40" cy="120" r="12" fill="url(#g)"/>
+  <circle cx="600" cy="120" r="12" fill="url(#g)"/>
+  <path d="M70 130 C90 200 70 280 95 360 C110 420 80 470 70 520 L150 540 C170 480 190 420 175 360 C160 280 200 200 175 130 Z" fill="url(#g)"/>
+  <path d="M110 360 C130 390 140 430 130 480" stroke="#1a1200" stroke-width="3" opacity=".25"/>
+  <path d="M570 130 C550 200 570 280 545 360 C530 420 560 470 570 520 L490 540 C470 480 450 420 465 360 C480 280 440 200 465 130 Z" fill="url(#g)"/>
+  <circle cx="320" cy="300" r="110" stroke="url(#g)" stroke-width="10" fill="none"/>
+  <path d="M280 360 L320 200 L360 360" stroke="url(#g)" stroke-width="18" stroke-linejoin="round" fill="none"/>
+  <path d="M295 310 H345" stroke="url(#g)" stroke-width="14"/>
+  <path d="M280 175 L295 145 L310 170 L320 140 L330 170 L345 145 L360 175 L350 185 H290 Z" fill="url(#g)"/>
+  <text x="320" y="520" text-anchor="middle" font-family="Georgia, serif" font-size="36" fill="url(#g)" font-weight="600">Antic Curtain</text>
+</svg>

@@ -2,26 +2,22 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Layers, FolderKanban, ListTree, Inbox, ArrowLeft } from "lucide-react";
+import RenderingStatus from "@/components/admin/RenderingStatus";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
     Promise.all([
-      base44.entities.CurtainModel.list("-created_date", 500),
-      base44.entities.Project.list("-created_date", 500),
-      base44.entities.CurtainCategory.list("order", 100),
-      base44.entities.ConsultationRequest.list("-created_date", 500),
+      base44.entities.CurtainModel.count({}),
+      base44.entities.Project.count({}),
+      base44.entities.CurtainCategory.count({}),
+      base44.entities.ConsultationRequest.count({}),
+      base44.entities.ConsultationRequest.count({ status: "new" }),
+      base44.entities.ConsultationRequest.list("-created_date", 5),
     ])
-      .then(([models, projects, categories, requests]) => {
-        setStats({
-          models: models.length,
-          projects: projects.length,
-          categories: categories.length,
-          requests: requests.length,
-          newRequests: requests.filter((r) => (r.status || "new") === "new").length,
-          latest: requests.slice(0, 5),
-        });
+      .then(([models, projects, categories, requests, newRequests, latest]) => {
+        setStats({ models, projects, categories, requests, newRequests, latest });
       })
       .catch(() =>
         setStats({ models: 0, projects: 0, categories: 0, requests: 0, newRequests: 0, latest: [] })
@@ -54,6 +50,10 @@ export default function AdminDashboard() {
             <p className="mt-1 font-body text-[11px] text-muted-foreground">{c.label}</p>
           </Link>
         ))}
+      </div>
+
+      <div className="mt-8">
+        <RenderingStatus />
       </div>
 
       <div className="mt-8 rounded-2xl border border-secondary/60 bg-card">

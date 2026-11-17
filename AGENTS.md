@@ -1,52 +1,126 @@
-# AGENTS.md
+# AGENTS.md — پرده آنتیک (local)
 
-## Project Context
+این فایل **منبع حقیقت برای هر ایجنت** روی این ریپو است.
+همهٔ کارها باید روی **استک لوکال** انجام شود.
 
-This is a Base44 app repository. Treat it as user-owned application code, keep changes focused on the user's request, and preserve existing project conventions.
+## قانون‌های قطعی
 
-Start with `README.md` for local setup, environment variables, and publish workflow.
+1. **بدون Base44، بدون Wix، بدون سرویس commerce خارجی.**
+2. skillهای زیر `.agents/skills/wix-*` **منسوخ و اشتباه** هستند — **هرگز نخوان و اجرا نکن.**
+3. داده و پرداخت فقط از طریق API لوکال: `http://localhost:3001/api` (در dev از Vite با پروکسی `/api`).
+4. قبل از هر تغییر: `README.md` و همین فایل را بخوان.
 
-## Base44 References
+## دو دامنهٔ دسته (اجباری)
 
-- CLI overview: https://docs.base44.com/developers/references/cli/get-started/overview.md
-- Agent skills: https://docs.base44.com/developers/backend/overview/skills.md
+| دامنه | مدل | API | UI |
+|--------|------|-----|-----|
+| **کاتالوگ پرده** | `CurtainCategory` (+ `CurtainModel.categorySlug`) | `/api/entities/CurtainCategory` | `useCurtainCategories` |
+| **فروشگاه** | `ShopCategory` (+ `Product.categoryId`) | `/api/catalog/categories` | `store-catalog` / `useShop` |
 
-If your agent supports Agent Skills, install or update Base44 skills before Base44-specific work:
+- فروشگاه **فقط اکسسوری** است؛ به `CurtainCategory` وصل نیست.
+- هر سکشن سایت غیر از `/shop` باید دسته‌ها را از `useCurtainCategories` بخواند — **لیست slug هاردکد ننویس.**
+- helpers: `pickFeaturedCategories`, `pickVisualCategories`, `pickSystemCategories`, `pickSecondaryCategories`.
+
+## استک واقعی
+
+| لایه | تکنولوژی | پورت / مسیر |
+|------|----------|-------------|
+| فرانت | React 18 + Vite + Tailwind + React Router + TanStack Query | `:5173` |
+| بک‌اند | Express + Prisma + SQLite + JWT | `:3001` |
+| پرداخت | زرین‌پال (خالی بودن `ZARINPAL_MERCHANT_ID` = حالت دمو) | `/api/orders` |
+| ادمین | صفحات `/admin/*` | لاگین لازم |
+
+## راه‌اندازی لوکال (اجباری قبل از تست)
 
 ```bash
-npx skills add base44/skills
+# ترمینال ۱ — بک‌اند
+cd backend
+cp .env.example .env   # اگر .env ندارید
+npm install
+npm run db:setup       # prisma generate + db push + seed
+npm run dev            # http://localhost:3001
+
+# ترمینال ۲ — فرانت
+cd ..
+npm install
+npm run dev            # http://localhost:5173  → پروکسی /api و /uploads
 ```
 
-## Key Files
+- ادمین: `admin@antic.local` / `admin123` → `/login` → `/admin`
+- سلامت API: `GET http://localhost:3001/api/health`
 
-- `src/`: frontend application source.
-- `src/api/base44Client.js`: frontend Base44 SDK client.
-- `vite.config.js`: Vite config and Base44 Vite plugin setup.
-- `.env.local`: local-only environment values; never commit secrets.
+### env مهم بک‌اند (`backend/.env`)
 
-## Working Notes
+```env
+PORT=3001
+DATABASE_URL="file:./dev.db"
+JWT_SECRET="change-me-to-a-long-random-string-in-production"
+CORS_ORIGIN="http://localhost:5173"
+FRONTEND_URL="http://localhost:5173"
+PUBLIC_BASE_URL="http://localhost:3001"
+ADMIN_EMAIL="admin@antic.local"
+ADMIN_PASSWORD="admin123"
+ZARINPAL_MERCHANT_ID=""
+ZARINPAL_SANDBOX="true"
+```
 
-- Use `base44 dev` as the default local development command when you need the local Base44 backend. It can run the backend and frontend together.
-- When docs or code mention the frontend being started automatically, that usually means the Base44 project config includes `site.serveCommand`, for example `"serveCommand": "npm run dev"` in `base44/config.jsonc`.
-- Use `npm run dev` only for frontend-only work against the hosted Base44 backend.
-- Prefer the existing Base44 CLI workflow over adding new npm scripts for Base44-specific tasks.
-- Reuse the existing SDK client and Vite plugin patterns before adding new Base44 integration paths.
-- Run the relevant checks from `package.json` before finishing code changes.
+فرانت (اختیاری در روت):
 
+```env
+# VITE_API_BASE=/api
+# VITE_PROXY_TARGET=http://localhost:3001
+```
 
-## This app — a Wix-managed headless frontend (built with the Wix skills)
+## نقشهٔ کد (لوکال)
 
-This project is the **frontend for a Wix-managed business** — a REST client that talks
-directly to a live Wix site. The **Wix site is the source of truth** for all content and
-commerce; build and seed it only through the Wix connector and the skills below. **Do NOT
-use the Base44 commerce kit (or any Base44 solution kit).**
+### فرانت (`src/`)
 
-The Wix skills live under `.agents/skills/` — on ANY turn, read them from that exact path.
+| مسیر | نقش |
+|------|-----|
+| `src/api/client.js` | کلاینت HTTP اصلی (`api`) |
+| `src/api/base44Client.js` | **فقط shim منسوخ** → re-export از `client.js` |
+| `src/hooks/useCurtainCategories.js` | **منبع واحد** دسته‌های کاتالوگ |
+| `src/rest/store-cart.js` | سبد + checkout |
+| `src/rest/store-catalog.js` | محصولات/دسته‌های **فروشگاه اکسسوری** |
+| `src/rest/wix-store-*.js` | **shim منسوخ** |
+| `src/lib/AuthContext.jsx` | لاگین/توکن |
+| `src/context/CartContext.jsx` | state سبد |
 
-- `wix-vibe-headless` — how the client is built and how the site is seeded. This app's REST
-  transport, scaffolds and UI are already deployed into `src/` from it.
-- `wix-base44-connector` — how this app calls its Wix site from here: gathering the site's
-  context, finding an API and its contract, and which calls belong in the browser vs a
-  backend function.
-- `wix-manage` — REST recipes for configuring and managing the underlying Wix business
-  solutions (products, orders, inventory, and more). Check here before writing management code.
+**import ترجیحی:**
+
+```js
+import { api, setToken, clearToken } from "@/api/client";
+import { useCurtainCategories } from "@/hooks/useCurtainCategories";
+import { getCurrentCart, addToCart, checkout } from "@/rest/store-cart";
+import { searchProducts, queryCategories } from "@/rest/store-catalog";
+```
+
+### بک‌اند (`backend/`)
+
+| مسیر | نقش |
+|------|-----|
+| `backend/src/routes/entities.ts` | CRUD از جمله `CurtainCategory` |
+| `backend/src/routes/catalog.ts` | `ShopCategory` + `Product` (اکسسوری) |
+| `backend/src/routes/orders.ts` | سفارش + زرین‌پال |
+| `backend/prisma/seed.ts` | seed جدا برای پرده vs اکسسوری |
+
+## قوانین کار ایجنت
+
+### انجام بده
+
+- دسته‌های کاتالوگ فقط از `CurtainCategory` / `useCurtainCategories`.
+- دسته‌های فروشگاه فقط از `ShopCategory` / `store-catalog`.
+- UI فارسی، شناسه‌های کد انگلیسی.
+- بعد از تغییر معنادار: `npm run lint` در روت.
+
+### انجام نده
+
+- مخلوط کردن `CurtainCategory` با `ShopCategory`.
+- لیست ثابت slug برای دسته‌های سایت.
+- SDK مربوط به Base44 / Wix.
+- commit کردن `backend/dev.db` یا `.env`.
+
+## خلاصه یک خطی
+
+اپ self-hosted: Vite + Express + Prisma + SQLite + زرین‌پال.
+کاتالوگ پرده و فروشگاه اکسسوری دو دامنهٔ جدا با یک منبع برای هر کدام.

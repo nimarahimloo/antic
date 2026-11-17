@@ -1,3 +1,4 @@
+import { SITE_PHONE_HREF } from "@/lib/siteContact";
 import { useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useProductDetail } from "@/hooks/useProductDetail";
@@ -6,7 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { productGallery, storeImage } from "@/lib/storeImage";
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductSpecs from "@/components/product/ProductSpecs";
-import { ArrowRight, ShoppingBag, Minus, Plus, Check, Truck, ShieldCheck, Headphones, Store, BadgeCheck } from "lucide-react";
+import { ArrowRight, ShoppingBag, Minus, Plus, Check, Truck, ShieldCheck, Headphones, Store, BadgeCheck, Phone } from "lucide-react";
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -21,9 +22,10 @@ export default function ProductDetail() {
     [d.product]
   );
   const focusUrl = d.focusMediaUrl ? storeImage(d.focusMediaUrl) : null;
+  const contactOnly = !d.price;
 
   async function buyNow() {
-    if (!d.product || !d.canAdd || d.adding || cartLoading) return;
+    if (contactOnly || !d.product || !d.canAdd || d.adding || cartLoading) return;
     const result = await d.submit();
     if (result === null) return;
     await checkout();
@@ -53,7 +55,6 @@ export default function ProductDetail() {
     );
   }
 
-  // جدول مشخصات — برند، گزینه‌های انتخاب‌شده (رنگ/جنس و…)، وضعیت موجودی
   const specRows = [
     { key: "برند", value: "پرده آنتیک" },
     { key: "نام محصول", value: d.product.name },
@@ -72,7 +73,6 @@ export default function ProductDetail() {
 
   return (
     <div className="bg-background pb-24">
-      {/* مسیر */}
       <div className="mx-auto max-w-7xl px-5 pt-8 lg:px-10">
         <nav className="flex items-center gap-2 font-body text-xs text-muted-foreground">
           <Link to="/" className="transition-colors hover:text-primary">خانه</Link>
@@ -85,12 +85,10 @@ export default function ProductDetail() {
 
       <div className="mx-auto max-w-7xl px-5 py-8 lg:px-10 lg:py-12">
         <div className="grid gap-10 lg:grid-cols-5 lg:gap-14">
-          {/* گالری */}
           <div className="lg:col-span-2 lg:sticky lg:top-28 lg:self-start">
             <ProductGallery images={images} focusUrl={focusUrl} productName={d.product.name} />
           </div>
 
-          {/* اطلاعات و خرید */}
           <div className="lg:col-span-3">
             <div className="rounded-3xl border border-secondary/60 bg-card p-6 lg:p-8">
               <div className="flex items-center gap-2">
@@ -102,14 +100,16 @@ export default function ProductDetail() {
                 {d.product.name}
               </h1>
 
-              {/* قیمت */}
               <div className="mt-6 rounded-2xl border border-secondary/60 bg-background p-5">
                 <span className="font-body text-xs text-muted-foreground">قیمت</span>
                 <div className="mt-1.5 flex flex-wrap items-baseline gap-3">
                   {d.price ? (
                     <span className="font-display text-2xl font-black text-primary">{d.price}</span>
                   ) : (
-                    <span className="font-body text-sm text-muted-foreground">تماس برای قیمت</span>
+                    <a href={SITE_PHONE_HREF} className="btn-gold mt-1 inline-flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      تماس بگیرید
+                    </a>
                   )}
                   {d.compareAtPrice && d.compareAtPrice !== d.price && (
                     <span className="font-body text-sm text-muted-foreground line-through">{d.compareAtPrice}</span>
@@ -124,7 +124,6 @@ export default function ProductDetail() {
                 />
               )}
 
-              {/* گزینه‌ها (رنگ/جنس و…) */}
               {optionGroups.map((group) => (
                 <div key={group.id} className="mt-7">
                   <h3 className="mb-3 font-display text-sm font-bold text-foreground">{group.name}</h3>
@@ -153,7 +152,6 @@ export default function ProductDetail() {
                 </div>
               ))}
 
-              {/* مودیفایرها */}
               {modifierGroups.map((m) => (
                 <div key={m.key} className="mt-7">
                   <h3 className="mb-3 font-display text-sm font-bold text-foreground">
@@ -188,43 +186,50 @@ export default function ProductDetail() {
                 <p className="mt-5 font-body text-xs text-primary">برای ادامه، گزینه‌ها را انتخاب کنید.</p>
               )}
 
-              {/* تعداد و خرید */}
-              <div className="mt-8 flex items-center gap-4">
-                <div className="flex items-center rounded-full border border-secondary/70 bg-background">
-                  <button onClick={() => d.setQuantity(Math.max(1, (Number(d.quantity) || 1) - 1))} className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-primary" aria-label="کاهش">
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <span className="w-10 text-center font-display text-sm font-bold text-foreground">{d.quantity || 1}</span>
-                  <button onClick={() => d.setQuantity((Number(d.quantity) || 1) + 1)} className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-primary" aria-label="افزایش">
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
-                <button
-                  onClick={d.submit}
-                  disabled={!d.canAdd || d.adding}
-                  className="btn-ghost-gold flex-1 justify-center disabled:opacity-50"
-                  style={{ minHeight: 48 }}
-                >
-                  <ShoppingBag className="h-4 w-4" /> افزودن به سبد
-                </button>
-              </div>
+              {contactOnly ? (
+                <a href={SITE_PHONE_HREF} className="btn-gold mt-8 w-full justify-center" style={{ minHeight: 48 }}>
+                  <Phone className="h-4 w-4" />
+                  تماس بگیرید
+                </a>
+              ) : (
+                <>
+                  <div className="mt-8 flex items-center gap-4">
+                    <div className="flex items-center rounded-full border border-secondary/70 bg-background">
+                      <button onClick={() => d.setQuantity(Math.max(1, (Number(d.quantity) || 1) - 1))} className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-primary" aria-label="کاهش">
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span className="w-10 text-center font-display text-sm font-bold text-foreground">{d.quantity || 1}</span>
+                      <button onClick={() => d.setQuantity((Number(d.quantity) || 1) + 1)} className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-primary" aria-label="افزایش">
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={d.submit}
+                      disabled={!d.canAdd || d.adding}
+                      className="btn-ghost-gold flex-1 justify-center disabled:opacity-50"
+                      style={{ minHeight: 48 }}
+                    >
+                      <ShoppingBag className="h-4 w-4" /> افزودن به سبد
+                    </button>
+                  </div>
 
-              <button
-                onClick={buyNow}
-                disabled={!d.canAdd || d.adding || cartLoading}
-                className="btn-gold mt-3 w-full justify-center disabled:opacity-50"
-                style={{ minHeight: 48 }}
-              >
-                خرید آنی
-              </button>
+                  <button
+                    onClick={buyNow}
+                    disabled={!d.canAdd || d.adding || cartLoading}
+                    className="btn-gold mt-3 w-full justify-center disabled:opacity-50"
+                    style={{ minHeight: 48 }}
+                  >
+                    خرید آنی
+                  </button>
+                </>
+              )}
 
-              {d.inStock && d.variant && (
+              {d.inStock && d.variant && !contactOnly && (
                 <p className="mt-4 flex items-center gap-2 font-body text-xs text-muted-foreground">
                   <Check className="h-4 w-4 text-primary" /> موجود و آماده ارسال
                 </p>
               )}
 
-              {/* نشان‌های اطمینان */}
               <div className="mt-8 grid grid-cols-3 gap-3 border-t border-secondary/60 pt-6">
                 <Trust icon={<Truck className="h-5 w-5" />} title="ارسال سریع" />
                 <Trust icon={<ShieldCheck className="h-5 w-5" />} title="ضمانت اصالت" />
@@ -234,7 +239,6 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* معرفی + مشخصات */}
         <div className="mt-14 grid gap-8 lg:grid-cols-3">
           <div className="rounded-3xl border border-secondary/60 bg-card p-6 lg:col-span-2 lg:p-8">
             <h2 className="font-display text-lg font-black text-foreground">معرفی محصول</h2>

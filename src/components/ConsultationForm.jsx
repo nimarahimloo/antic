@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Loader2, Phone } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { SITE_PHONE_HREF, SITE_PHONE_DISPLAY } from "@/lib/siteContact";
 
 const SPACE_TYPES = ["پذیرایی", "اتاق خواب", "آشپزخانه", "دفتر کار", "فضای تجاری", "سایر"];
 
@@ -33,8 +34,11 @@ export default function ConsultationForm({ reference = "", submitLabel = "ثبت
         status: "new",
       });
       setSent(true);
-    } catch {
-      setError("ثبت درخواست ناموفق بود؛ لطفاً دوباره تلاش کنید یا تلفنی تماس بگیرید.");
+    } catch (err) {
+      const msg =
+        (err && typeof err === "object" && "message" in err && String(err.message)) ||
+        "ثبت درخواست ناموفق بود؛ لطفاً دوباره تلاش کنید یا تلفنی تماس بگیرید.";
+      setError(msg.includes("Failed") || msg.includes("fetch") ? "ثبت درخواست ناموفق بود؛ لطفاً دوباره تلاش کنید یا تلفنی تماس بگیرید." : msg);
     } finally {
       setSending(false);
     }
@@ -50,8 +54,8 @@ export default function ConsultationForm({ reference = "", submitLabel = "ثبت
         <p className="mt-2 font-body text-sm leading-7 text-muted-foreground">
           کارشناس ما در اولین فرصت با شما تماس می‌گیرد. برای تماس فوری:
         </p>
-        <a href="tel:02112345678" className="btn-gold mt-5 justify-center">
-          <Phone className="h-4 w-4" /> ۰۲۱-۱۲۳۴۵۶۷۸
+        <a href={SITE_PHONE_HREF} className="btn-gold mt-5 justify-center">
+          <Phone className="h-4 w-4" /> {SITE_PHONE_DISPLAY}
         </a>
       </div>
     );

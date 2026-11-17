@@ -1,63 +1,65 @@
 import { useEffect, useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { ALL_CATEGORIES } from "@/lib/catalogData";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
+import FabricSwatch from "@/components/catalog/FabricSwatch";
+import { api } from "@/api/client";
+import { allCategorySelectOptions } from "@/lib/categoryTree";
 
 export default function AdminModels() {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    base44.entities.CurtainCategory
-      .list("order", 100)
-      .then((data) => setCategories(data?.length ? data : ALL_CATEGORIES))
-      .catch(() => setCategories(ALL_CATEGORIES));
+    api.entities.CurtainCategory.list("order", 500)
+      .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
+      .catch(() => setCategories([]));
   }, []);
 
   const fields = [
-    { key: "code", label: "کد محصول", required: true, placeholder: "مثلاً ZB-01" },
-    { key: "name", label: "نام مدل", required: true, placeholder: "مثلاً: زبرا کرمی" },
-    { key: "category_slug", label: "دسته‌بندی", required: true, type: "select" },
-    { key: "subcategory", label: "زیردسته", help: "شناسه زیردسته، مثل plain یا patterned" },
-    { key: "fabric", label: "نوع پارچه", placeholder: "مثلاً: زبرا" },
-    { key: "color", label: "رنگ", placeholder: "مثلاً: کرمی" },
-    { key: "color_code", label: "کد رنگ", placeholder: "#C9A227" },
-    { key: "material", label: "ترکیب جنس" },
-    { key: "texture", label: "بافت" },
-    { key: "image", label: "تصویر مدل", type: "image" },
-    { key: "description", label: "توضیحات", type: "textarea" },
+    { key: "image", label: "عکس پارچه", type: "image", required: true },
+    { key: "code", label: "کد محصول", required: true, placeholder: "ZB-001" },
+    { key: "name", label: "نام (اختیاری)", placeholder: "خالی = همان کد" },
+    {
+      key: "category_slug",
+      label: "دسته",
+      required: true,
+      type: "select",
+    },
+    { key: "description", label: "یادداشت (اختیاری)", type: "textarea" },
   ];
 
   const columns = [
     {
       key: "image",
-      label: "تصویر",
-      render: (v, r) =>
-        v ? (
-          <img src={v} alt="" className="h-10 w-10 rounded-lg object-cover" />
-        ) : (
-          <span
-            className="block h-10 w-10 rounded-lg border border-secondary/60"
-            style={{ backgroundColor: r.color_code || "transparent" }}
-          />
-        ),
+      label: "نمایش",
+      render: (_v, r) => (
+        <div className="h-14 w-20 overflow-hidden rounded-lg border border-secondary/60">
+          {r.install_image ? (
+            <img src={r.install_image} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <FabricSwatch fabric={r} />
+          )}
+        </div>
+      ),
     },
-    { key: "code", label: "کد", render: (v) => <span className="font-display font-bold text-primary">{v}</span> },
-    { key: "name", label: "نام" },
+    {
+      key: "code",
+      label: "کد",
+      render: (v, r) => <span className="font-display font-bold text-primary">{v || r.name}</span>,
+    },
     { key: "category_slug", label: "دسته" },
     {
-      key: "color",
-      label: "رنگ",
-      render: (v, r) => (
-        <span className="flex items-center gap-2">
-          {r.color_code && (
-            <span
-              className="h-3.5 w-3.5 rounded-full border border-secondary/60"
-              style={{ backgroundColor: r.color_code }}
-            />
-          )}
-          {v || "—"}
-        </span>
-      ),
+      key: "install_status",
+      label: "نصب",
+      render: (_v, r) => {
+        if (r.install_pending === "rendering")
+          return <span className="text-[10px] text-primary">رندر…</span>;
+        if (r.install_image)
+          return (
+            <span className="text-[10px] text-primary">
+              آماده{r.install_score != null ? ` · ${r.install_score}` : ""}
+            </span>
+          );
+        return <span className="text-[10px] text-muted-foreground">—</span>;
+      },
     },
   ];
 
@@ -67,8 +69,9 @@ export default function AdminModels() {
       entity="CurtainModel"
       fields={fields}
       columns={columns}
+      autoAnalyzeFabric
       options={{
-        category_slug: categories.map((c) => ({ value: c.slug, label: c.name })),
+        category_slug: allCategorySelectOptions(categories),
       }}
     />
   );

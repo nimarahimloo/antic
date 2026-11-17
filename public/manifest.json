@@ -1,0 +1,19 @@
+{
+  "name": "پرده آنتیک",
+  "short_name": "آنتیک",
+  "description": "خانه لوکس پرده و پارچه — کاتالوگ تعاملی",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0B0B",
+  "theme_color": "#0B0B0B",
+  "lang": "fa",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

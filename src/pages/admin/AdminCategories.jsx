@@ -1,45 +1,90 @@
+import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
+import { allCategorySelectOptions } from "@/lib/categoryTree";
+import { base44 } from "@/api/base44Client";
 
 export default function AdminCategories() {
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    base44.entities.CurtainCategory.list("order", 500)
+      .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
+      .catch(() => setCategories([]));
+  }, []);
+
+  const categoryBySlug = Object.fromEntries(
+    categories.filter((c) => c?.slug).map((c) => [String(c.slug).toLowerCase(), c])
+  );
+
   const fields = [
-    { key: "name", label: "نام دسته", required: true, placeholder: "مثلاً: زبرا" },
-    { key: "slug", label: "شناسه", required: true, placeholder: "مثلاً: zebra" },
-    { key: "order", label: "ترتیب نمایش", type: "number", placeholder: "مثلاً: 1" },
-    { key: "image", label: "تصویر", type: "image" },
-    { key: "description", label: "توضیحات", type: "textarea" },
+    { key: "name", label: "نام دسته", required: true, placeholder: "مثلاً: شید" },
     {
-      key: "subcategories",
-      label: "زیردسته‌ها",
-      type: "sublist",
-      help: "با کاما جدا کنید؛ برای شناسه سفارشی از قالب «نام:شناسه» استفاده کنید",
-      placeholder: "ساده:plain, طرح‌دار:patterned",
+      key: "slug",
+      label: "شناسه انگلیسی",
+      required: true,
+      placeholder: "shade",
     },
+    {
+      key: "mechanism",
+      label: "دسته بندی",
+      type: "select",
+    },
+    { key: "order", label: "ترتیب", type: "number", placeholder: "1" },
+    {
+      key: "in_catalog",
+      label: "کاتالوگ دارد",
+      type: "boolean",
+      default: true,
+    },
+    { key: "image", label: "کاور", type: "image" },
+    { key: "description", label: "توضیح کوتاه", type: "textarea" },
   ];
 
   const columns = [
     {
       key: "image",
-      label: "تصویر",
+      label: "کاور",
       render: (v) =>
         v ? <img src={v} alt="" className="h-10 w-10 rounded-lg object-cover" /> : "—",
     },
-    { key: "name", label: "نام", render: (v) => <span className="font-display font-bold text-foreground">{v}</span> },
-    { key: "slug", label: "شناسه" },
-    { key: "order", label: "ترتیب" },
     {
-      key: "subcategories",
-      label: "زیردسته‌ها",
-      render: (v) => (Array.isArray(v) ? v.length : 0),
+      key: "name",
+      label: "نام",
+      render: (v) => <span className="font-display font-bold text-foreground">{v}</span>,
     },
+    { key: "slug", label: "شناسه" },
+    {
+      key: "mechanism",
+      label: "دسته بندی",
+      render: (v) => {
+        if (!v) return "—";
+        const cat = categoryBySlug[String(v).toLowerCase()];
+        return cat?.name || v;
+      },
+    },
+    {
+      key: "in_catalog",
+      label: "کاتالوگ",
+      render: (v) =>
+        v === false || v === 0 || v === "false" ? (
+          <span className="text-muted-foreground">خیر</span>
+        ) : (
+          <span className="font-bold text-primary">بله</span>
+        ),
+    },
+    { key: "order", label: "ترتیب" },
   ];
 
   return (
     <AdminEntityPage
-      title="دسته‌بندی‌ها"
+      title="دسته‌بندی"
       entity="CurtainCategory"
       fields={fields}
       columns={columns}
       sortBy="order"
+      options={{
+        mechanism: allCategorySelectOptions(categories),
+      }}
     />
   );
 }
