@@ -26,3 +26,4 @@ prisma/*.db
 *.log
 tmp/
 temp/
+pnpm-lock.yaml
