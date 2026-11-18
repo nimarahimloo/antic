@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowRight, Phone, CheckCircle2 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 import CurtainPreview from "@/components/catalog/CurtainPreview";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 
@@ -16,12 +17,15 @@ export default function CurtainDetail() {
     setLoading(true);
     setNotFound(false);
     setModel(null);
-    base44.entities.CurtainModel.get(id)
+    api.entities.CurtainModel.get(id)
       .then((m) => {
         if (m) setModel(m);
         else setNotFound(true);
       })
-      .catch(() => setNotFound(true))
+      .catch((err) => {
+        console.error("Failed to load curtain model:", apiErrorMessage(err));
+        setNotFound(true);
+      })
       .finally(() => setLoading(false));
   }, [id]);
 

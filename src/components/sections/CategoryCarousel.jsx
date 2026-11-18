@@ -2,21 +2,36 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
-import { getRootCategories } from "@/lib/categoryTree";
+import { getRootCategories, parseSubs } from "@/lib/categoryTree";
 
 /**
  * اسلایدر دسته‌های کاتالوگ زیر هیرو:
- * فقط دسته‌های مادر (بدون زیردسته‌ها)
+ * دسته‌های مادر + زیردسته‌ها (flat)
  * - کشیدن با ماوس/لمس
  * - دکمه‌های چپ و راست
  * - حرکت خودکار آهسته (با توقف هنگام تعامل)
  */
 export default function CategoryCarousel() {
   const { categories: allCats, loading } = useCurtainCategories({ catalogOnly: true });
-  const categories = useMemo(
-    () => getRootCategories(allCats, { includeSpace: false }),
-    [allCats]
-  );
+
+  // دسته‌های مادر + زیردسته‌ها (flat) تا هر دو در اسلایدر نمایش داده شوند
+  const categories = useMemo(() => {
+    const roots = getRootCategories(allCats, { includeSpace: false });
+    const flat = [];
+    for (const root of roots) {
+      flat.push({ slug: root.slug, name: root.name, image: root.image || null });
+      for (const sub of parseSubs(root.subcategories)) {
+        flat.push({
+          slug: sub.slug,
+          name: sub.name,
+          image: null,
+          isSub: true,
+          parentSlug: root.slug,
+        });
+      }
+    }
+    return flat;
+  }, [allCats]);
   const scrollerRef = useRef(null);
   const dragRef = useRef({
     active: false,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 
 let cache = null;
 
@@ -13,7 +13,7 @@ export function useRenderTemplates() {
   const [templates, setTemplates] = useState(null);
   useEffect(() => {
     if (!cache) {
-      cache = base44.entities.RenderTemplate.list("-updated_date", 120)
+      cache = api.entities.RenderTemplate.list("-updated_date", 120)
         .then((tplRows) => {
           const map = {};
           for (const r of Array.isArray(tplRows) ? tplRows : []) {
@@ -21,7 +21,10 @@ export function useRenderTemplates() {
           }
           return map;
         })
-        .catch(() => ({}));
+        .catch((err) => {
+          console.error("Failed to load render templates:", err);
+          return {};
+        });
     }
     cache.then(setTemplates);
   }, []);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 import { allCategorySelectOptions } from "@/lib/categoryTree";
 
 /** نمونه‌های اجرا — گالری چندتصویری (تا ۲۰ تصویر) مثل کاور */
@@ -8,9 +9,12 @@ export default function AdminProjects() {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    base44.entities.CurtainCategory.list("order", 500)
+    api.entities.CurtainCategory.list("order", 500)
       .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
-      .catch(() => setCategories([]));
+      .catch((err) => {
+        console.error("Failed to load categories:", apiErrorMessage(err));
+        setCategories([]);
+      });
   }, []);
 
   const fields = [

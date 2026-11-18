@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,9 +17,11 @@ export default function ForgotPassword() {
     e.preventDefault();
     setLoading(true);
     try {
-      await base44.auth.resetPasswordRequest(email);
-    } catch {
-      // Always show success regardless
+      await api.auth.resetPasswordRequest(email);
+    } catch (err) {
+      // Intentionally do not reveal whether the email exists (security).
+      // Still log the error so backend outages are visible in the console.
+      console.error("Forgot password request failed:", apiErrorMessage(err));
     } finally {
       setLoading(false);
       setSent(true);

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Check, Loader2, RefreshCw, X } from 'lucide-react';
 import RenderCompare from '@/components/admin/RenderCompare';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const BADGE = { approved: ['تأییدشده', 'border-primary/60 text-primary'], rejected: ['ردشده', 'border-destructive/60 text-destructive'] };
 
@@ -9,12 +10,12 @@ export default function InstallReviewAdmin() {
   const [rows, setRows] = useState(null);
   const [busy, setBusy] = useState('');
   const [compare, setCompare] = useState(null);
-  const reload = () => base44.entities.CurtainModel.list('-updated_date', 200).then(all => setRows(all.filter(m => m.install_image)));
+  const reload = () => api.entities.CurtainModel.list('-updated_date', 200).then(all => setRows(all.filter(m => m.install_image))).catch(err => console.error("Failed to load models:", apiErrorMessage(err)));
   useEffect(() => { reload(); }, []);
 
-  async function act(id, task) { setBusy(id); await task(); await reload(); setBusy(''); }
-  const setStatus = (m, install_status) => act(m.id, () => base44.entities.CurtainModel.update(m.id, { install_status }));
-  const regenerate = m => act(m.id, () => base44.functions.invoke('generateInstallImage', { model_id: m.id, regenerate: true }));
+  async function act(id, task) { setBusy(id); try { await task(); await reload(); } catch (err) { console.error("Action failed:", apiErrorMessage(err)); } finally { setBusy(''); } }
+  const setStatus = (m, install_status) => act(m.id, () => api.entities.CurtainModel.update(m.id, { install_status }));
+  const regenerate = m => act(m.id, () => api.functions.invoke('generateInstallImage', { model_id: m.id, regenerate: true }));
 
   return (
     <div className="mt-6 rounded-2xl border border-secondary/60 bg-card p-5">

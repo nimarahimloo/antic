@@ -5,7 +5,8 @@ import CategoryCoverCard from "@/components/CategoryCoverCard";
 import ProjectCard from "@/components/ProjectCard";
 import { mosaicGridClass, mosaicItemClass } from "@/lib/mosaicLayout";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 
 export default function PortfolioCategoryPage() {
   const { slug } = useParams();
@@ -21,9 +22,12 @@ export default function PortfolioCategoryPage() {
   useEffect(() => {
     if (!slug) return;
     setLoadingProjects(true);
-    base44.entities.Project.filter({ category_slug: slug }, "-created_date", 100)
+    api.entities.Project.filter({ category_slug: slug }, "-created_date", 100)
       .then((rows) => setProjects(Array.isArray(rows) ? rows : []))
-      .catch(() => setProjects([]))
+      .catch((err) => {
+        console.error("Failed to load projects:", apiErrorMessage(err));
+        setProjects([]);
+      })
       .finally(() => setLoadingProjects(false));
   }, [slug]);
 

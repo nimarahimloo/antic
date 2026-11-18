@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { Check, X, Clock, Layers, Loader2, Sparkles, Play, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -39,9 +39,9 @@ export default function RenderingStatus() {
       .catch((e) => {
         setErr(e.message || "بارگذاری آمار ناموفق");
         Promise.all([
-          base44.entities.CurtainModel.count({}),
-          base44.entities.CurtainModel.count({ install_status: "approved" }),
-          base44.entities.CurtainModel.count({ install_status: "rejected" }),
+          api.entities.CurtainModel.count({}),
+          api.entities.CurtainModel.count({ install_status: "approved" }),
+          api.entities.CurtainModel.count({ install_status: "rejected" }),
         ])
           .then(([total, approved, rejected]) =>
             setStats({

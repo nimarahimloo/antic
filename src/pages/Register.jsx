@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +33,7 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      const res = await base44.auth.register({
+      const res = await api.auth.register({
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
         password,
@@ -40,14 +41,14 @@ export default function Register() {
       });
       window.location.href = postLoginPath(res?.user, returnTo);
     } catch (err) {
-      setError(err.message || "ثبت‌نام ناموفق بود");
+      setError(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", returnTo);
+    api.auth.loginWithProvider("google", returnTo);
   };
 
   return (

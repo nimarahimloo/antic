@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
-import { api, clearToken, setToken } from "@/api/client";
+import { api, AUTH_EVENT, clearToken, setToken } from "@/api/client";
 
 const AuthContext = createContext();
 const TOKEN_KEY = "antic_access_token";
@@ -36,6 +36,20 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     consumeAccessTokenFromUrl();
     checkAppState();
+
+    // Global 401 handler: any API call that returns 401 clears the token and
+    // redirects to login so the user isn't stuck with a stale session.
+    const onUnauthorized = () => {
+      clearToken();
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthChecked(true);
+      navigateToLogin();
+    };
+    window.addEventListener(AUTH_EVENT, onUnauthorized);
+    return () => {
+      window.removeEventListener(AUTH_EVENT, onUnauthorized);
+    };
   }, []);
 
   const checkAppState = async () => {

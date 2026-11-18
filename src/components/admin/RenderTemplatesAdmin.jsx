@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Loader2, Upload, Trash2 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { refreshRenderTemplates } from "@/hooks/useRenderTemplates";
 import { resolveStyle, MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
 import { filterInstallCategories } from "@/lib/installCategories";
+import { apiErrorMessage } from "@/lib/apiError";
 
 /**
  * قالب سبز (chroma) — فقط آپلود عکس واقعی/حرفه‌ای با ناحیه پارچه سبز.
@@ -23,8 +24,14 @@ export default function RenderTemplatesAdmin() {
     setLoading(true);
     try {
       const [cats, tpls] = await Promise.all([
-        base44.entities.CurtainCategory.list("order", 200).catch(() => []),
-        base44.entities.RenderTemplate.list("-updated_date", 200).catch(() => []),
+        api.entities.CurtainCategory.list("order", 200).catch((err) => {
+          console.error("Failed to load categories:", apiErrorMessage(err));
+          return [];
+        }),
+        api.entities.RenderTemplate.list("-updated_date", 200).catch((err) => {
+          console.error("Failed to load templates:", apiErrorMessage(err));
+          return [];
+        }),
       ]);
       setCategories(Array.isArray(cats) ? cats : []);
       setTemplates(Array.isArray(tpls) ? tpls : []);
@@ -54,7 +61,7 @@ export default function RenderTemplatesAdmin() {
       await reload();
       setOkMsg("ذخیره شد.");
     } catch (e) {
-      setError(String(e?.data?.error || e?.message || "عملیات ناموفق"));
+      setError(apiErrorMessage(e));
     } finally {
       setBusy("");
     }
@@ -63,16 +70,16 @@ export default function RenderTemplatesAdmin() {
   const upload = (cat, file) =>
     file &&
     run(cat.slug, async () => {
-      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
+      const { file_url } = await api.integrations.Core.UploadPublicFile({ file });
       if (!file_url) throw new Error("آپلود ناموفق");
       const existing = rowOf(cat.slug);
       if (existing) {
-        await base44.entities.RenderTemplate.update(existing.id, {
+        await api.entities.RenderTemplate.update(existing.id, {
           style: cat.slug,
           image: file_url,
         });
       } else {
-        await base44.entities.RenderTemplate.create({ style: cat.slug, image: file_url });
+        await api.entities.RenderTemplate.create({ style: cat.slug, image: file_url });
       }
       // آینه روی mechanism تا مدل‌هایی که فقط با سازوکار match می‌شوند هم پیدا کنند
       const mechanism = cat.mechanism || resolveStyle({ category_slug: cat.slug });
@@ -81,9 +88,9 @@ export default function RenderTemplatesAdmin() {
           (r) => String(r.style || "").toLowerCase() === String(mechanism).toLowerCase()
         );
         if (mechRow) {
-          await base44.entities.RenderTemplate.update(mechRow.id, { image: file_url });
+          await api.entities.RenderTemplate.update(mechRow.id, { image: file_url });
         } else {
-          await base44.entities.RenderTemplate.create({ style: mechanism, image: file_url });
+          await api.entities.RenderTemplate.create({ style: mechanism, image: file_url });
         }
       }
     });
@@ -91,7 +98,7 @@ export default function RenderTemplatesAdmin() {
   const remove = (cat) =>
     run(cat.slug, async () => {
       const existing = rowOf(cat.slug);
-      if (existing) await base44.entities.RenderTemplate.delete(existing.id);
+      if (existing) await api.entities.RenderTemplate.delete(existing.id);
     });
 
   if (loading) {

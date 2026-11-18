@@ -25,7 +25,10 @@ export default function AdminOrders() {
     fetch(`${API}/orders`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((d) => setRows(Array.isArray(d) ? d : []))
-      .catch(() => setRows([]))
+      .catch((err) => {
+        console.error("Failed to load orders:", err);
+        setRows([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 

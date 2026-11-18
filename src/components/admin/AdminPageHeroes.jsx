@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Upload, Loader2, Image as ImageIcon } from "lucide-react";
 import { compressImage } from "@/lib/compressImage";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -72,7 +72,7 @@ export default function AdminPageHeroes({ value, onChange, loading }) {
     setLocalError("");
     try {
       const compressed = await compressImage(file);
-      const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+      const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
       const url = res?.file_url || res?.url || res?.path;
       if (!url) throw new Error("آپلود پاسخ معتبری نداد");
       update(key, "image", url);

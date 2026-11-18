@@ -17,7 +17,9 @@ export default function CheckoutResult() {
     fetch(`${API}/orders/${orderId}`)
       .then((r) => r.json())
       .then(setOrder)
-      .catch(() => {})
+      .catch((err) => {
+        console.error("Failed to load order:", err);
+      })
       .finally(() => setLoading(false));
   }, [orderId]);
 

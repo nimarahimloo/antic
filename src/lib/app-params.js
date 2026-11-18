@@ -9,7 +9,6 @@ const isClearAccessTokenRequested = () =>
 
 const clearStoredAccessToken = () => {
   window.localStorage.removeItem("antic_access_token");
-  window.localStorage.removeItem("base44_access_token"); // legacy key cleanup
   window.localStorage.removeItem("token");
 };
 

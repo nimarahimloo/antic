@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { ImageIcon, Trash2, Share2 } from "lucide-react";
 
 export default function SavedDesignsGallery({ limit = 8 }) {
@@ -9,7 +9,7 @@ export default function SavedDesignsGallery({ limit = 8 }) {
 
   const load = () => {
     setLoading(true);
-    base44.entities.SavedDesign
+    api.entities.SavedDesign
       .filter({}, { sort: "-created_date", limit })
       .then((data) => setDesigns(data?.items || []))
       .catch(() => setDesigns([]))
@@ -34,7 +34,7 @@ export default function SavedDesignsGallery({ limit = 8 }) {
 
   const handleDelete = async (id) => {
     try {
-      await base44.entities.SavedDesign.delete(id);
+      await api.entities.SavedDesign.delete(id);
       load();
     } catch {}
   };

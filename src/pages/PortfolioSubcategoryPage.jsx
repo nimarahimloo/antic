@@ -4,7 +4,8 @@ import { ArrowRight } from "lucide-react";
 import ProjectCard from "@/components/ProjectCard";
 import { mosaicGridClass, mosaicItemClass } from "@/lib/mosaicLayout";
 import { usePortfolioCategories } from "@/hooks/usePortfolioCategories";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 
 export default function PortfolioSubcategoryPage() {
   const { slug, sub } = useParams();
@@ -24,12 +25,15 @@ export default function PortfolioSubcategoryPage() {
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
-    base44.entities.Project.filter({ category_slug: slug }, "-created_date", 100)
+    api.entities.Project.filter({ category_slug: slug }, "-created_date", 100)
       .then((rows) => {
         const list = Array.isArray(rows) ? rows : [];
         setProjects(list.filter((p) => String(p.subcategory || "") === String(sub || "")));
       })
-      .catch(() => setProjects([]))
+      .catch((err) => {
+        console.error("Failed to load projects:", apiErrorMessage(err));
+        setProjects([]);
+      })
       .finally(() => setLoading(false));
   }, [slug, sub]);
 

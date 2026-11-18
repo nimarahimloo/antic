@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 
 const STATUS = {
   new: "جدید",
@@ -17,7 +18,10 @@ export default function AccountRequests() {
     api.account
       .requests()
       .then((d) => setRows(Array.isArray(d) ? d : []))
-      .catch(() => setRows([]))
+      .catch((err) => {
+        console.error("Failed to load requests:", apiErrorMessage(err));
+        setRows([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 

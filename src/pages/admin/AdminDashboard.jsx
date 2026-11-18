@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { Layers, FolderKanban, ListTree, Inbox, ArrowLeft } from "lucide-react";
 import RenderingStatus from "@/components/admin/RenderingStatus";
 
@@ -9,12 +9,12 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.CurtainModel.count({}),
-      base44.entities.Project.count({}),
-      base44.entities.CurtainCategory.count({}),
-      base44.entities.ConsultationRequest.count({}),
-      base44.entities.ConsultationRequest.count({ status: "new" }),
-      base44.entities.ConsultationRequest.list("-created_date", 5),
+      api.entities.CurtainModel.count({}),
+      api.entities.Project.count({}),
+      api.entities.CurtainCategory.count({}),
+      api.entities.ConsultationRequest.count({}),
+      api.entities.ConsultationRequest.count({ status: "new" }),
+      api.entities.ConsultationRequest.list("-created_date", 5),
     ])
       .then(([models, projects, categories, requests, newRequests, latest]) => {
         setStats({ models, projects, categories, requests, newRequests, latest });

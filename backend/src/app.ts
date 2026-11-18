@@ -43,25 +43,25 @@ const DEFAULT_HERO = [
     space: "پذیرایی",
     title: "فضای پذیرایی",
     subtitle: "پرده‌های شیک برای فضای پذیرایی",
-    image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/2be489b62_generated_image.png",
+    image: "/images/migrated/2be489b62_generated_image.png",
   },
   {
     space: "آشپزخانه",
     title: "آشپزخانه",
     subtitle: "کنترل نور و هماهنگی با دکوراسیون آشپزخانه",
-    image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/e29f4aed1_generated_image.png",
+    image: "/images/migrated/e29f4aed1_generated_image.png",
   },
   {
     space: "اتاق خواب",
     title: "اتاق خواب",
     subtitle: "حریم خصوصی و آرامش برای اتاق خواب",
-    image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/58350d5ba_generated_image.png",
+    image: "/images/migrated/58350d5ba_generated_image.png",
   },
   {
     space: "فضاهای ویژه",
     title: "فضاهای ویژه",
     subtitle: "راهکار اختصاصی برای فضاهای خاص",
-    image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/7480c6599_generated_image.png",
+    image: "/images/migrated/7480c6599_generated_image.png",
   },
 ];
 

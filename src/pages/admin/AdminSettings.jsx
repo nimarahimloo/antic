@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Key, Globe, Sparkles, AlertCircle, Upload, Loader2, Plus, Trash2, Image as ImageIcon } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
+import { apiErrorMessage } from "@/lib/apiError";
 import { useAuth } from "@/lib/AuthContext";
 import { adminToast } from "@/lib/adminToast";
 import AdminPageHeroes, {
@@ -15,10 +16,10 @@ const inputCls =
 const labelCls = "mb-1.5 block font-body text-xs text-muted-foreground";
 
 const DEFAULT_SLIDES = [
-  { space: "پذیرایی", title: "فضای پذیرایی", subtitle: "پرده‌های شیک برای فضای پذیرایی", image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/2be489b62_generated_image.png" },
-  { space: "آشپزخانه", title: "آشپزخانه", subtitle: "کنترل نور و هماهنگی با دکوراسیون آشپزخانه", image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/e29f4aed1_generated_image.png" },
-  { space: "اتاق خواب", title: "اتاق خواب", subtitle: "حریم خصوصی و آرامش برای اتاق خواب", image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/58350d5ba_generated_image.png" },
-  { space: "فضاهای ویژه", title: "فضاهای ویژه", subtitle: "راهکار اختصاصی برای فضاهای خاص", image: "https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/7480c6599_generated_image.png" },
+  { space: "پذیرایی", title: "فضای پذیرایی", subtitle: "پرده‌های شیک برای فضای پذیرایی", image: "/images/migrated/2be489b62_generated_image.png" },
+  { space: "آشپزخانه", title: "آشپزخانه", subtitle: "کنترل نور و هماهنگی با دکوراسیون آشپزخانه", image: "/images/migrated/e29f4aed1_generated_image.png" },
+  { space: "اتاق خواب", title: "اتاق خواب", subtitle: "حریم خصوصی و آرامش برای اتاق خواب", image: "/images/migrated/58350d5ba_generated_image.png" },
+  { space: "فضاهای ویژه", title: "فضاهای ویژه", subtitle: "راهکار اختصاصی برای فضاهای خاص", image: "/images/migrated/7480c6599_generated_image.png" },
 ];
 
 function emptySlide() {
@@ -45,7 +46,7 @@ export default function AdminSettings() {
       setLoading(true);
       setError("");
       try {
-        const rows = await base44.entities.SiteSetting.list("-updated_date", 10);
+        const rows = await api.entities.SiteSetting.list("-updated_date", 10);
         const main =
           (Array.isArray(rows) ? rows : []).find((r) => r.key === "main" || !r.key) ||
           (Array.isArray(rows) && rows[0]) ||
@@ -70,8 +71,8 @@ export default function AdminSettings() {
             setPageHeroes(normalizePageHeroes(ph));
           }
         }
-      } catch {
-        if (!cancelled) setError("بارگذاری تنظیمات ناموفق بود.");
+      } catch (err) {
+        if (!cancelled) setError(apiErrorMessage(err));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -83,7 +84,7 @@ export default function AdminSettings() {
 
   async function uploadImage(file) {
     const compressed = await compressImage(file);
-    const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+    const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
     const url = res?.file_url || res?.url || res?.path;
     if (!url) throw new Error("آپلود پاسخ معتبری نداد");
     return url;
@@ -98,7 +99,7 @@ export default function AdminSettings() {
       setLogoUrl(url);
       setHint("لوگو آپلود شد؛ برای اعمال ذخیره کنید.");
     } catch (e) {
-      setError(e?.message || "آپلود لوگو ناموفق بود.");
+      setError(apiErrorMessage(e));
     } finally {
       setUploadingLogo(false);
     }
@@ -113,7 +114,7 @@ export default function AdminSettings() {
       setSlides((prev) => prev.map((s, i) => (i === idx ? { ...s, image: url } : s)));
       setHint("تصویر اسلاید آپلود شد؛ برای اعمال ذخیره کنید.");
     } catch (e) {
-      setError(e?.message || "آپلود تصویر اسلاید ناموفق بود.");
+      setError(apiErrorMessage(e));
     } finally {
       setUploadingSlide(null);
     }
@@ -150,9 +151,9 @@ export default function AdminSettings() {
     };
     try {
       if (settingId) {
-        await base44.entities.SiteSetting.update(settingId, payload);
+        await api.entities.SiteSetting.update(settingId, payload);
       } else {
-        const created = await base44.entities.SiteSetting.create(payload);
+        const created = await api.entities.SiteSetting.create(payload);
         if (created?.id) setSettingId(created.id);
       }
       setHint("ذخیره شد. تغییرات در سایت اعمال می‌شود.");
@@ -161,9 +162,8 @@ export default function AdminSettings() {
         await checkAppState();
       }
     } catch (e) {
-      const msg = e?.data?.error || e?.message || "ذخیره ناموفق بود.";
-      setError(msg);
-      adminToast("error", "تنظیمات", msg);
+      setError(apiErrorMessage(e));
+      adminToast("error", "تنظیمات", apiErrorMessage(e));
     } finally {
       setSaving(false);
     }

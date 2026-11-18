@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { Plus, Pencil, Trash2, X, Loader2, Upload, Sparkles } from "lucide-react";
 import { compressImage } from "@/lib/compressImage";
 import { analyzeFabric } from "@/components/catalog/photo/fabricAnalyzer";
 import { adminToast } from "@/lib/adminToast";
+import { apiErrorMessage } from "@/lib/apiError";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -35,10 +36,10 @@ export default function AdminEntityPage({
   const load = useCallback(() => {
     setLoading(true);
     setTableError("");
-    base44.entities[entity]
+    api.entities[entity]
       .list(sortBy, 500)
       .then((data) => setRecords(data || []))
-      .catch(() => setTableError("بارگذاری لیست ناموفق بود."))
+      .catch((err) => setTableError(apiErrorMessage(err)))
       .finally(() => setLoading(false));
   }, [entity, sortBy]);
 
@@ -139,14 +140,14 @@ export default function AdminEntityPage({
     setError("");
     try {
       const isEdit = Boolean(editing?.id);
-      if (isEdit) await base44.entities[entity].update(editing.id, payload);
-      else await base44.entities[entity].create(payload);
+      if (isEdit) await api.entities[entity].update(editing.id, payload);
+      else await api.entities[entity].create(payload);
       const detail = payload.name || payload.title || payload.code || payload.slug || "";
       adminToast(isEdit ? "update" : "create", title, detail);
       closeModal();
       load();
     } catch (err) {
-      const msg = err?.data?.error || err?.message || "ذخیره ناموفق بود؛ دوباره تلاش کنید.";
+      const msg = apiErrorMessage(err);
       setError(msg);
       adminToast("error", title, msg);
     } finally {
@@ -158,12 +159,13 @@ export default function AdminEntityPage({
     const label = record[columns[0]?.key] ?? "این مورد";
     if (!window.confirm(`حذف «${label}»؟ این عمل بازگشت‌پذیر نیست.`)) return;
     try {
-      await base44.entities[entity].delete(record.id);
+      await api.entities[entity].delete(record.id);
       adminToast("delete", title, String(label));
       load();
-    } catch {
-      setTableError("حذف ناموفق بود.");
-      adminToast("error", title, "حذف ناموفق بود.");
+    } catch (err) {
+      const msg = apiErrorMessage(err);
+      setTableError(msg);
+      adminToast("error", title, msg);
     }
   }
 
@@ -192,8 +194,8 @@ export default function AdminEntityPage({
           ? `تشخیص: ${a.fabric} · ${a.texture} · ${a.color}`
           : `تشخیص: ${a.fabric} · ${a.texture} · ${a.color}${a.colorHex ? ` (${a.colorHex})` : ""}`
       );
-    } catch {
-      setHint("تحلیل تصویر ناموفق بود.");
+    } catch (err) {
+      setHint("تحلیل تصویر ناموفق بود: " + apiErrorMessage(err));
     } finally {
       setAnalyzing(false);
     }
@@ -206,13 +208,13 @@ export default function AdminEntityPage({
     setHint("");
     try {
       const compressed = await compressImage(file);
-      const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+      const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
       const url = res?.file_url || res?.url;
       if (!url) throw new Error("آپلود پاسخ معتبری نداد");
       setForm((f) => ({ ...f, [fieldKey]: url }));
       if (fieldKey === "image" && autoAnalyzeFabric) await applyFabricAnalysis(url);
     } catch (err) {
-      setError(err?.message || "آپلود تصویر ناموفق بود.");
+      setError(apiErrorMessage(err));
     } finally {
       setUploadingField(null);
     }
@@ -233,7 +235,7 @@ export default function AdminEntityPage({
       const urls = [];
       for (const file of files) {
         const compressed = await compressImage(file);
-        const uploader = base44?.integrations?.Core?.UploadPublicFile;
+        const uploader = api?.integrations?.Core?.UploadPublicFile;
         if (typeof uploader !== "function") throw new Error("سرویس آپلود در دسترس نیست");
         const res = await uploader({ file: compressed });
         const url = res?.file_url || res?.url || res?.path;
@@ -249,7 +251,7 @@ export default function AdminEntityPage({
         return { ...f, [fieldKey]: next };
       });
     } catch (err) {
-      setError(err?.message || "آپلود گالری ناموفق بود.");
+      setError(apiErrorMessage(err));
     } finally {
       setUploadingField(null);
     }

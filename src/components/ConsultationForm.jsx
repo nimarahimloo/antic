@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Check, Loader2, Phone } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { SITE_PHONE_HREF, SITE_PHONE_DISPLAY } from "@/lib/siteContact";
+import { apiErrorMessage } from "@/lib/apiError";
 
 const SPACE_TYPES = ["پذیرایی", "اتاق خواب", "آشپزخانه", "دفتر کار", "فضای تجاری", "سایر"];
 
@@ -23,7 +24,7 @@ export default function ConsultationForm({ reference = "", submitLabel = "ثبت
     setSending(true);
     setError("");
     try {
-      await base44.entities.ConsultationRequest.create({
+      await api.entities.ConsultationRequest.create({
         name: form.name.trim(),
         phone: form.phone.trim(),
         email: form.email.trim() || undefined,
@@ -35,10 +36,7 @@ export default function ConsultationForm({ reference = "", submitLabel = "ثبت
       });
       setSent(true);
     } catch (err) {
-      const msg =
-        (err && typeof err === "object" && "message" in err && String(err.message)) ||
-        "ثبت درخواست ناموفق بود؛ لطفاً دوباره تلاش کنید یا تلفنی تماس بگیرید.";
-      setError(msg.includes("Failed") || msg.includes("fetch") ? "ثبت درخواست ناموفق بود؛ لطفاً دوباره تلاش کنید یا تلفنی تماس بگیرید." : msg);
+      setError(apiErrorMessage(err));
     } finally {
       setSending(false);
     }

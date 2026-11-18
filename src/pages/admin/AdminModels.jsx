@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import FabricSwatch from "@/components/catalog/FabricSwatch";
 import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 import { allCategorySelectOptions } from "@/lib/categoryTree";
 
 export default function AdminModels() {
@@ -10,7 +11,10 @@ export default function AdminModels() {
   useEffect(() => {
     api.entities.CurtainCategory.list("order", 500)
       .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
-      .catch(() => setCategories([]));
+      .catch((err) => {
+        console.error("Failed to load categories:", apiErrorMessage(err));
+        setCategories([]);
+      });
   }, []);
 
   const fields = [

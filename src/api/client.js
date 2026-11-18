@@ -1,9 +1,15 @@
 /**
  * HTTP client for the Antic backend (/api, proxied by Vite in dev).
+ *
+ * All requests throw `ApiError` on failure (non-ok HTTP or network error).
+ * On 401 responses the stored token is cleared and an `antic:auth:unauthorized`
+ * window event is dispatched so AuthContext / listeners can react (e.g. redirect
+ * to login) without the client itself hard-coding a navigation.
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const TOKEN_KEY = "antic_access_token";
+export const AUTH_EVENT = "antic:auth:unauthorized";
 
 function getToken() {
   if (typeof window === "undefined") return null;
@@ -20,25 +26,90 @@ export function clearToken() {
   setToken(null);
 }
 
+/**
+ * Normalised error thrown by every API call.
+ * - status: HTTP status code (0 for network errors)
+ * - data: parsed body or null
+ * - isNetworkError: true when the request never reached the server
+ * - isAuthError: true for 401 / 403
+ */
+export class ApiError extends Error {
+  status;
+  data;
+  isNetworkError;
+  isAuthError;
+
+  constructor(message, { status = 0, data, isNetworkError = false } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.data = data;
+    this.isNetworkError = isNetworkError;
+    this.isAuthError = status === 401 || status === 403;
+  }
+}
+
+export function isApiError(err) {
+  return err instanceof ApiError;
+}
+
+/**
+ * Perform a fetch request and normalise the result into either the parsed body
+ * or a thrown ApiError. Network failures become ApiError with isNetworkError=true.
+ * HTTP 401 clears the token and dispatches an auth event.
+ */
 async function request(path, { method = "GET", body, auth = true } = {}) {
   const headers = { "Content-Type": "application/json" };
   if (auth) {
     const token = getToken();
     if (token) headers.Authorization = "Bearer " + token;
   }
-  const res = await fetch(API_BASE + path, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  if (res.status === 204) return undefined;
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(data.error || "HTTP " + res.status);
-    err.status = res.status;
-    err.data = data;
-    throw err;
+
+  let res;
+  try {
+    res = await fetch(API_BASE + path, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch (fetchErr) {
+    throw new ApiError("شبکه در دسترس نیست. لطفاً اتصال اینترنت را بررسی کنید.", {
+      status: 0,
+      data: null,
+      isNetworkError: true,
+    });
   }
+
+  if (res.status === 204) return undefined;
+
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
+
+  if (!res.ok) {
+    const message =
+      (data &&
+        typeof data === "object" &&
+        "error" in data &&
+        typeof data.error === "string"
+        ? data.error
+        : null) ||
+      `HTTP ${res.status}`;
+
+    if (res.status === 401) {
+      // Clear a stale token so the next request doesn't keep failing with 401.
+      clearToken();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(AUTH_EVENT));
+      }
+    }
+
+    throw new ApiError(message, { status: res.status, data });
+  }
+
   return data;
 }
 
@@ -194,7 +265,7 @@ async function uploadFile(file, publicEndpoint) {
   if (token) headers.Authorization = "Bearer " + token;
   const res = await fetch(API_BASE + path, { method: "POST", headers, body: form });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Upload failed");
+  if (!res.ok) throw new ApiError(data.error || "Upload failed", { status: res.status, data });
   return data;
 }
 
@@ -269,7 +340,7 @@ export const api = {
     },
     redirectToLogin(returnUrl) {
       if (typeof window === "undefined") return;
-      const q = returnUrl ? "?returnTo=" + encodeURIComponent(returnUrl) : "";
+      const q = returnTo ? "?returnTo=" + encodeURIComponent(returnTo) : "";
       window.location.href = "/login" + q;
     },
   },
@@ -357,6 +428,3 @@ export const api = {
     },
   },
 };
-
-/** @deprecated use `api` */
-export const base44 = api;

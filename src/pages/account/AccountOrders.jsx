@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Loader2, ArrowRight } from "lucide-react";
 import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 
 const STATUS = {
   pending: { label: "در انتظار پرداخت", cls: "text-accent border-accent/40" },
@@ -24,7 +25,10 @@ function OrderList() {
     api.account
       .orders()
       .then((d) => setRows(Array.isArray(d) ? d : []))
-      .catch(() => setRows([]))
+      .catch((err) => {
+        console.error("Failed to load orders:", apiErrorMessage(err));
+        setRows([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 

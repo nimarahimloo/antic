@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { resolveStyle, MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
 
 /**
@@ -32,7 +32,7 @@ export default function RenderCompare({ model, onClose }) {
       const all = [];
       for (const k of keys) {
         try {
-          const rows = await base44.entities.InstallReference.filter({ style: k }, "-created_date", 8);
+          const rows = await api.entities.InstallReference.filter({ style: k }, "-created_date", 8);
           if (Array.isArray(rows)) all.push(...rows);
         } catch {
           /* ignore */

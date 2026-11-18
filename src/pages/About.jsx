@@ -72,7 +72,7 @@ export default function About() {
           >
             <div className="overflow-hidden rounded-3xl border border-secondary/60">
               <img
-                src="https://media.base44.com/images/public/6a9f0b12fbe31e2b02fd6664/dc534e002_generated_image.png"
+                src="/images/migrated/dc534e002_generated_image.png"
                 alt="نمونه پارچه پرده آنتیک"
                 className="aspect-[4/3] w-full object-cover"
               />

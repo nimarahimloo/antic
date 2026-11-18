@@ -1,7 +1,7 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
 import AdminAssistant from "@/components/agent/AdminAssistant";
 import { useAuth } from "@/lib/AuthContext";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import {
   LayoutDashboard,
   Layers,
@@ -75,7 +75,7 @@ export default function AdminLayout() {
               <ExternalLink className="h-3.5 w-3.5" /> مشاهده سایت
             </Link>
             <button
-              onClick={() => base44.auth.logout(window.location.origin + "/")}
+              onClick={() => api.auth.logout(window.location.origin + "/")}
               className="flex items-center gap-1.5 font-body text-xs text-muted-foreground transition-colors hover:text-destructive"
             >
               <LogOut className="h-3.5 w-3.5" /> خروج

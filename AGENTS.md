@@ -78,7 +78,6 @@ ZARINPAL_SANDBOX="true"
 | مسیر | نقش |
 |------|-----|
 | `src/api/client.js` | کلاینت HTTP اصلی (`api`) |
-| `src/api/base44Client.js` | **فقط shim منسوخ** → re-export از `client.js` |
 | `src/hooks/useCurtainCategories.js` | **منبع واحد** دسته‌های کاتالوگ |
 | `src/rest/store-cart.js` | سبد + checkout |
 | `src/rest/store-catalog.js` | محصولات/دسته‌های **فروشگاه اکسسوری** |

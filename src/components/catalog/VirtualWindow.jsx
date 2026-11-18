@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { shade } from "./curtainUtils";
 import { renderCurtain } from "./CurtainStyles";
 
@@ -113,7 +113,7 @@ export default function VirtualWindow({ fabric, settings: override }) {
   const [dbSettings, setDbSettings] = useState(null);
 
   useEffect(() => {
-    base44.entities.VirtualWindowSetting
+    api.entities.VirtualWindowSetting
       .list("-created_date", 1)
       .then((data) => setDbSettings(data?.[0] || null))
       .catch(() => setDbSettings(null));

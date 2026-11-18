@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 import ConsultationForm from "@/components/ConsultationForm";
 import ProductGallery from "@/components/product/ProductGallery";
 
@@ -34,12 +35,15 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    base44.entities.Project.get(id)
+    api.entities.Project.get(id)
       .then((data) => {
         setProject(data);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        console.error("Failed to load project:", apiErrorMessage(err));
+        setLoading(false);
+      });
   }, [id]);
 
   const images = useMemo(() => buildProjectImages(project), [project]);

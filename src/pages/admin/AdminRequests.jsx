@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 import { Trash2, Loader2 } from "lucide-react";
 import { adminToast } from "@/lib/adminToast";
 
@@ -16,10 +17,13 @@ export default function AdminRequests() {
 
   const load = useCallback(() => {
     setLoading(true);
-    base44.entities.ConsultationRequest
+    api.entities.ConsultationRequest
       .list("-created_date", 300)
       .then((data) => setRequests(data || []))
-      .catch(() => {})
+      .catch((err) => {
+        console.error("Failed to load requests:", err);
+        setRequests([]);
+      })
       .finally(() => setLoading(false));
   }, []);
   useEffect(load, [load]);
@@ -28,23 +32,23 @@ export default function AdminRequests() {
     const prev = record.status;
     setRequests((rs) => rs.map((r) => (r.id === record.id ? { ...r, status } : r)));
     try {
-      await base44.entities.ConsultationRequest.update(record.id, { status });
+      await api.entities.ConsultationRequest.update(record.id, { status });
       const label = STATUS_OPTIONS.find((s) => s.value === status)?.label || status;
       adminToast("update", "درخواست", `${record.name || ""} — ${label}`);
-    } catch {
+    } catch (err) {
       setRequests((rs) => rs.map((r) => (r.id === record.id ? { ...r, status: prev } : r)));
-      adminToast("error", "درخواست", "تغییر وضعیت ناموفق بود");
+      adminToast("error", "درخواست", apiErrorMessage(err));
     }
   }
 
   async function remove(record) {
     if (!window.confirm(`حذف درخواست «${record.name}»؟`)) return;
     try {
-      await base44.entities.ConsultationRequest.delete(record.id);
+      await api.entities.ConsultationRequest.delete(record.id);
       setRequests((rs) => rs.filter((r) => r.id !== record.id));
       adminToast("delete", "درخواست", record.name || "");
-    } catch {
-      adminToast("error", "درخواست", "حذف ناموفق بود");
+    } catch (err) {
+      adminToast("error", "درخواست", apiErrorMessage(err));
     }
   }
 

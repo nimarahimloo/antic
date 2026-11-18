@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Loader2, Upload, X } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { refreshRenderTemplates } from "@/hooks/useRenderTemplates";
 import { filterInstallCategories } from "@/lib/installCategories";
 
@@ -23,8 +23,8 @@ export default function InstallReferencesAdmin() {
     setError("");
     try {
       const [cats, refs] = await Promise.all([
-        base44.entities.CurtainCategory.list("order", 200).catch(() => []),
-        base44.entities.InstallReference.list("-created_date", 400).catch(() => []),
+        api.entities.CurtainCategory.list("order", 200).catch(() => []),
+        api.entities.InstallReference.list("-created_date", 400).catch(() => []),
       ]);
       setCategories(Array.isArray(cats) ? cats : []);
       setRows(Array.isArray(refs) ? refs : []);
@@ -45,9 +45,9 @@ export default function InstallReferencesAdmin() {
     setError("");
     try {
       for (const file of files) {
-        const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
+        const { file_url } = await api.integrations.Core.UploadPublicFile({ file });
         if (!file_url) throw new Error("آپلود ناموفق");
-        await base44.entities.InstallReference.create({
+        await api.entities.InstallReference.create({
           style: slug,
           image: file_url,
           note: "real-install",
@@ -64,7 +64,7 @@ export default function InstallReferencesAdmin() {
 
   const remove = async (id) => {
     try {
-      await base44.entities.InstallReference.delete(id);
+      await api.entities.InstallReference.delete(id);
       refreshRenderTemplates();
       reload();
     } catch {

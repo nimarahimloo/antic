@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, X, Loader2, Upload } from "lucide-react";
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
+import { apiErrorMessage } from "@/lib/apiError";
 
 const API = import.meta.env.VITE_API_BASE || "/api";
 const GALLERY_MAX = 20;
@@ -87,7 +88,10 @@ export default function AdminProducts() {
         setRows(Array.isArray(products) ? products : []);
         setCats(Array.isArray(categories) ? categories : []);
       })
-      .catch(() => setRows([]))
+      .catch((err) => {
+        console.error("Failed to load products:", err);
+        setRows([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -218,7 +222,7 @@ export default function AdminProducts() {
       closeModal();
       load();
     } catch (err) {
-      setError(err?.message || "ذخیره ناموفق بود");
+      setError(apiErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -232,8 +236,8 @@ export default function AdminProducts() {
         headers: authHeaders(),
       });
       load();
-    } catch {
-      setError("حذف ناموفق بود");
+    } catch (err) {
+      setError(apiErrorMessage(err));
     }
   }
 

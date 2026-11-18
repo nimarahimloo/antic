@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
 
 const cache = {};
 const pending = {};
@@ -18,7 +18,7 @@ export function useInstallImage(fabric) {
     if (known || cache[id] === '' || fabric?.install_status === 'rejected' || !id || !fabric?.image) return;
     let alive = true;
     setLoading(true);
-    pending[id] ||= base44.functions.invoke('generateInstallImage', { model_id: id }).then(r => (cache[id] = r.data?.install_image || ''));
+    pending[id] ||= api.functions.invoke('generateInstallImage', { model_id: id }).then(r => (cache[id] = r.data?.install_image || ''));
     pending[id].then(u => alive && setUrl(u)).finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [id, approved, fabric?.install_status, fabric?.image]);

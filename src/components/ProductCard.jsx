@@ -95,14 +95,17 @@ export default function ProductCard({ product }) {
               )}
             </div>
             {contactForPrice ? (
-              <a
-                href={SITE_PHONE_HREF}
-                onClick={(e) => e.stopPropagation()}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.location.href = SITE_PHONE_HREF;
+                }}
                 className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-[11px] font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
               >
                 <Phone className="h-3.5 w-3.5" />
                 تماس بگیرید
-              </a>
+              </button>
             ) : (
               <button
                 onClick={handleAdd}

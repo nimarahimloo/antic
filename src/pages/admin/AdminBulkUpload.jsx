@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 import { UploadCloud, X, Loader2, Check, Package } from "lucide-react";
 import { ALL_CATEGORIES as FALLBACK_CATEGORIES } from "@/lib/catalogData";
 
@@ -14,7 +15,7 @@ export default function AdminBulkUpload() {
   const fileRef = useRef(null);
 
   useEffect(() => {
-    base44.entities.CurtainCategory
+    api.entities.CurtainCategory
       .list("order", 100)
       .then((data) => {
         if (data?.length) {
@@ -25,7 +26,8 @@ export default function AdminBulkUpload() {
           setSelectedCategory(FALLBACK_CATEGORIES[0]?.slug || "");
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Failed to load categories:", err);
         setCategories(FALLBACK_CATEGORIES);
         setSelectedCategory(FALLBACK_CATEGORIES[0]?.slug || "");
       });
@@ -40,7 +42,7 @@ export default function AdminBulkUpload() {
     try {
       const uploaded = [];
       for (const file of files) {
-        const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
+        const { file_url } = await api.integrations.Core.UploadPublicFile({ file });
         uploaded.push({
           id: Math.random().toString(36).slice(2),
           image: file_url,
@@ -52,7 +54,8 @@ export default function AdminBulkUpload() {
       }
       setItems((prev) => [...prev, ...uploaded]);
     } catch (e) {
-      console.error(e);
+      const msg = apiErrorMessage(e);
+      alert(msg);
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -91,13 +94,13 @@ export default function AdminBulkUpload() {
         color_code: i.color_code || undefined,
         image: i.image,
       }));
-      await base44.entities.CurtainModel.bulkCreate(records);
+      await api.entities.CurtainModel.bulkCreate(records);
       setCreated(records.length);
       setItems([]);
       setSubcategory("");
       setTimeout(() => setCreated(0), 4000);
     } catch (e) {
-      console.error(e);
+      alert(apiErrorMessage(e));
     } finally {
       setCreating(false);
     }

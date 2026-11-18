@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Search, Phone, X } from "lucide-react";
@@ -6,13 +6,34 @@ import CurtainPreview from "@/components/catalog/CurtainPreview";
 import CatalogCard from "@/components/catalog/CatalogCard";
 import ProjectCard from "@/components/ProjectCard";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
-import { base44 } from "@/api/base44Client";
+import { apiErrorMessage } from "@/lib/apiError";
+import { api } from "@/api/client";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
+import { getRootCategories, parseSubs } from "@/lib/categoryTree";
 
+/**
+ * کاتالوگ تعاملی — صفحات models
+ * دسته‌های مادر + زیردسته‌ها (flat list)
+ * - جستجوی زنده با debounce
+ * - کلیک روی دسته → نمایش مدل‌های آن دسته
+ */
 export default function InteractiveCatalog({ initialCategory }) {
-  const { categories: CATEGORIES, loading: catsLoading } = useCurtainCategories({
+  const { categories: allCats, loading: catsLoading } = useCurtainCategories({
     catalogOnly: true,
   });
+
+  // دسته‌های مادر + زیردسته‌ها به صورت لیست شسته (flat) تا هر دو در UI نمایش داده شوند
+  const categories = useMemo(() => {
+    const roots = getRootCategories(allCats, { includeSpace: false });
+    const flat = [];
+    for (const root of roots) {
+      flat.push({ slug: root.slug, name: root.name, image: root.image || null, isSub: false });
+      for (const sub of parseSubs(root.subcategories)) {
+        flat.push({ slug: sub.slug, name: sub.name, image: null, isSub: true, parentSlug: root.slug });
+      }
+    }
+    return flat;
+  }, [allCats]);
 
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || "");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
@@ -21,22 +42,119 @@ export default function InteractiveCatalog({ initialCategory }) {
   const [loading, setLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryCounts, setCategoryCounts] = useState({});
+  const countsLoaded = useRef(false);
+
+  const scrollerRef = useRef(null);
+  const dragRef = useRef({
+    active: false,
+    startX: 0,
+    scrollLeft: 0,
+    moved: false,
+    pointerId: null,
+  });
+  const resumeTimer = useRef(null);
+  const [paused, setPaused] = useState(false);
+
+  const pauseAuto = useCallback(() => {
+    setPaused(true);
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(() => setPaused(false), 2500);
+  }, []);
 
   useEffect(() => {
-    if (!CATEGORIES.length) return;
-    if (initialCategory && CATEGORIES.find((c) => c.slug === initialCategory)) {
-      setSelectedCategory(initialCategory);
-    } else if (!selectedCategory || !CATEGORIES.find((c) => c.slug === selectedCategory)) {
-      setSelectedCategory(CATEGORIES[0].slug);
-    }
-  }, [CATEGORIES, initialCategory]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    };
+  }, []);
 
-  const category = CATEGORIES.find((c) => c.slug === selectedCategory);
+  useEffect(() => {
+    if (!categories.length || paused) return;
+    const id = setInterval(() => {
+      const el = scrollerRef.current;
+      if (!el || dragRef.current.active) return;
+      const max = el.scrollWidth - el.clientWidth;
+      if (max <= 4) return;
+      if (el.scrollLeft >= max - 2) {
+        el.scrollLeft = 0;
+      } else {
+        el.scrollLeft += 0.75;
+      }
+    }, 24);
+    return () => clearInterval(id);
+  }, [categories.length, paused]);
+
+  const onPointerDown = (e) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    dragRef.current = {
+      active: true,
+      startX: e.clientX,
+      scrollLeft: el.scrollLeft,
+      moved: false,
+      pointerId: e.pointerId,
+    };
+    pauseAuto();
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const onPointerMove = (e) => {
+    if (!dragRef.current.active) return;
+    const el = scrollerRef.current;
+    if (!el) return;
+    const dx = e.clientX - dragRef.current.startX;
+    if (Math.abs(dx) > 4) dragRef.current.moved = true;
+    el.scrollLeft = dragRef.current.scrollLeft - dx;
+  };
+
+  const endDrag = (_e) => {
+    if (!dragRef.current.active) return;
+    const el = scrollerRef.current;
+    if (el && dragRef.current.pointerId != null) {
+      try {
+        el.releasePointerCapture(dragRef.current.pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
+    dragRef.current.active = false;
+    dragRef.current.pointerId = null;
+  };
+
+  const onClickCapture = (_e) => {
+    if (dragRef.current.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+      dragRef.current.moved = false;
+    }
+  };
+
+  useEffect(() => {
+    if (!allCats.length) return;
+    if (initialCategory && allCats.find((c) => c.slug === initialCategory)) {
+      setSelectedCategory(initialCategory);
+    } else if (!selectedCategory || !allCats.find((c) => c.slug === selectedCategory)) {
+      setSelectedCategory(allCats[0].slug);
+    }
+  }, [allCats, initialCategory]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const category = allCats.find((c) => c.slug === selectedCategory);
 
   useEffect(() => {
     setSelectedSubcategory("");
   }, [selectedCategory]);
+
+  // Debounce search so the API isn't hammered on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     if (!selectedCategory && !search.trim()) {
@@ -52,7 +170,7 @@ export default function InteractiveCatalog({ initialCategory }) {
       if (selectedCategory) filter.category_slug = selectedCategory;
       if (selectedSubcategory) filter.subcategory = selectedSubcategory;
     }
-    base44.entities.CurtainModel.filter(filter, {
+    api.entities.CurtainModel.filter(filter, {
       sort: "-created_date",
       limit: 80,
       search: q || undefined,
@@ -64,46 +182,56 @@ export default function InteractiveCatalog({ initialCategory }) {
           try {
             const pf = { category_slug: selectedCategory };
             if (selectedSubcategory) pf.subcategory = selectedSubcategory;
-            const projects = await base44.entities.Project.filter(pf, {
+            const projects = await api.entities.Project.filter(pf, {
               sort: "-created_date",
               limit: 24,
             });
             setProjectFallback(Array.isArray(projects) ? projects : []);
-          } catch {
+          } catch (err) {
+            console.error("Failed to load project fallback:", apiErrorMessage(err));
             setProjectFallback([]);
           }
         } else {
           setProjectFallback([]);
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Failed to load models:", apiErrorMessage(err));
         setGridItems([]);
         setProjectFallback([]);
       })
       .finally(() => setLoading(false));
-  }, [selectedCategory, selectedSubcategory, search]);
+  }, [selectedCategory, selectedSubcategory, debouncedSearch]);
 
+  // Category counts: deferred + batched to avoid hammering the server on page load
   useEffect(() => {
-    if (!CATEGORIES.length) return;
-    let cancelled = false;
-    (async () => {
+    if (!allCats.length || countsLoaded.current) return;
+    countsLoaded.current = true;
+
+    const timer = setTimeout(async () => {
+      let cancelled = false;
       const counts = {};
-      await Promise.all(
-        CATEGORIES.map(async (c) => {
+      const batchSize = 5;
+      for (let i = 0; i < allCats.length; i += batchSize) {
+        const batch = allCats.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (c) => {
           try {
-            const n = await base44.entities.CurtainModel.count({ category_slug: c.slug });
-            counts[c.slug] = typeof n === "number" ? n : n?.count || 0;
+            const n = await api.entities.CurtainModel.count({ category_slug: c.slug });
+            if (!cancelled) counts[c.slug] = typeof n === "number" ? n : n?.count || 0;
           } catch {
-            counts[c.slug] = 0;
+            if (!cancelled) counts[c.slug] = 0;
           }
-        })
-      );
+        }));
+        if (cancelled) break;
+      }
       if (!cancelled) setCategoryCounts(counts);
-    })();
+    }, 500);
+
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [CATEGORIES]);
+  }, [allCats]);
 
   useEffect(() => {
     if (gridItems.length > 0) {
@@ -114,6 +242,20 @@ export default function InteractiveCatalog({ initialCategory }) {
       setSelectedModel(null);
     }
   }, [gridItems]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (loading && categories.length === 0) {
+    return (
+      <section className="border-b border-secondary/40 bg-background py-10">
+        <div className="mx-auto flex max-w-7xl gap-5 overflow-hidden px-5 lg:px-10">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-44 w-44 shrink-0 animate-pulse rounded-2xl bg-secondary/40 lg:h-56 lg:w-56" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (!categories.length) return null;
 
   return (
     <section className="bg-background pb-16 pt-4 lg:pb-24">
@@ -139,23 +281,36 @@ export default function InteractiveCatalog({ initialCategory }) {
         </div>
 
         {/* کارت کاور دسته‌ها */}
-        <div className="mb-8 flex gap-3 overflow-x-auto no-scrollbar pb-1" dir="rtl">
-          {catsLoading && !CATEGORIES.length
+        <div
+          ref={scrollerRef}
+          dir="ltr"
+          className="flex cursor-grab gap-3 overflow-x-auto no-scrollbar pb-1 active:cursor-grabbing lg:gap-4"
+          style={{ scrollBehavior: dragRef.current.active ? "auto" : undefined, touchAction: "pan-x" }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onClickCapture={onClickCapture}
+        >
+          {catsLoading && !categories.length
             ? [...Array(5)].map((_, i) => (
                 <div
                   key={i}
                   className="h-28 w-28 shrink-0 animate-pulse rounded-2xl bg-secondary/40 lg:h-32 lg:w-32"
                 />
               ))
-            : CATEGORIES.map((cat) => {
+            : categories.map((cat) => {
                 const active = selectedCategory === cat.slug && !search.trim();
                 return (
                   <button
                     type="button"
                     key={cat.slug}
-                    onClick={() => {
+                    data-card
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSearch("");
-                      setSelectedCategory(cat.slug);
+                      setSelectedSubcategory(cat.isSub ? "" : undefined);
+                      setSelectedCategory(cat.parentSlug || cat.slug);
                     }}
                     className={`group relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl border transition-all lg:h-32 lg:w-32 ${
                       active
@@ -178,12 +333,12 @@ export default function InteractiveCatalog({ initialCategory }) {
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-2 text-center">
-                      <span className="font-display text-[11px] font-bold text-foreground lg:text-xs">
-                        {cat.name}
+                      <span className={`font-display text-[11px] font-bold ${cat.isSub ? "text-muted-foreground" : "text-foreground"} lg:text-xs`}>
+                        {cat.isSub ? `↳ ${cat.name}` : cat.name}
                       </span>
-                      {categoryCounts[cat.slug] != null && (
+                      {categoryCounts[cat.parentSlug || cat.slug] != null && !cat.isSub && (
                         <span className="mt-0.5 block font-body text-[9px] text-muted-foreground">
-                          {categoryCounts[cat.slug]} مدل
+                          {categoryCounts[cat.parentSlug || cat.slug]} مدل
                         </span>
                       )}
                     </div>

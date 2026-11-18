@@ -1,17 +1,11 @@
-import { useMemo } from "react";
-import { useShop, SORTS } from "@/hooks/useShop";
+import { useShop } from "@/hooks/useShop";
 import ProductGrid from "@/components/ProductGrid";
-import { Search, SlidersHorizontal } from "lucide-react";
 import PageHero from "@/components/PageHero";
 import { storeImage } from "@/lib/storeImage";
 import { mediaUrl } from "@/lib/mediaUrl";
 
 export default function Shop() {
   const s = useShop({ pageSize: 24 });
-  const [sortKey] = useMemo(() => {
-    const entry = Object.entries(SORTS).find(([k]) => k === s.sort) ?? ["featured", { label: "پیش‌فرض" }];
-    return [entry[0], entry[1].label];
-  }, [s.sort]);
 
   return (
     <div className="bg-background">
@@ -64,33 +58,6 @@ export default function Shop() {
                 </button>
               );
             })}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="relative flex items-center">
-              <Search className="pointer-events-none absolute right-3 h-4 w-4 text-muted-foreground" />
-              <input
-                type="search"
-                value={s.filters.search ?? ""}
-                onChange={(e) => s.setFilters({ search: e.target.value || undefined })}
-                placeholder="جستجو…"
-                className="w-full rounded-full border border-secondary/70 bg-card py-2.5 pr-10 pl-4 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary sm:w-72"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-              <select
-                value={sortKey}
-                onChange={(e) => s.setSort(e.target.value)}
-                className="rounded-full border border-secondary/70 bg-card px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors focus:border-primary"
-              >
-                {Object.entries(SORTS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
         </div>
       </section>

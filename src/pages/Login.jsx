@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,17 +34,17 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      const res = await base44.auth.login(identifier.trim(), password);
+      const res = await api.auth.login(identifier.trim(), password);
       window.location.href = postLoginPath(res?.user, returnTo);
     } catch (err) {
-      setError(err.message || "ورود ناموفق بود");
+      setError(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", returnTo === "/" ? "/account" : returnTo);
+    api.auth.loginWithProvider("google", returnTo === "/" ? "/account" : returnTo);
   };
 
   return (

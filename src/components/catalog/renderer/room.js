@@ -42,7 +42,7 @@ export function buildRoom(scene, settings) {
   return { room, view };
 }
 
-/** Local procedural outdoor view — no external CDN (Unsplash/base44). */
+/** Local procedural outdoor view — no external CDN. */
 function makeOutdoorCanvas() {
   const c = document.createElement('canvas');
   c.width = 1024; c.height = 1024;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
+import { apiErrorMessage } from "@/lib/apiError";
 import { Upload, Save, Share2, ImageIcon, Loader2, X, SlidersHorizontal } from "lucide-react";
 import CurtainOverlay from "@/components/studio/CurtainOverlay";
 import { compositeDesign } from "@/lib/compositeDesign";
@@ -51,9 +52,12 @@ export default function WindowCurtainStudio() {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
-    base44.entities.CurtainModel.list("-created_date", 48)
+    api.entities.CurtainModel.list("-created_date", 48)
       .then((data) => setModels(Array.isArray(data) ? data : data?.items || []))
-      .catch(() => setModels([]));
+      .catch((err) => {
+        console.error("Failed to load models:", err);
+        setModels([]);
+      });
   }, []);
 
   const handleUpload = async (e) => {
@@ -63,11 +67,11 @@ export default function WindowCurtainStudio() {
     setSavedMsg(null);
     try {
       const compressed = await compressImage(file, { maxDim: 1280, quality: 0.82, maxBytes: 3_500_000 });
-      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+      const { file_url } = await api.integrations.Core.UploadPublicFile({ file: compressed });
       setPhotoUrl(file_url);
     } catch {
       try {
-        const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
+        const { file_url } = await api.integrations.Core.UploadPublicFile({ file });
         setPhotoUrl(file_url);
       } catch {
         setPhotoUrl(URL.createObjectURL(file));
@@ -105,13 +109,13 @@ export default function WindowCurtainStudio() {
       });
       const blob = await (await fetch(dataUrl)).blob();
       const file = new File([blob], `design-${Date.now()}.png`, { type: "image/png" });
-      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
+      const { file_url } = await api.integrations.Core.UploadPublicFile({ file });
 
       const title = selectedModel?.code
         ? `طرح ${selectedModel.code}`
         : `طرح پرده ${STUDIO_STYLES.find((s) => s.slug === selectedStyle)?.name || ""}`;
 
-      await base44.entities.SavedDesign.create({
+      await api.entities.SavedDesign.create({
         title,
         image: file_url,
         curtain_style: selectedStyle,
@@ -121,8 +125,8 @@ export default function WindowCurtainStudio() {
       });
 
       setSavedMsg({ type: "success", text: "طرح شما در گالری ذخیره شد." });
-    } catch {
-      setSavedMsg({ type: "error", text: "ذخیره طرح ناموفق بود." });
+    } catch (err) {
+      setSavedMsg({ type: "error", text: apiErrorMessage(err) });
     } finally {
       setSaving(false);
       setTimeout(() => setSavedMsg(null), 4000);
