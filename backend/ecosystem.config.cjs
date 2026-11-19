@@ -1,6 +1,7 @@
 /**
  * PM2 — پرده آنتیک API
  * از پوشه backend اجرا شود:
+ *   npm run build     # tsc -> dist/
  *   pm2 start ecosystem.config.cjs
  *   pm2 save
  */
@@ -9,8 +10,8 @@ module.exports = {
     {
       name: "antic-api",
       cwd: __dirname,
-      script: "npx",
-      args: "tsx src/index.ts",
+      script: "node",
+      args: "dist/src/index.js",
       interpreter: "none",
       instances: 1,
       exec_mode: "fork",
