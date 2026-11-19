@@ -8,8 +8,7 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 
 COPY package.json package-lock.json ./
-COPY prisma ./prisma
-RUN npm ci --ignore-scripts
+RUN npm ci
 
 # ---- builder -------------------------------------------------------------
 FROM node:22-alpine AS builder
@@ -23,7 +22,11 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT_STANDALONE=true
 
-RUN npx prisma generate --schema=prisma/schema.prisma
+# توجه: Next.js مقدار `rewrites()` را در زمان build داخل routes-manifest ذخیره
+# می‌کند، پس آدرس بک‌اند باید هنگام build مشخص باشد (نه فقط در runtime).
+ARG BACKEND_INTERNAL_URL=http://backend:3001
+ENV BACKEND_INTERNAL_URL=$BACKEND_INTERNAL_URL
+
 RUN npm run build
 
 # ---- runner --------------------------------------------------------------

@@ -40,6 +40,9 @@ npm run dev        # http://localhost:3000  →  پروکسی /api و /uploads
 
 ادمین: `admin@antic.local` / `admin123` → `/login` → `/admin`
 
+> دیتابیس فقط در `backend/` مدیریت می‌شود. اسکیمای یکتا: `backend/prisma/schema.prisma`.
+> هیچ کپی دومی از اسکیما در روت وجود ندارد.
+
 ### بررسی سلامت
 
 ```bash
@@ -93,14 +96,37 @@ SMTP_FROM="no-reply@example.com"
 ## استقرار (Docker)
 
 ```bash
-# خروجی مستقل Next.js
-NEXT_OUTPUT_STANDALONE=true npm run build
+# متغیرهای محیطی (اختیاری — پیش‌فرض‌ها در docker-compose.yml هستند)
+export JWT_SECRET="یک-رشته-تصادفی-بلند"
+export ADMIN_PASSWORD="رمز-قوی"
+export CORS_ORIGIN="https://your-domain.ir"
+export FRONTEND_URL="https://your-domain.ir"
+export PUBLIC_BASE_URL="https://your-domain.ir"
 
 docker compose up -d --build
 ```
 
-- فرانت: `http://localhost:3000`
-- بک‌اند: `http://localhost:3001`
+- فرانت: `http://localhost:3000` (ایمیج Next.js standalone روی پورت ۳۰۰۰)
+- بک‌اند: `http://localhost:3001` (Express روی پورت ۳۰۰۱)
+- دیتابیس SQLite و پوشهٔ آپلود در volume‌های `backend_data` / `backend_uploads` می‌مانند.
+
+> **مهم:** Next.js مقدار `rewrites()` را در زمان `build` داخل `routes-manifest.json` ثابت می‌کند.
+> به همین دلیل `BACKEND_INTERNAL_URL` باید **هنگام build** مشخص باشد (در compose به‌صورت `build.args` پاس داده می‌شود).
+> اگر آدرس بک‌اند عوض شد، باید دوباره build بگیرید.
+
+### استقرار بدون Docker
+
+```bash
+# فرانت
+NEXT_OUTPUT_STANDALONE=true npm run build
+node .next/standalone/server.js
+
+# بک‌اند
+cd backend
+npm install
+npm run build        # tsc → dist/
+npm start            # node dist/src/index.js
+```
 
 ## لایسنس
 

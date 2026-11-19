@@ -63,12 +63,15 @@ ZARINPAL_MERCHANT_ID=""
 ZARINPAL_SANDBOX="true"
 ```
 
-فرانت (اختیاری در روت):
+فرانت (اختیاری در روت `.env`):
 
 ```env
 # NEXT_PUBLIC_API_BASE=/api
 # NEXT_PUBLIC_SITE_URL="https://antic-curtain.ir"
+# BACKEND_INTERNAL_URL="http://localhost:3001"
 ```
+
+> روت `.env` فقط متغیرهای فرانت را دارد؛ کلیدها و رمزها در `backend/.env` هستند.
 
 ## نقشهٔ کد (لوکال)
 
@@ -102,7 +105,10 @@ import { searchProducts, queryCategories } from "@/rest/store-catalog";
 | `backend/src/routes/entities.ts` | CRUD از جمله `CurtainCategory` |
 | `backend/src/routes/catalog.ts` | `ShopCategory` + `Product` (اکسسوری) |
 | `backend/src/routes/orders.ts` | سفارش + زرین‌پال |
+| `backend/prisma/schema.prisma` | **تنها** اسکیمای دیتابیس — در روت کپی دومش نیست |
 | `backend/prisma/seed.ts` | seed جدا برای پرده vs اکسسوری |
+
+> Prisma فقط در `backend/` است. فرانت هیچ Prisma dependency ندارد و اسکیمای دیتابیس را در روت نگه نمی‌دارد. هر تغییر مدل فقط در `backend/prisma/schema.prisma` انجام می‌شود و بعد `cd backend && npx prisma generate && npx prisma db push`.
 
 ## قوانین کار ایجنت
 
@@ -117,7 +123,8 @@ import { searchProducts, queryCategories } from "@/rest/store-catalog";
 
 - مخلوط کردن `CurtainCategory` با `ShopCategory`.
 - لیست ثابت slug برای دسته‌های سایت.
-- commit کردن `backend/dev.db` یا `.env`.
+- commit کردن `backend/prisma/dev.db` یا هر `.env`.
+- ساختن کپی دوم از `prisma/schema.prisma` در روت.
 
 ## خلاصه یک خطی
 

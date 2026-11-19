@@ -3,13 +3,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Next.js rewrites را در زمان build ثابت می‌کند
+        BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:3001}
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
-      # پروکسی داخلی به سرویس backend
       NEXT_PUBLIC_API_BASE: /api
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
-      BACKEND_INTERNAL_URL: http://backend:3001
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:3001}
     ports:
       - "3000:3000"
     depends_on:
@@ -25,7 +27,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3001"
-      DATABASE_URL: "file:./data/dev.db"
+      # مسیر مطلق: Prisma مسیر نسبی SQLite را نسبت به فایل schema حساب می‌کند
+      DATABASE_URL: "file:/app/data/dev.db"
       JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string-in-production}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
