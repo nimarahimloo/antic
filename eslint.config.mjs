@@ -73,6 +73,25 @@ export default [
       // قوانین پیش‌فرض react/no-unescaped-entities برای متن فارسی سخت‌گیرانه است
       "react/no-unescaped-entities": "off",
       "react/display-name": "off",
+
+      // --- React Compiler diagnostic rules ---------------------------------
+      // این قوانین برای کامپایلر React نوشته شده‌اند. در این پروژه کامپایلر
+      // فعال نیست (reactCompiler در next.config.mjs خاموش است) و الگوهای
+      // «fetch داخل effect» رایج و سالم هستند، پس به‌جای error با warning
+      // گزارش می‌شوند تا مسیر مهاجرت به کامپایلر روشن بماند.
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/purity": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/immutability": "warn",
+      "react-hooks/set-state-in-render": "warn",
+    },
+  },
+  {
+    // فایل‌های کانفیگ Node.js (CommonJS) — require مجاز است
+    files: ["**/*.cjs", "**/*.config.js", "**/*.config.cjs"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-var-requires": "off",
     },
   },
 ];

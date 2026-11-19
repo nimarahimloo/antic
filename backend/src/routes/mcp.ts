@@ -115,9 +115,9 @@ router.post("/tools/:name", async (req, res) => {
         content: rows.map((p) => ({
           id: p.id,
           title: p.title,
-          space_type: p.spaceType,
-          location: p.location,
-          featured: p.featured,
+          category_slug: p.categorySlug,
+          subcategory: p.subcategory,
+          description: p.description,
           cover_image: p.coverImage,
         })),
       });

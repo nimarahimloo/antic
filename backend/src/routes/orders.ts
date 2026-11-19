@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { HttpError, sendError } from "../lib/errors.js";
+import { routeParam } from "../lib/routeParams.js";
 import { requireAdmin, optionalAuth, type AuthedRequest } from "../middleware/auth.js";
 
 const router = Router();
@@ -23,7 +24,7 @@ function frontBase() {
   return (
     process.env.FRONTEND_URL ||
     process.env.CORS_ORIGIN?.split(",")[0]?.trim() ||
-    "http://localhost:5173"
+    "http://localhost:3000"
   );
 }
 
@@ -239,7 +240,7 @@ router.get("/", requireAdmin, async (_req: AuthedRequest, res) => {
 
 router.get("/:id", optionalAuth, async (req: AuthedRequest, res) => {
   try {
-    const order = await prisma.order.findUnique({ where: { id: req.params.id } });
+    const order = await prisma.order.findUnique({ where: { id: routeParam(req, "id") } });
     if (!order) throw new HttpError(404, "سفارش پیدا نشد");
 
     // If authenticated, verify ownership; unauthenticated access allowed
@@ -278,7 +279,7 @@ router.patch("/:id/status", requireAdmin, async (req: AuthedRequest, res) => {
       throw new HttpError(400, "وضعیت نامعتبر");
     }
     const row = await prisma.order.update({
-      where: { id: req.params.id },
+      where: { id: routeParam(req, "id") },
       data: { status },
     });
     res.json({ id: row.id, status: row.status });

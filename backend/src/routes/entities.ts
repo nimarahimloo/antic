@@ -8,6 +8,7 @@ import {
 } from "../lib/entities.js";
 import { fromApi, toApi, toApiList } from "../lib/serialize.js";
 import { HttpError, sendError } from "../lib/errors.js";
+import { routeParam } from "../lib/routeParams.js";
 import { optionalAuth, requireAdmin, type AuthedRequest } from "../middleware/auth.js";
 import { ensureCategoryTemplateBackground } from "../services/categoryTemplate.js";
 import { renderOneModel } from "../services/renderQueue.js";
@@ -66,7 +67,7 @@ function afterModelWrite(row: {
 
 router.get("/:Entity/count", optionalAuth, async (req: AuthedRequest, res) => {
   try {
-    const meta = getMeta(req.params.Entity);
+    const meta = getMeta(routeParam(req, "Entity"));
     if (!canRead(meta, req.user)) throw new HttpError(403, "Forbidden");
     let filter: Record<string, unknown> = {};
     if (typeof req.query.filter === "string") {
@@ -94,7 +95,7 @@ router.get("/:Entity/count", optionalAuth, async (req: AuthedRequest, res) => {
 
 router.get("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
   try {
-    const meta = getMeta(req.params.Entity);
+    const meta = getMeta(routeParam(req, "Entity"));
     if (!canRead(meta, req.user)) throw new HttpError(403, "Forbidden");
 
     const sortBy = (req.query.sort_by as string) || (req.query.sort as string);
@@ -131,7 +132,7 @@ router.get("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
 
 router.get("/:Entity/:id", optionalAuth, async (req: AuthedRequest, res) => {
   try {
-    const meta = getMeta(req.params.Entity);
+    const meta = getMeta(routeParam(req, "Entity"));
     if (!canRead(meta, req.user)) throw new HttpError(403, "Forbidden");
     // @ts-expect-error dynamic
     const row = await meta.model.findUnique({ where: { id: req.params.id } });
@@ -144,7 +145,7 @@ router.get("/:Entity/:id", optionalAuth, async (req: AuthedRequest, res) => {
 
 router.post("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
   try {
-    const meta = getMeta(req.params.Entity);
+    const meta = getMeta(routeParam(req, "Entity"));
     if (meta.name === "User") throw new HttpError(403, "Use /api/auth/register to create users");
     if (!canWrite(meta, req.user, true)) throw new HttpError(403, "Forbidden");
     const data = fromApi(req.body || {}, meta.name);
@@ -163,7 +164,7 @@ router.post("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
 
 router.put("/:Entity/:id", requireAdmin, async (req: AuthedRequest, res) => {
   try {
-    const meta = getMeta(req.params.Entity);
+    const meta = getMeta(routeParam(req, "Entity"));
     if (meta.name === "User") throw new HttpError(403, "User updates via entities are disabled");
     const data = fromApi(req.body || {}, meta.name);
     if (Object.keys(data).length === 0) throw new HttpError(400, "Empty payload");
@@ -185,7 +186,7 @@ router.put("/:Entity/:id", requireAdmin, async (req: AuthedRequest, res) => {
 
 router.delete("/:Entity/:id", requireAdmin, async (req: AuthedRequest, res) => {
   try {
-    const meta = getMeta(req.params.Entity);
+    const meta = getMeta(routeParam(req, "Entity"));
     if (meta.name === "User") throw new HttpError(403, "Cannot delete users via entities");
     // @ts-expect-error dynamic
     await meta.model.delete({ where: { id: req.params.id } });

@@ -9,29 +9,51 @@ import { apiErrorMessage } from "@/lib/apiError";
 import CurtainPreview from "@/components/catalog/CurtainPreview";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 
+interface CurtainModel {
+  id?: string;
+  code?: string;
+  name?: string;
+  image?: string;
+  install_image?: string;
+  color?: string;
+  color_code?: string;
+  fabric?: string;
+  texture?: string;
+  material?: string;
+  category_slug?: string;
+  description?: string;
+}
+
 export default function CurtainDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const [model, setModel] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [model, setModel] = useState<CurtainModel | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [loadedId, setLoadedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    setNotFound(false);
-    setModel(null);
+    let alive = true;
     api.entities.CurtainModel.get(id)
       .then((m) => {
-        if (m) setModel(m);
+        if (!alive) return;
+        if (m) setModel(m as CurtainModel);
         else setNotFound(true);
       })
       .catch((err) => {
         console.error("Failed to load curtain model:", apiErrorMessage(err));
+        if (!alive) return;
         setNotFound(true);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (alive) setLoadedId(id);
+      });
+    return () => {
+      alive = false;
+    };
   }, [id]);
+
+  const loading = loadedId !== id;
 
   if (loading) {
     return (

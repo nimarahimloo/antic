@@ -2,6 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { HttpError, sendError } from "../lib/errors.js";
+import { routeParam } from "../lib/routeParams.js";
 import { buildAssistantReply, type ChatMessage } from "../lib/consultant.js";
 import { optionalAuth, type AuthedRequest } from "../middleware/auth.js";
 
@@ -99,7 +100,7 @@ router.post("/conversations", async (req, res) => {
 
 router.get("/conversations/:id", (req, res) => {
   try {
-    const conv = store.get(req.params.id);
+    const conv = store.get(routeParam(req, "id"));
     if (!conv) throw new HttpError(404, "Conversation not found");
     res.json(conv);
   } catch (err) {
@@ -109,7 +110,7 @@ router.get("/conversations/:id", (req, res) => {
 
 router.post("/conversations/:id/messages", optionalAuth, async (req: AuthedRequest, res) => {
   try {
-    const conv = store.get(req.params.id);
+    const conv = store.get(routeParam(req, "id"));
     if (!conv) throw new HttpError(404, "Conversation not found");
 
     const body = z

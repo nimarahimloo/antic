@@ -43,7 +43,7 @@ export default function PremiumShowcase() {
                   <img
                     src={item.image}
                     alt={item.name}
-                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-105"
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-1200 ease-out group-hover:scale-105 motion-reduce:transition-none"
                   />
                 ) : (
                   <div className="absolute inset-0 bg-secondary/40" />

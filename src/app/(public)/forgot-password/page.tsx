@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.auth.resetPasswordRequest(email);
+      await api.auth.requestPasswordReset(email);
     } catch (err) {
       // Intentionally do not reveal whether the email exists (security).
       console.error("Forgot password request failed:", apiErrorMessage(err));

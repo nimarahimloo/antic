@@ -1,6 +1,5 @@
 "use client";
 
-import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactNode, useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
@@ -49,17 +48,15 @@ function SmoothScrollProvider({ children }: { children: ReactNode }) {
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider>
-      <QueryProvider>
-        <AuthProvider>
-          <CartProvider>
-            <SmoothScrollProvider>
-              <AuthInitializer>{children}</AuthInitializer>
-              <Toaster />
-            </SmoothScrollProvider>
-          </CartProvider>
-        </AuthProvider>
-      </QueryProvider>
-    </SessionProvider>
+    <QueryProvider>
+      <AuthProvider>
+        <CartProvider>
+          <SmoothScrollProvider>
+            <AuthInitializer>{children}</AuthInitializer>
+            <Toaster />
+          </SmoothScrollProvider>
+        </CartProvider>
+      </AuthProvider>
+    </QueryProvider>
   );
 }

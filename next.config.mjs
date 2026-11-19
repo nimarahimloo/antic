@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 
+// آدرس بک‌اند برای پروکسی داخلی Next.js.
+// در لوکال: http://localhost:3001 — در داکر: http://backend:3001
+const backendUrl = (process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001').replace(/\/$/, '');
+
 // تصاویر از دامنه/پورت‌های زیر بارگذاری می‌شوند (لوکال + محیط استیج/پروداکشن)
 const imageRemotePatterns = [
   {
@@ -38,8 +42,30 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        source: '/api/:path*',
+        destination: `${backendUrl}/api/:path*`,
+      },
+      {
         source: '/uploads/:path*',
-        destination: '/uploads/:path*',
+        destination: `${backendUrl}/uploads/:path*`,
+      },
+      {
+        // سرور MCP و اسناد اکتشافی OAuth روی بک‌اند سرو می‌شوند
+        source: '/.well-known/:path*',
+        destination: `${backendUrl}/.well-known/:path*`,
+      },
+      {
+        source: '/auth.md',
+        destination: `${backendUrl}/auth.md`,
+      },
+      {
+        // sitemap و robots از روی داده‌های دیتابیس ساخته می‌شوند
+        source: '/sitemap.xml',
+        destination: `${backendUrl}/sitemap.xml`,
+      },
+      {
+        source: '/robots.txt',
+        destination: `${backendUrl}/robots.txt`,
       },
     ];
   },

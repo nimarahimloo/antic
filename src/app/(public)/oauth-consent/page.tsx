@@ -6,9 +6,23 @@ import { Button } from "@/components/ui/button";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 
+interface ConsentTool {
+  name: string;
+  title?: string;
+  description?: string;
+}
+
+interface ConsentInfo {
+  authenticated?: boolean;
+  client_name?: string;
+  app_name?: string;
+  login_path?: string;
+  tools?: ConsentTool[];
+}
+
 export default function OAuthConsentPage() {
   const [ctx, setCtx] = useState<string | null>(null);
-  const [info, setInfo] = useState<any>(null);
+  const [info, setInfo] = useState<ConsentInfo | null>(null);
   const [checking, setChecking] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [decided, setDecided] = useState("");
@@ -39,7 +53,7 @@ export default function OAuthConsentPage() {
           setChecking(false);
           return;
         }
-        const data = await res.json();
+        const data = (await res.json()) as ConsentInfo;
         if (!data.authenticated) {
           const returnTo = window.location.pathname + "?ctx=" + encodeURIComponent(ctxParam);
           const encoded = encodeURIComponent(returnTo);
@@ -49,7 +63,7 @@ export default function OAuthConsentPage() {
           return;
         }
         setInfo(data);
-      } catch (e: any) {
+      } catch {
         setError("Could not load this authorization request. Please try again.");
       } finally {
         if (!redirecting) setChecking(false);
@@ -80,21 +94,30 @@ export default function OAuthConsentPage() {
         }
         if ([400, 403, 404, 409].includes(res.status)) {
           let detail = "";
-          try { detail = (await res.json()).detail; } catch (_) { /* keep default */ }
-          setReconnect(detail || "This authorization can no longer be completed. Reconnect from your AI client to try again.");
+          try {
+            const body = (await res.json()) as { detail?: string };
+            detail = body.detail || "";
+          } catch {
+            /* keep default */
+          }
+          setReconnect(
+            detail ||
+              "This authorization can no longer be completed. Reconnect from your AI client to try again.",
+          );
           setSubmitting(false);
           return;
         }
         throw new Error("Could not complete authorization. Please try again.");
       }
-      const data = await res.json();
-      window.location.href = data.redirect_url;
-      if (!/^https?:/i.test(data.redirect_url)) {
+      const data = (await res.json()) as { redirect_url?: string };
+      const redirectUrl = data.redirect_url || "";
+      window.location.href = redirectUrl;
+      if (!/^https?:/i.test(redirectUrl)) {
         setDecided(action);
         setSubmitting(false);
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not complete authorization. Please try again.");
       setSubmitting(false);
     }
   };
@@ -162,7 +185,7 @@ export default function OAuthConsentPage() {
       </p>
       {tools.length > 0 && (
         <ul className="space-y-2 text-sm mb-6">
-          {tools.map((tool: any) => (
+          {tools.map((tool) => (
             <li key={tool.name} className="flex flex-col">
               <span className="text-foreground font-medium">
                 {tool.title || tool.name}

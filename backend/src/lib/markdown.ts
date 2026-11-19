@@ -1,3 +1,4 @@
+import type { Request } from "express";
 import { prisma } from "./prisma.js";
 
 /** Media type agents request to receive markdown. */
@@ -7,11 +8,11 @@ export const MARKDOWN_MEDIA_TYPE = "text/markdown";
  * Content-negotiation helper: true when the request asks for markdown.
  * Matches `Accept: text/markdown` and `Accept: text/markdown; charset=utf-8`.
  */
-export function wantsMarkdown(req): boolean {
+export function wantsMarkdown(req: Pick<Request, "headers">): boolean {
   const accept = req.headers.accept || "";
   return accept
     .split(",")
-    .map((part) => part.split(";")[0].trim().toLowerCase())
+    .map((part: string) => part.split(";")[0].trim().toLowerCase())
     .includes(MARKDOWN_MEDIA_TYPE);
 }
 

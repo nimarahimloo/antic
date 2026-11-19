@@ -79,24 +79,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     api.auth.redirectToLogin(window.location.href);
   }, []);
 
-  useEffect(() => {
-    consumeAccessTokenFromUrl();
-    checkAppState();
-
-    const onUnauthorized = () => {
+  const checkUserAuth = useCallback(async () => {
+    try {
+      setIsLoadingAuth(true);
+      if (!hasStoredToken()) {
+        setUser(null);
+        setIsAuthenticated(false);
+        return;
+      }
+      const currentUser = await api.auth.me();
+      setUser(currentUser as User);
+      setIsAuthenticated(true);
+    } catch {
       clearToken();
       setUser(null);
       setIsAuthenticated(false);
+    } finally {
+      setIsLoadingAuth(false);
       setAuthChecked(true);
-      navigateToLogin();
-    };
-    window.addEventListener(AUTH_EVENT, onUnauthorized);
-    return () => {
-      window.removeEventListener(AUTH_EVENT, onUnauthorized);
-    };
-  }, [navigateToLogin]);
+    }
+  }, []);
 
-  const checkAppState = async () => {
+  const checkAppState = useCallback(async () => {
     try {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
@@ -120,28 +124,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
-  };
+  }, [checkUserAuth]);
 
-  const checkUserAuth = async () => {
-    try {
-      setIsLoadingAuth(true);
-      if (!hasStoredToken()) {
-        setUser(null);
-        setIsAuthenticated(false);
-        return;
-      }
-      const currentUser = await api.auth.me();
-      setUser(currentUser as User);
-      setIsAuthenticated(true);
-    } catch {
+  useEffect(() => {
+    consumeAccessTokenFromUrl();
+    void checkAppState();
+
+    const onUnauthorized = () => {
       clearToken();
       setUser(null);
       setIsAuthenticated(false);
-    } finally {
-      setIsLoadingAuth(false);
       setAuthChecked(true);
-    }
-  };
+      navigateToLogin();
+    };
+    window.addEventListener(AUTH_EVENT, onUnauthorized);
+    return () => {
+      window.removeEventListener(AUTH_EVENT, onUnauthorized);
+    };
+  }, [checkAppState, navigateToLogin]);
 
   const login = async (email: string, password: string) => {
     const res = await api.auth.login(email, password);
@@ -170,7 +170,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  return (    <AuthContext.Provider
+  return (
+    <AuthContext.Provider
       value={{
         user,
         isAuthenticated,

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { sendError, HttpError } from "../lib/errors.js";
+import { routeParam } from "../lib/routeParams.js";
 import { requireAdmin, type AuthedRequest } from "../middleware/auth.js";
 
 const router = Router();
@@ -188,7 +189,7 @@ router.get("/products/slug/:slug", async (req, res) => {
 
 router.get("/products/id/:id", async (req, res) => {
   try {
-    const row = await prisma.product.findUnique({ where: { id: req.params.id } });
+    const row = await prisma.product.findUnique({ where: { id: routeParam(req, "id") } });
     if (!row || !row.visible) return res.json({ product: null });
     res.json({ product: toStoreProduct(row) });
   } catch (err) {
@@ -274,7 +275,7 @@ router.put("/admin/products/:id", requireAdmin, async (req: AuthedRequest, res) 
     if (b.variants !== undefined) data.variantsJson = JSON.stringify(b.variants);
     if (b.sortOrder !== undefined) data.sortOrder = Number(b.sortOrder);
 
-    const row = await prisma.product.update({ where: { id: req.params.id }, data });
+    const row = await prisma.product.update({ where: { id: routeParam(req, "id") }, data });
     res.json(toStoreProduct(row));
   } catch (err) {
     sendError(res, err);
@@ -283,8 +284,8 @@ router.put("/admin/products/:id", requireAdmin, async (req: AuthedRequest, res) 
 
 router.delete("/admin/products/:id", requireAdmin, async (req: AuthedRequest, res) => {
   try {
-    await prisma.product.delete({ where: { id: req.params.id } });
-    res.json({ id: req.params.id });
+    await prisma.product.delete({ where: { id: routeParam(req, "id") } });
+    res.json({ id: routeParam(req, "id") });
   } catch (err) {
     sendError(res, err);
   }

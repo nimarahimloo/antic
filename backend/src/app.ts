@@ -1,8 +1,6 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
-import { fileURLToPath } from "url";
-import { readFile as readFileAsync } from "fs/promises";
 import authRoutes from "./routes/auth.js";
 import entityRoutes from "./routes/entities.js";
 import uploadRoutes from "./routes/upload.js";
@@ -21,7 +19,7 @@ import { wantsMarkdown, countTokens, pageMarkdown } from "./lib/markdown.js";
 
 const app = express();
 
-const origin = process.env.CORS_ORIGIN || "http://localhost:5173";
+const origin = process.env.CORS_ORIGIN || "http://localhost:3000";
 app.use(
   cors({
     origin: origin.split(",").map((s) => s.trim()),
@@ -299,43 +297,36 @@ igkeiten (\`agents\`) و کلاینت‌های هواشناسی می‌توان�
 
 /**
  * Markdown content negotiation for public pages.
+ *
+ * The Next.js frontend owns HTML rendering; this backend only serves the API.
+ * It still exposes markdown representations of the public pages so AI agents
+ * can fetch a compact text version of a page instead of the full HTML shell.
+ *
  * - Accept: text/markdown  → markdown representation (Content-Type: text/markdown, x-markdown-tokens)
- * - Otherwise              → HTML (SPA index.html) remains the default
- * Non-page routes (/api, /uploads, /sitemap.xml, /robots.txt) fall through to the 404 handler.
+ * - Otherwise              → 404 (the API backend has no HTML routes)
  */
-const PAGE_PATH_RE = /^\/((?!api|uploads|sitemap\.xml|robots\.txt).*)?$/;
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const INDEX_HTML = path.resolve(__dirname, "../../index.html");
+const PAGE_PATH_RE = /^\/((?!api|uploads|sitemap\.xml|robots\.txt|\.well-known|auth\.md).*)?$/;
 
 app.get(PAGE_PATH_RE, async (req, res, next) => {
   const { path: urlPath } = req;
   if (req.method !== "GET") return next();
 
-  if (wantsMarkdown(req)) {
-    try {
-      const md = await pageMarkdown(urlPath);
-      if (md) {
-        res.set("Content-Type", "text/markdown; charset=utf-8");
-        res.set("x-markdown-tokens", String(countTokens(md)));
-        return res.status(200).send(md);
-      }
-      // Unknown page path — still honor markdown request with a 404 markdown body
-      const notFoundMd = "# 404 Not found\n\nصفحه مورد نظر یافت نشد.\n";
-      res.set("Content-Type", "text/markdown; charset=utf-8");
-      res.set("x-markdown-tokens", String(countTokens(notFoundMd)));
-      return res.status(404).send(notFoundMd);
-    } catch (err) {
-      return next(err);
-    }
-  }
+  if (!wantsMarkdown(req)) return next();
 
-  // HTML default: serve the SPA entry page for client-side routes.
   try {
-    const html = await readFileAsync(INDEX_HTML, "utf-8");
-    res.set("Content-Type", "text/html; charset=utf-8");
-    return res.status(200).send(html);
-  } catch {
-    return next();
+    const md = await pageMarkdown(urlPath);
+    if (md) {
+      res.set("Content-Type", "text/markdown; charset=utf-8");
+      res.set("x-markdown-tokens", String(countTokens(md)));
+      return res.status(200).send(md);
+    }
+    // Unknown page path — still honor markdown request with a 404 markdown body
+    const notFoundMd = "# 404 Not found\n\nصفحه مورد نظر یافت نشد.\n";
+    res.set("Content-Type", "text/markdown; charset=utf-8");
+    res.set("x-markdown-tokens", String(countTokens(notFoundMd)));
+    return res.status(404).send(notFoundMd);
+  } catch (err) {
+    return next(err);
   }
 });
 

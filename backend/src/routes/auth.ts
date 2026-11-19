@@ -5,6 +5,8 @@ import { hashPassword, verifyPassword, signToken } from "../lib/auth.js";
 import { HttpError, sendError } from "../lib/errors.js";
 import { toApi } from "../lib/serialize.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
+import { createPasswordResetToken, redeemPasswordResetToken } from "../lib/passwordReset.js";
+import { sendMail } from "../lib/mailer.js";
 
 const router = Router();
 
@@ -130,12 +132,82 @@ router.post("/logout", (_req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * POST /api/auth/forgot-password
+ *
+ * Always answers 200 with the same body so the endpoint cannot be used to
+ * enumerate which email addresses have accounts. The reset link is emailed.
+ */
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const body = z.object({ email: z.string().min(1) }).parse(req.body);
+    const email = normEmail(body.email);
+
+    let token: string | null = null;
+    try {
+      token = await createPasswordResetToken(email);
+    } catch (err) {
+      console.error("Failed to create password reset token:", err);
+    }
+
+    if (token) {
+      const link = `${frontendBase()}/reset-password?token=${encodeURIComponent(token)}`;
+      try {
+        await sendMail({
+          to: email,
+          subject: "بازیابی رمز عبور — پرده آنتیک",
+          text: [
+            "سلام،",
+            "",
+            "برای بازنشانی رمز عبور حساب خود روی لینک زیر کلیک کنید:",
+            link,
+            "",
+            "این لینک ۳۰ دقیقه معتبر است و فقط یک‌بار قابل استفاده است.",
+            "اگر شما این درخواست را ثبت نکرده‌اید، این ایمیل را نادیده بگیرید.",
+          ].join("\n"),
+        });
+      } catch (err) {
+        console.error("Failed to send password reset email:", err);
+      }
+    }
+
+    res.json({ ok: true, message: "اگر حسابی با این ایمیل وجود داشته باشد، لینک بازیابی ارسال شد." });
+  } catch (err) {
+    sendError(res, err instanceof z.ZodError ? new HttpError(400, err.message) : err);
+  }
+});
+
+/**
+ * POST /api/auth/reset-password
+ *
+ * Redeems a single-use reset token and sets the new password.
+ */
+router.post("/reset-password", async (req, res) => {
+  try {
+    const body = z
+      .object({
+        token: z.string().min(1),
+        newPassword: z.string().min(8, "رمز عبور باید حداقل ۸ کاراکتر باشد"),
+      })
+      .parse(req.body);
+
+    const ok = await redeemPasswordResetToken(body.token, body.newPassword);
+    if (!ok) {
+      throw new HttpError(400, "لینک بازیابی نامعتبر یا منقضی شده است");
+    }
+
+    res.json({ ok: true, message: "رمز عبور با موفقیت تغییر کرد." });
+  } catch (err) {
+    sendError(res, err instanceof z.ZodError ? new HttpError(400, err.message) : err);
+  }
+});
+
 function googleConfigured() {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
 function frontendBase() {
-  return (process.env.FRONTEND_URL || process.env.CORS_ORIGIN || "http://localhost:5173").replace(
+  return (process.env.FRONTEND_URL || process.env.CORS_ORIGIN || "http://localhost:3000").replace(
     /\/$/,
     ""
   );

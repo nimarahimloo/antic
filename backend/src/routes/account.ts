@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword, verifyPassword } from "../lib/auth.js";
 import { HttpError, sendError } from "../lib/errors.js";
+import { routeParam } from "../lib/routeParams.js";
 import { toApi } from "../lib/serialize.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { normPhone } from "./auth.js";
@@ -203,7 +204,7 @@ router.get("/orders", async (req: AuthedRequest, res) => {
 router.get("/orders/:id", async (req: AuthedRequest, res) => {
   try {
     const user = await loadUser(req);
-    const order = await prisma.order.findUnique({ where: { id: req.params.id } });
+    const order = await prisma.order.findUnique({ where: { id: routeParam(req, "id") } });
     if (!order) throw new HttpError(404, "سفارش پیدا نشد");
     const owns =
       order.userId === user.id ||
@@ -269,7 +270,7 @@ router.post("/addresses", async (req: AuthedRequest, res) => {
 router.put("/addresses/:id", async (req: AuthedRequest, res) => {
   try {
     const existing = await prisma.address.findFirst({
-      where: { id: req.params.id, userId: req.user!.sub },
+      where: { id: routeParam(req, "id"), userId: req.user!.sub },
     });
     if (!existing) throw new HttpError(404, "آدرس یافت نشد");
 
@@ -315,7 +316,7 @@ router.put("/addresses/:id", async (req: AuthedRequest, res) => {
 router.delete("/addresses/:id", async (req: AuthedRequest, res) => {
   try {
     const existing = await prisma.address.findFirst({
-      where: { id: req.params.id, userId: req.user!.sub },
+      where: { id: routeParam(req, "id"), userId: req.user!.sub },
     });
     if (!existing) throw new HttpError(404, "آدرس یافت نشد");
     await prisma.address.delete({ where: { id: existing.id } });

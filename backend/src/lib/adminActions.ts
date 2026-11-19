@@ -150,10 +150,10 @@ async function resolveByIdOrName(
     case "request": {
       const r = await prisma.consultationRequest.findFirst({
         where: {
-          OR: [{ id: { contains: t } }, { phone: { contains: t } }, { name: { contains: t } }],
+          OR: [{ id: { contains: t } }, { phone: { contains: t } }, { fullName: { contains: t } }],
         },
       });
-      return r ? { id: r.id, label: r.name } : null;
+      return r ? { id: r.id, label: r.fullName } : null;
     }
     case "template": {
       const r = await prisma.renderTemplate.findFirst({
@@ -553,14 +553,14 @@ async function listEntity(entity: EntityKind, search?: string | null): Promise<A
     case "request": {
       const rows = await prisma.consultationRequest.findMany({
         where: q
-          ? { OR: [{ name: { contains: q } }, { phone: { contains: q } }] }
+          ? { OR: [{ fullName: { contains: q } }, { phone: { contains: q } }] }
           : undefined,
         orderBy: { createdAt: "desc" },
         take: 12,
       });
       return pack(
         rows
-          .map((r) => `• **${r.name}** (${r.phone}) — ${r.status} — \`${r.id.slice(0, 8)}\``)
+          .map((r) => `• **${r.fullName}** (${r.phone}) — ${r.status} — \`${r.id.slice(0, 8)}\``)
           .join("\n") || "خالی",
         [{ type: "link_buttons", items: adminLink("request") }]
       );
@@ -762,7 +762,7 @@ async function updateEntity(
       if (f.status) data.status = f.status;
       if (Object.keys(data).length === 0) throw new Error("وضعیت را مشخص کن");
       const row = await prisma.consultationRequest.update({ where: { id }, data });
-      return { id: row.id, label: row.name };
+      return { id: row.id, label: row.fullName };
     }
     case "template": {
       const data: Record<string, unknown> = {};

@@ -338,6 +338,22 @@ export const api = {
     async resendOtp() {
       return { ok: true };
     },
+    /** Request a password-reset link. The backend never reveals if the email exists. */
+    async requestPasswordReset(email: string) {
+      return request("/auth/forgot-password", {
+        method: "POST",
+        body: { email },
+        auth: false,
+      });
+    },
+    /** Redeem a single-use reset token and set the new password. */
+    async resetPassword(token: string, newPassword: string) {
+      return request("/auth/reset-password", {
+        method: "POST",
+        body: { token, newPassword },
+        auth: false,
+      });
+    },
     setToken,
     logout(redirectUrl?: string) {
       clearToken();

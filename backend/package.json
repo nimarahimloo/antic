@@ -16,6 +16,7 @@
     "test": "node scripts/smoke-test.mjs && node scripts/functional-test.mjs",
     "render:batch": "tsx scripts/run-batch.ts",
     "chroma:ensure": "node scripts/ensure-chroma.mjs",
+    "typecheck": "tsc --noEmit",
     "postdeploy": "node scripts/ensure-chroma.mjs",
     "restore:admin": "node scripts/restore-adminActions.mjs"
   },

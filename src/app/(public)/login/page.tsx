@@ -89,6 +89,11 @@ function LoginForm() {
               </Link>
             </p>
             <p className="mt-2 font-body text-xs text-muted-foreground">
+              <Link href="/forgot-password" className="font-semibold text-primary underline hover:no-underline">
+                رمز عبور را فراموش کرده‌اید؟
+              </Link>
+            </p>
+            <p className="mt-4 font-body text-xs text-muted-foreground">
               یا با{" "}
               <a href="/auth/google" className="font-semibold text-primary underline hover:no-underline">
                 Google
