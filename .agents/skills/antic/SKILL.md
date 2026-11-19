@@ -1,6 +1,6 @@
 ---
 name: antic
-description: Local development skill for پرده آنتیک — self-hosted React/Vite + Express/Prisma curtain shop. Use for any change to this repo. Ignore all wix-* skills.
+description: Local development skill for پرده آنتیک — self-hosted Next.js + Express/Prisma curtain shop. Use for any change to this repo.
 ---
 
 # Antic (local)
@@ -11,13 +11,12 @@ Any task on the `antic` repository: UI, admin, catalog, cart, Zarinpal orders, P
 
 ## Hard rules
 
-- **No Base44. No Wix.** Ignore `.agents/skills/wix-*` entirely.
 - Full instructions: repository root `AGENTS.md` and `README.md`.
 - Prefer imports:
   - `@/api/client` → `api`
   - `@/rest/store-cart`
   - `@/rest/store-catalog`
-- Backend: `backend/` on port **3001**. Frontend: Vite on **5173** with `/api` proxy.
+- Backend: `backend/` on port **3001**. Frontend: Next.js on **3000**.
 
 ## Quick start
 

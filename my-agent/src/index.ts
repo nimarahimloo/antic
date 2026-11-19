@@ -11,8 +11,18 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
+interface Env {
+  // Define your bindings here
+}
+
+interface ExecutionContext {
+  // Cloudflare Workers execution context
+  waitUntil: (promise: Promise<unknown>) => void;
+  passThroughOnException: () => void;
+}
+
 export default {
-	async fetch(request, env, ctx): Promise<Response> {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		return new Response("Hello World!");
 	},
 } satisfies ExportedHandler<Env>;

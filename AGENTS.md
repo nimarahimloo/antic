@@ -6,8 +6,7 @@
 ## قانون‌های قطعی
 
 1. **بدون Base44، بدون Wix، بدون سرویس commerce خارجی.**
-2. skillهای زیر `.agents/skills/wix-*` **منسوخ و اشتباه** هستند — **هرگز نخوان و اجرا نکن.**
-3. داده و پرداخت فقط از طریق API لوکال: `http://localhost:3001/api` (در dev از Vite با پروکسی `/api`).
+3. داده و پرداخت فقط از طریق API لوکال: `http://localhost:3001/api` (در dev از Next.js با پروکسی `/api`).
 4. قبل از هر تغییر: `README.md` و همین فایل را بخوان.
 
 ## دو دامنهٔ دسته (اجباری)
@@ -25,7 +24,7 @@
 
 | لایه | تکنولوژی | پورت / مسیر |
 |------|----------|-------------|
-| فرانت | React 18 + Vite + Tailwind + React Router + TanStack Query | `:5173` |
+| فرانت | Next.js + Tailwind + TanStack Query | `:3000` |
 | بک‌اند | Express + Prisma + SQLite + JWT | `:3001` |
 | پرداخت | زرین‌پال (خالی بودن `ZARINPAL_MERCHANT_ID` = حالت دمو) | `/api/orders` |
 | ادمین | صفحات `/admin/*` | لاگین لازم |
@@ -81,7 +80,6 @@ ZARINPAL_SANDBOX="true"
 | `src/hooks/useCurtainCategories.js` | **منبع واحد** دسته‌های کاتالوگ |
 | `src/rest/store-cart.js` | سبد + checkout |
 | `src/rest/store-catalog.js` | محصولات/دسته‌های **فروشگاه اکسسوری** |
-| `src/rest/wix-store-*.js` | **shim منسوخ** |
 | `src/lib/AuthContext.jsx` | لاگین/توکن |
 | `src/context/CartContext.jsx` | state سبد |
 
@@ -116,10 +114,9 @@ import { searchProducts, queryCategories } from "@/rest/store-catalog";
 
 - مخلوط کردن `CurtainCategory` با `ShopCategory`.
 - لیست ثابت slug برای دسته‌های سایت.
-- SDK مربوط به Base44 / Wix.
 - commit کردن `backend/dev.db` یا `.env`.
 
 ## خلاصه یک خطی
 
-اپ self-hosted: Vite + Express + Prisma + SQLite + زرین‌پال.
+اپ self-hosted: Next.js + Express + Prisma + SQLite + زرین‌پال.
 کاتالوگ پرده و فروشگاه اکسسوری دو دامنهٔ جدا با یک منبع برای هر کدام.

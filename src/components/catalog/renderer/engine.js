@@ -62,7 +62,7 @@ export function createCurtainEngine(host, canvas, context, settings, status) {
   let fabricKey = '';
   let fabricRef = null;
   let imageRef = null;
-  let openRef = 0.3;
+  
   let scaleRef = 0.65;
   let motionUntil = 0;
 

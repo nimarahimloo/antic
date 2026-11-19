@@ -19,6 +19,18 @@ dist-ssr/
 .vite/
 *.local
 
+# Next.js
+.next/
+.next-docs/
+out/
+next-env.d.ts.bak
+tsconfig.tsbuildinfo
+
+# Legacy Vite / backup artifacts
+*.bak
+**/*.bak
+src/pages.vite.bak/
+
 # Backend runtime data (server-only)
 backend/uploads/*
 !backend/uploads/.gitkeep
@@ -67,5 +79,4 @@ Thumbs.db
 *.sw?
 
 # Misc
-base44/.app.jsonc
 pnpm-lock.yaml

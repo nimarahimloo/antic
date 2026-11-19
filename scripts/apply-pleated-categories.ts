@@ -56,12 +56,13 @@ const PLEATED_SUBS = [
   },
 ];
 
-function empty(v) {
+function empty(v: unknown): boolean {
   return v == null || v === "";
 }
 
-function parseSubs(raw) {
+function parseSubs(raw: unknown): Array<{ name: string; slug: string; description?: string }> {
   if (!raw) return [];
+  if (typeof raw !== "string") return [];
   try {
     const p = JSON.parse(raw);
     if (!Array.isArray(p)) return [];
@@ -81,7 +82,14 @@ function parseSubs(raw) {
   }
 }
 
-async function upsert(slug, data) {
+async function upsert(slug: string, data: {
+  name: string;
+  order: number;
+  description?: string;
+  mechanism?: string;
+  subcategories?: string;
+  inCatalog: boolean;
+}) {
   const existing = await prisma.curtainCategory.findUnique({ where: { slug } });
   if (!existing) {
     await prisma.curtainCategory.create({
