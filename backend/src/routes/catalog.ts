@@ -197,9 +197,16 @@ router.get("/products/id/:id", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/catalog/categories
+ *
+ * دسته‌های **فروشگاه اکسسوری** (ShopCategory).
+ * دسته‌های کاتالوگ پرده (CurtainCategory) از مسیر
+ * `/api/entities/CurtainCategory` سرو می‌شوند — این دو دامنه از هم جدا هستند.
+ */
 router.get("/categories", async (_req, res) => {
   try {
-    const rows = await prisma.curtainCategory.findMany({
+    const rows = await prisma.shopCategory.findMany({
       orderBy: { order: "asc" },
     });
     res.json({
@@ -209,7 +216,7 @@ router.get("/categories", async (_req, res) => {
         slug: c.slug,
         description: c.description || "",
         image: c.image ? { url: c.image } : undefined,
-        visible: true,
+        visible: c.visible,
         order: c.order,
       })),
     });

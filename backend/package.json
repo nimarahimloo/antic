@@ -12,6 +12,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
     "db:import-woo": "node scripts/import-woocommerce-sql.mjs",
+    "db:import-curtains": "node scripts/import-curtains-csv.mjs",
+    "db:import-accessories": "node scripts/import-accessories-csv.mjs",
     "smoke": "node scripts/smoke-test.mjs",
     "test:functional": "node scripts/functional-test.mjs",
     "test": "node scripts/smoke-test.mjs && node scripts/functional-test.mjs",
