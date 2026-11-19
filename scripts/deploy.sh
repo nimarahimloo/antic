@@ -18,6 +18,11 @@ git checkout "$BRANCH"
 git pull --ff-only origin "$BRANCH"
 
 echo "==> فرانت (Next.js)"
+# Next.js مقدار rewrites() را در زمان build ثابت می‌کند، پس آدرس بک‌اند
+# باید قبل از build مشخص باشد.
+export BACKEND_INTERNAL_URL="${BACKEND_INTERNAL_URL:-http://127.0.0.1:3001}"
+export NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL:-https://pardehantic.ir}"
+export NEXT_TELEMETRY_DISABLED=1
 npm ci --no-audit --no-fund
 npm run build
 
@@ -52,6 +57,22 @@ else
 fi
 
 pm2 save >/dev/null 2>&1 || true
+
+echo "==> nginx"
+if [ -f "$ROOT/deploy/nginx/antic.conf" ] && command -v nginx >/dev/null 2>&1; then
+  cp /etc/nginx/sites-available/antic /etc/nginx/sites-available/antic.bak 2>/dev/null || true
+  cp "$ROOT/deploy/nginx/antic.conf" /etc/nginx/sites-available/antic
+  ln -sf /etc/nginx/sites-available/antic /etc/nginx/sites-enabled/antic
+  if nginx -t >/dev/null 2>&1; then
+    systemctl reload nginx && echo "    nginx reload OK"
+  else
+    echo "    !! nginx -t failed — کانفیگ قبلی برگردانده شد"
+    cp /etc/nginx/sites-available/antic.bak /etc/nginx/sites-available/antic 2>/dev/null || true
+    nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
+  fi
+else
+  echo "    (nginx یا فایل کانفیگ پیدا نشد — دستی بررسی کنید)"
+fi
 
 echo "==> health"
 sleep 2
