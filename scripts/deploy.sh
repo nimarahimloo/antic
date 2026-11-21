@@ -24,10 +24,23 @@ if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "!! فایل‌های track‌شده تغییر دارند — نادیده گرفته می‌شوند (env/db دست نمی‌خورد)"
 fi
 
+DB_PATH="$ROOT/backend/prisma/dev.db"
+DB_GUARD=""
+
+cleanup() {
+  [[ -n "$DB_GUARD" && -f "$DB_GUARD" ]] && rm -f "$DB_GUARD"
+}
+trap cleanup EXIT
+
 echo "==> backup ($STAMP)"
-if [[ -f "$ROOT/backend/prisma/dev.db" ]]; then
-  cp -a "$ROOT/backend/prisma/dev.db" "$BACKUP_DIR/dev.db.$STAMP"
+if [[ -f "$DB_PATH" && -s "$DB_PATH" ]]; then
+  cp -a "$DB_PATH" "$BACKUP_DIR/dev.db.$STAMP"
   echo "    db: $BACKUP_DIR/dev.db.$STAMP"
+  # نسخه‌ی موقت: اگر checkout فایل db را حذف کرد، همین‌جا برگردانده می‌شود
+  DB_GUARD="$(mktemp /tmp/antic-db-guard.XXXXXX.db)"
+  cp -a "$DB_PATH" "$DB_GUARD"
+else
+  echo "    !! هشدار: دیتابیس production پیدا نشد یا خالی است"
 fi
 for f in /etc/nginx/nginx.conf /etc/nginx/sites-enabled/default /etc/nginx/sites-available/default; do
   [[ -f "$f" ]] && cp -a "$f" "$BACKUP_DIR/$(echo "$f" | tr '/' '_').$STAMP"
@@ -39,6 +52,21 @@ echo "    backup: $BACKUP_DIR"
 echo "==> pull ($BRANCH)"
 git checkout "$BRANCH"
 git pull --ff-only origin "$BRANCH"
+
+# بعضی نسخه‌های قدیمی‌repo فایل db را track می‌کردند و checkout آن را حذف می‌کرد
+if [[ -n "$DB_GUARD" ]]; then
+  if [[ ! -f "$DB_PATH" || ! -s "$DB_PATH" ]]; then
+    echo "    !! دیتابیس بعد از checkout حذف شد — بازگردانی می‌شود"
+    mkdir -p "$(dirname "$DB_PATH")"
+    cp -a "$DB_GUARD" "$DB_PATH"
+  else
+    echo "    db سالم است"
+  fi
+fi
+if [[ ! -f "$DB_PATH" || ! -s "$DB_PATH" ]]; then
+  echo "!! دیتابیس production موجود نیست — دیپلوی متوقف شد"
+  exit 1
+fi
 
 echo "==> فرانت (Next.js)"
 # Next.js مقدار rewrites() را در زمان build ثابت می‌کند، پس آدرس بک‌اند
