@@ -138,8 +138,10 @@ PY
   fi
 
   # سایت قدیمی (Vite) نباید هم‌زمان فعال باشد
+  DEFAULT_WAS_ENABLED=0
   if [ -e /etc/nginx/sites-enabled/default ]; then
     rm -f /etc/nginx/sites-enabled/default
+    DEFAULT_WAS_ENABLED=1
     echo "    سایت قدیمی default غیرفعال شد"
   fi
 
@@ -150,6 +152,11 @@ PY
     systemctl reload nginx && echo "    nginx reload OK"
   else
     echo "    !! nginx -t failed — کانفیگ قبلی برگردانده شد"
+    rm -f /etc/nginx/sites-enabled/antic
+    if [[ "$DEFAULT_WAS_ENABLED" == "1" && -f "$BACKUP_DIR/_etc_nginx_sites-enabled_default.$STAMP" ]]; then
+      cp -a "$BACKUP_DIR/_etc_nginx_sites-enabled_default.$STAMP" /etc/nginx/sites-enabled/default
+      echo "    سایت default به حالت قبل برگشت"
+    fi
     cp /etc/nginx/sites-available/antic.bak /etc/nginx/sites-available/antic 2>/dev/null || true
     cp "$BACKUP_DIR/_etc_nginx_nginx.conf.$STAMP" /etc/nginx/nginx.conf 2>/dev/null || true
     nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
