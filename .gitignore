@@ -82,3 +82,7 @@ Thumbs.db
 
 # Misc
 pnpm-lock.yaml
+
+# Bun
+bun.lock
+bun.lockb
