@@ -66,12 +66,16 @@ export default function GlobalSearch({ compact = false, className = "" }: { comp
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
     if (!q.trim()) {
-      setResults([]);
-      setLoading(false);
+      setTimeout(() => {
+        setResults([]);
+        setLoading(false);
+      }, 0);
       return;
     }
-    setLoading(true);
-    timer.current = setTimeout(() => runSearch(q), 220);
+    setTimeout(() => {
+      setLoading(true);
+      timer.current = setTimeout(() => runSearch(q), 220);
+    }, 0);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };

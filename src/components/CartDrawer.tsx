@@ -13,20 +13,18 @@ export default function CartDrawer() {
   const { cart, isOpen, setIsOpen, removeItem, updateQuantity, checkout, loading, error, clearError } =
     useCart();
 
-  const handleCheckout = () => {
-    checkout();
-  };
-  const lineItems = cart?.lineItems ?? [];
-
   const subtotal = useMemo(() => {
+    const lineItems = cart?.lineItems ?? [];
     return lineItems.reduce(
       (s, li) =>
         s + Number(li.pricing?.unitPrice?.amount || 0) * (li.quantityInfo?.confirmedQuantity || 0),
       0
     );
-  }, [lineItems]);
+  }, [cart?.lineItems]);
 
-  const unavailable = lineItems.filter((li) => li.status && li.status !== "IN_STOCK");
+  const lineItems = useMemo(() => cart?.lineItems ?? [], [cart?.lineItems]);
+
+  const unavailable = useMemo(() => lineItems.filter((li) => li.status && li.status !== "IN_STOCK"), [lineItems]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -133,7 +131,7 @@ export default function CartDrawer() {
             </div>
             <button
               disabled={loading || unavailable.length > 0}
-              onClick={handleCheckout}
+              onClick={() => checkout()}
               className="w-full cursor-pointer rounded-sm border-none bg-primary p-3 text-[15px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "…" : unavailable.length > 0 ? "آیتم ناموجود را حذف کنید" : "ادامه و پرداخت"}

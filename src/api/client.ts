@@ -67,7 +67,7 @@ async function request(
       body: body !== undefined ? JSON.stringify(body) : undefined,
       credentials: "include",
     });
-  } catch (fetchErr) {
+  } catch {
     throw new ApiError("شبکه در دسترس نیست. لطفاً اتصال اینترنت را بررسی کنید.", {
       status: 0,
       data: null,

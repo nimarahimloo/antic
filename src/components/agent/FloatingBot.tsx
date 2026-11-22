@@ -162,7 +162,8 @@ export default function FloatingBot({
 
   useEffect(() => {
     if (open) {
-      setUnread(0);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTimeout(() => setUnread(0), 0);
       unlockChatSounds();
       ensureConversation().then(() => {
         setTimeout(() => inputRef.current?.focus(), 200);

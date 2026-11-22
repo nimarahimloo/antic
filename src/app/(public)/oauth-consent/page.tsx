@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { appParams } from "@/lib/app-params";
 import { Button } from "@/components/ui/button";
 import { ShieldCheck, Loader2 } from "lucide-react";
@@ -21,7 +22,8 @@ interface ConsentInfo {
 }
 
 export default function OAuthConsentPage() {
-  const [ctx, setCtx] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const ctx = searchParams.get("ctx");
   const [info, setInfo] = useState<ConsentInfo | null>(null);
   const [checking, setChecking] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -30,14 +32,10 @@ export default function OAuthConsentPage() {
   const [reconnect, setReconnect] = useState("");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const ctxParam = params.get("ctx");
-    setCtx(ctxParam);
-
     (async () => {
       let redirecting = false;
       try {
-        if (!ctxParam) {
+        if (!ctx) {
           setError("This authorization link is invalid or has expired.");
           setChecking(false);
           return;
@@ -45,7 +43,7 @@ export default function OAuthConsentPage() {
         const infoHeaders: Record<string, string> = {};
         if (appParams.token) infoHeaders.Authorization = "Bearer " + appParams.token;
         const res = await fetch(
-          `/api/apps/${appParams.appId}/mcp/consent-info?handle=${encodeURIComponent(ctxParam)}`,
+          `/api/apps/${appParams.appId}/mcp/consent-info?handle=${encodeURIComponent(ctx)}`,
           { credentials: "include", headers: infoHeaders },
         );
         if (!res.ok) {
@@ -55,7 +53,7 @@ export default function OAuthConsentPage() {
         }
         const data = (await res.json()) as ConsentInfo;
         if (!data.authenticated) {
-          const returnTo = window.location.pathname + "?ctx=" + encodeURIComponent(ctxParam);
+          const returnTo = window.location.pathname + "?ctx=" + encodeURIComponent(ctx);
           const encoded = encodeURIComponent(returnTo);
           redirecting = true;
           window.location.href =
@@ -69,7 +67,7 @@ export default function OAuthConsentPage() {
         if (!redirecting) setChecking(false);
       }
     })();
-  }, []);
+  }, [ctx]);
 
   const respond = async (action: string) => {
     if (!ctx) return;

@@ -6,7 +6,7 @@ import pluginUnusedImports from "eslint-plugin-unused-imports";
 import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
 import nextTypeScript from "eslint-config-next/typescript";
 
-export default [
+const eslintConfig = [
   {
     ignores: [
       ".next/**",
@@ -63,6 +63,13 @@ export default [
           argsIgnorePattern: "^_",
         },
       ],
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          varsIgnorePattern: "^_",
+          argsIgnorePattern: "^_",
+        },
+      ],
       "react/prop-types": "off",
       "react/react-in-jsx-scope": "off",
       "react/no-unknown-property": [
@@ -95,3 +102,5 @@ export default [
     },
   },
 ];
+
+export default eslintConfig;

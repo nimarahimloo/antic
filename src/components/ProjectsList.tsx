@@ -15,8 +15,8 @@ interface ProjectCategory {
 }
 
 export default function ProjectsList({
-  category,
-  subcategory,
+  category: _category,
+  subcategory: _subcategory,
 }: {
   category?: string;
   subcategory?: string;

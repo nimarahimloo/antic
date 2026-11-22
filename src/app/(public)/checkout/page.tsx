@@ -7,7 +7,6 @@ import { formatToman } from "@/components/CartDrawer";
 import PageHero from "@/components/PageHero";
 
 export default function CheckoutPage() {
-  const [step, setStep] = useState<"info" | "payment" | "result">("info");
   const [form, setForm] = useState({
     customerName: "",
     customerPhone: "",
@@ -19,7 +18,7 @@ export default function CheckoutPage() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { cart, checkout, refreshCart } = useCart();
+  const { cart, checkout } = useCart();
 
   const lineItems = cart?.lineItems ?? [];
   const subtotal = lineItems.reduce(
@@ -60,8 +59,6 @@ export default function CheckoutPage() {
       });
       if (paymentUrl && paymentUrl !== "/checkout") {
         window.location.href = paymentUrl;
-      } else {
-        setStep("payment");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا در ثبت سفارش");
