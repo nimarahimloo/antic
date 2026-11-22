@@ -162,14 +162,16 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
   }, [search]);
 
   useEffect(() => {
-    if (!selectedCategory && !search.trim()) {
-      setGridItems([]);
-      setProjectFallback([]);
-      setLoading(false);
+    if (!selectedCategory && !debouncedSearch.trim()) {
+      setTimeout(() => {
+        setGridItems([]);
+        setProjectFallback([]);
+        setLoading(false);
+      }, 0);
       return;
     }
     setLoading(true);
-    const q = search.trim();
+    const q = debouncedSearch.trim();
     const filter: Record<string, string> = {};
     if (!q) {
       if (selectedCategory) filter.category_slug = selectedCategory;

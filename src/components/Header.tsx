@@ -52,7 +52,7 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    setTimeout(() => setOpen(false), 0);
+    setOpen(false);
   }, [pathname]);
 
   return (

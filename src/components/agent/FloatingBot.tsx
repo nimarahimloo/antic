@@ -162,15 +162,13 @@ export default function FloatingBot({
 
   useEffect(() => {
     if (open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTimeout(() => setUnread(0), 0);
+      setUnread(0);
       unlockChatSounds();
       ensureConversation().then(() => {
         setTimeout(() => inputRef.current?.focus(), 200);
         scrollToEnd(false);
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   useEffect(() => {

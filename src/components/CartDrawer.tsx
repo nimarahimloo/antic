@@ -13,16 +13,15 @@ export default function CartDrawer() {
   const { cart, isOpen, setIsOpen, removeItem, updateQuantity, checkout, loading, error, clearError } =
     useCart();
 
+  const lineItems = cart?.lineItems ?? [];
+
   const subtotal = useMemo(() => {
-    const lineItems = cart?.lineItems ?? [];
     return lineItems.reduce(
       (s, li) =>
         s + Number(li.pricing?.unitPrice?.amount || 0) * (li.quantityInfo?.confirmedQuantity || 0),
       0
     );
-  }, [cart?.lineItems]);
-
-  const lineItems = useMemo(() => cart?.lineItems ?? [], [cart?.lineItems]);
+  }, [lineItems]);
 
   const unavailable = useMemo(() => lineItems.filter((li) => li.status && li.status !== "IN_STOCK"), [lineItems]);
 
