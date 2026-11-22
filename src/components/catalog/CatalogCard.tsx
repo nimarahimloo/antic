@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { Check } from "lucide-react";
 import { mediaUrl } from "@/lib/mediaUrl";
 
 interface Model {
+  id: string;
   code: string;
   name: string;
   install_image?: string;
@@ -23,16 +25,19 @@ export default function CatalogCard({ model, active, onClick }: CatalogCardProps
   const thumb = mediaUrl(model.install_image || model.image) || null;
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={`${model.code} — ${model.name}`}
-      className={`group relative flex flex-col overflow-hidden rounded-xl border text-right transition-all duration-300 ${
-        active
-          ? "border-primary ring-2 ring-primary/40"
-          : "border-secondary/60 hover:border-primary/60"
-      }`}
-    >
+    <Link href={`/curtain/${model.id}`} className="block">
+      <article
+        onClick={(e) => {
+          e.preventDefault();
+          onClick();
+        }}
+        title={`${model.code} — ${model.name}`}
+        className={`group relative flex flex-col overflow-hidden rounded-xl border text-right transition-all duration-300 ${
+          active
+            ? "border-primary ring-2 ring-primary/40"
+            : "border-secondary/60 hover:border-primary/60"
+        }`}
+      >
       <div className="relative aspect-[4/3] overflow-hidden bg-secondary/30">
         {thumb ? (
           <img
@@ -72,6 +77,7 @@ export default function CatalogCard({ model, active, onClick }: CatalogCardProps
           </span>
         </div>
       </div>
-    </button>
+    </article>
+  </Link>
   );
 }

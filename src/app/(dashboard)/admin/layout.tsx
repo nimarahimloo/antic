@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, FileText, Settings, LogOut, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, FileText, Settings, LogOut, ChevronLeft, ChevronRight, Sparkles, UploadCloud } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ const ADMIN_NAV = [
   { label: "دسته‌بندی‌ها", href: "/admin/categories", icon: Package },
   { label: "محصولات", href: "/admin/products", icon: ShoppingBag },
   { label: "سفارش‌ها", href: "/admin/orders", icon: Package },
+  { label: "بارگذاری گروهی", href: "/admin/bulk-upload", icon: UploadCloud },
   { label: "تنظیمات پنجره", href: "/admin/window", icon: Settings },
   { label: "تنظیمات", href: "/admin/settings", icon: Settings },
 ];

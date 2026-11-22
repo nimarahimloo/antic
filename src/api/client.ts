@@ -192,6 +192,9 @@ function createEntityApi(name: string) {
       const res = await request(`/entities/${name}/count?${q}`);
       return typeof res === "number" ? res : (res as { count: number }).count;
     },
+    async bulkCreate(records: Record<string, unknown>[]) {
+      return request(`/entities/${name}/bulk`, { method: "POST", body: { records } });
+    },
   };
 }
 

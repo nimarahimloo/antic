@@ -29,14 +29,14 @@ git pull origin dev
 # ترمینال ۱ — بک‌اند
 cd backend
 cp .env.example .env
-npm install
-npm run db:setup   # prisma generate + db push + seed
-npm run dev        # http://localhost:3001
+bun install
+bun run db:setup   # prisma generate + db push + seed
+bun run dev        # http://localhost:3001
 
 # ترمینال ۲ — فرانت
 cd ..
-npm install
-npm run dev        # http://localhost:3000  →  پروکسی /api و /uploads
+bun install
+bun run dev        # http://localhost:3000  →  پروکسی /api و /uploads
 ```
 
 ادمین: `admin@antic.local` / `admin123` → `/login` → `/admin`
@@ -47,11 +47,11 @@ npm run dev        # http://localhost:3000  →  پروکسی /api و /uploads
 ### بررسی سلامت
 
 ```bash
-npm run lint        # ESLint (flat config)
-npm run typecheck   # tsc --noEmit
-npm run build       # next build (Turbopack)
+bun run lint        # ESLint (flat config)
+bun run typecheck   # tsc --noEmit
+bun run build       # next build (Turbopack)
 
-cd backend && npm run typecheck
+cd backend && bun run typecheck
 curl http://localhost:3001/api/health
 ```
 
@@ -157,14 +157,14 @@ docker compose up -d --build
 
 ```bash
 # فرانت
-NEXT_OUTPUT_STANDALONE=true npm run build
+NEXT_OUTPUT_STANDALONE=true bun run build
 node .next/standalone/server.js
 
 # بک‌اند
 cd backend
-npm install
-npm run build        # tsc → dist/
-npm start            # node dist/src/index.js
+bun install
+bun run build        # tsc → dist/
+bun run start        # node dist/src/index.js
 ```
 
 ## لایسنس

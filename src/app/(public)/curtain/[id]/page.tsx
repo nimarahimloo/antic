@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Phone, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Phone, CheckCircle2, ExternalLink } from "lucide-react";
 import { api } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
 import CurtainPreview from "@/components/catalog/CurtainPreview";
+import ProjectCard from "@/components/ProjectCard";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 
 interface CurtainModel {
@@ -30,6 +31,8 @@ export default function CurtainDetailPage() {
   const [model, setModel] = useState<CurtainModel | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loadedId, setLoadedId] = useState<string | null>(null);
+  const [relatedProjects, setRelatedProjects] = useState<Array<{ id: string; title: string; cover_image?: string }>>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
@@ -52,6 +55,29 @@ export default function CurtainDetailPage() {
       alive = false;
     };
   }, [id]);
+
+  // Fetch related projects based on curtain model's category
+  useEffect(() => {
+    if (!model?.category_slug) {
+      setRelatedProjects([]);
+      setProjectsLoading(false);
+      return;
+    }
+    setProjectsLoading(true);
+    const pf: Record<string, string> = { category_slug: model.category_slug };
+    api.entities.Project.filter(pf, {
+      sort: "-created_date",
+      limit: 6,
+    })
+      .then((data) => {
+        setRelatedProjects((Array.isArray(data) ? data : []) as Array<{ id: string; title: string; cover_image?: string }>);
+      })
+      .catch((err) => {
+        console.error("Failed to load related projects:", apiErrorMessage(err));
+        setRelatedProjects([]);
+      })
+      .finally(() => setProjectsLoading(false));
+  }, [model?.category_slug]);
 
   const loading = loadedId !== id;
 
@@ -145,6 +171,40 @@ export default function CurtainDetailPage() {
                 بازگشت به کاتالوگ
               </Link>
             </div>
+
+            {/* Related Projects Section */}
+            {model.category_slug && (
+              <div className="mt-10">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="font-display text-lg font-black text-foreground">نمونه‌های اجرا شده مرتبط</h2>
+                  <Link
+                    href={`/projects/category/${model.category_slug}`}
+                    className="font-body text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    مشاهده همه <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </div>
+                {projectsLoading ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-secondary/40" />
+                    ))}
+                  </div>
+                ) : relatedProjects.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {relatedProjects.map((p) => (
+                      <ProjectCard key={p.id} project={p} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center rounded-2xl border border-dashed border-secondary/60 bg-card/40">
+                    <p className="font-body text-sm text-muted-foreground">
+                      هنوز نمونه اجرا برای این دسته ثبت نشده است.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

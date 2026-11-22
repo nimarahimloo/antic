@@ -1,16 +1,59 @@
 "use client";
 
-import { Card } from "@/components/ui/card";
+import AdminEntityPage from "@/components/admin/AdminEntityPage";
+import { useCurtainCategories, allCategorySelectOptions } from "@/hooks/useCurtainCategories";
 
+/** نمونه‌های اجرا — گالری چندتصویری (تا ۲۰ تصویر) مثل کاور */
 export default function AdminProjectsPage() {
+  const { categories } = useCurtainCategories();
+
+  const fields = [
+    { key: "title", label: "عنوان", required: true },
+    { key: "cover_image", label: "کاور", type: "image", required: true },
+    {
+      key: "category_slug",
+      label: "دسته",
+      type: "select",
+      required: true,
+    },
+    { key: "description", label: "توضیح", type: "textarea" },
+    {
+      key: "images",
+      label: "گالری (اختیاری)",
+      type: "gallery",
+      help: "مانند کاور — تا ۲۰ تصویر، انتخاب چندتایی از دستگاه",
+    },
+  ];
+
+  const columns = [
+    {
+      key: "cover_image",
+      label: "کاور",
+      render: (v: unknown) =>
+        v ? <img src={String(v)} alt="" className="h-10 w-10 rounded-lg object-cover" /> : "—",
+    },
+    {
+      key: "title",
+      label: "عنوان",
+      render: (v: unknown) => <span className="font-display font-bold text-foreground">{String(v)}</span>,
+    },
+    {
+      key: "category_slug",
+      label: "دسته",
+      render: (v: unknown) => {
+        const cat = categories.find((c) => c.slug === String(v));
+        return cat?.name || String(v || "—");
+      },
+    },
+  ];
+
   return (
-    <div className="bg-background">
-      <div className="mx-auto max-w-7xl px-5 py-8 lg:px-10 lg:py-12">
-        <h1 className="font-display text-2xl font-bold text-foreground mb-6">پروژه‌ها</h1>
-        <Card className="p-6">
-          <p className="text-muted-foreground">بخش پروژه‌ها در حال توسعه است.</p>
-        </Card>
-      </div>
-    </div>
+    <AdminEntityPage
+      title="نمونه‌های اجرا"
+      entity="Project"
+      fields={fields}
+      columns={columns}
+      options={{ category_slug: allCategorySelectOptions(categories) }}
+    />
   );
 }

@@ -203,3 +203,16 @@ export function pickSecondaryCategories(categories: Category[], limit = 8): Cate
   if (rest.length >= 2) return rest.slice(0, limit);
   return categories.slice(Math.floor(categories.length / 2), Math.floor(categories.length / 2) + limit);
 }
+
+/** همهٔ دسته‌ها بدون فیلتر — برای سلکت ادمین */
+export function allCategorySelectOptions(categories: Category[]): Array<{ value: string; label: string }> {
+  return (Array.isArray(categories) ? categories : [])
+    .filter((c) => c && c.slug)
+    .slice()
+    .sort(
+      (a, b) =>
+        (Number(a.order) || 0) - (Number(b.order) || 0) ||
+        String(a.name || "").localeCompare(String(b.name || ""), "fa")
+    )
+    .map((c) => ({ value: c.slug, label: c.name || c.slug }));
+}
