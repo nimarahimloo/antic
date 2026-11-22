@@ -10,7 +10,7 @@ import {
   getRootCategories,
   getSubOptionsForParent,
   rootSelectOptions,
-} from "../../src/lib/categoryTree.js";
+} from "../../src/lib/categoryTree.ts";
 
 const SAMPLE = [
   {

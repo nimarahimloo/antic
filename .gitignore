@@ -36,6 +36,7 @@ src/pages.vite.bak/
 backend/uploads/*
 !backend/uploads/.gitkeep
 backend/data/*.sql
+backend/data/ai/
 backend/**/*.db
 backend/**/*.db-journal
 backend/**/*.db-shm

@@ -63,6 +63,29 @@ ZARINPAL_MERCHANT_ID=""
 ZARINPAL_SANDBOX="true"
 ```
 
+### env فضای کاری AI (فقط `backend/.env`)
+
+```env
+AI_PRIVATE_DIR="./data/ai"
+CLOUDFLARE_ACCOUNT_ID=""
+CLOUDFLARE_API_TOKEN=""
+AI_ENABLE_CLOUDFLARE=true
+GOOGLE_GENERATIVE_AI_API_KEY=""
+AI_ENABLE_GOOGLE=false
+OPENROUTER_API_KEY=""
+AI_ENABLE_OPENROUTER=false
+AI_MAX_OUTPUT_TOKENS=2500
+AI_DAILY_CHAT_REQUESTS=50
+AI_DAILY_IMAGE_REQUESTS=10
+AI_DAILY_TOTAL_TOKENS=200000
+AI_CLOUDFLARE_DAILY_QUOTA_UNITS=9000
+```
+
+- inference فقط سمت backend؛ هیچ کلید provider در `NEXT_PUBLIC_*` نیست.
+- فایل‌های AI داخل `AI_PRIVATE_DIR` هستند و **هرگز** زیر `/uploads` عمومی سرو نمی‌شوند.
+- Cloudflare Workers AI سهمیهٔ رایگان مشترک ۱۰٬۰۰۰ Neuron/day دارد؛ محدودیت محلی یک محافظ تقریبی است.
+- Google/OpenRouter فقط مدل Free و با فعال‌سازی صریح؛ مدل پولی/Image پولی Google در این workspace مجاز نیست.
+
 فرانت (اختیاری در روت `.env`):
 
 ```env
@@ -87,6 +110,8 @@ ZARINPAL_SANDBOX="true"
 | `src/rest/store-catalog.ts` | محصولات/دسته‌های **فروشگاه اکسسوری** |
 | `src/lib/AuthContext.tsx` | لاگین/توکن |
 | `src/context/CartContext.tsx` | state سبد |
+| `src/app/(dashboard)/admin/workspace/page.tsx` | UI فضای کاری AI (گفتگو + استودیوی تصویر) |
+| `src/types/ai-workspace.ts` | تایپ‌های مشترک workspace |
 | `src/lib/categoryTree.ts` | سلسله‌مراتب دسته (مادر در جدول، زیردسته در JSON) |
 | `src/lib/installCategories.js` | فیلتر دسته‌های قابل‌نصب (mechanism/slug/name) |
 | `src/lib/curtainStyleResolve.js` | تشخیص استایل پرده از slug/mechanism/name |
@@ -111,6 +136,14 @@ import { searchProducts, queryCategories } from "@/rest/store-catalog";
 | `backend/src/routes/catalog.ts` | `ShopCategory` + `Product` (اکسسوری) |
 | `backend/src/routes/orders.ts` | سفارش + زرین‌پال |
 | `backend/src/routes/auth.ts` | احراز هویت (register/login/me/forgot/reset/google) |
+| `backend/src/routes/ai.ts` | فضای کاری AI: گفتگوی stream، گفتگوها، فایل خصوصی و تصویر |
+| `backend/src/routes/mcp.ts` | مسیر MCP: `list_categories`, `search_models`, `get_model`, `list_projects` |
+| `backend/src/services/aiProviders.ts` | registry ارائه‌دهنده‌ها/مدل‌ها (کلید فقط backend) |
+| `backend/src/services/aiCatalog.ts` | منبع مشترک ابزارهای کاتالوگ AI و MCP |
+| `backend/src/services/aiTools.ts` | تعریف ابزارهای AI SDK برای tool calling |
+| `backend/src/services/aiFiles.ts` | ذخیرهٔ خصوصی فایل AI خارج از `/uploads` عمومی |
+| `backend/src/services/aiImages.ts` | FLUX.2 generation/edit با حداکثر ۴ مرجع |
+| `backend/src/services/aiUsage.ts` | ledger و محدودیت روزانهٔ مصرف |
 | `backend/prisma/schema.prisma` | **تنها** اسکیمای دیتابیس — در روت کپی دومش نیست |
 | `backend/prisma/seed.ts` | seed جدا برای پرده vs اکسسوری |
 
@@ -215,6 +248,11 @@ SMTP_FROM="no-reply@example.com"
 | `GET /api/health` | سلامت سرور |
 | `GET /api/entities/CurtainCategory` | لیست دسته‌های کاتالوگ |
 | `GET /api/entities/CurtainModel` | لیست مدل‌های پرده |
+| `GET /api/ai/providers` | registry ارائه‌دهنده/مدل AI (ادمین) |
+| `POST /api/ai/chat` | گفتگوی streaming + tool calling (ادمین) |
+| `GET/POST /api/ai/conversations` | تاریخچهٔ گفتگوی پایدار (ادمین) |
+| `POST /api/ai/files` | بارگذاری فایل خصوصی AI (ادمین) |
+| `POST /api/ai/images/generate` | تولید/ویرایش FLUX.2 (ادمین) |
 | `GET /api/catalog/categories` | دسته‌های فروشگاه (ShopCategory) |
 | `GET /api/catalog/products` | محصولات فروشگاه |
 | `POST /api/orders/checkout` | ایجاد سفارش + لینک پرداخت |
@@ -224,6 +262,8 @@ SMTP_FROM="no-reply@example.com"
 | `GET /api/app/public-settings` | تنظیمات عمومی (logo, hero slides, ...) |
 | `GET /sitemap.xml` | از دیتابیس تولید می‌شود |
 | `GET /robots.txt` | اشاره به sitemap |
+| `GET /api/mcp` | اطلاعات ابزارهای MCP (نام، توضیح، پارامترها) |
+| `POST /api/mcp/tools/:name` | فراخوانی ابزار MCP (list_categories, search_models, get_model, list_projects) |
 
 ## استقرار (Docker)
 
@@ -275,6 +315,19 @@ npm start            # node dist/src/index.js
 - commit کردن `backend/prisma/dev.db` یا هر `.env`.
 - ساختن کپی دوم از `prisma/schema.prisma` در روت.
 - ساختن فایل `.js` هم‌نام با `.ts` موجود.
+
+## نکات امنیتی و نگهداری
+
+### رفع آسیب‌پذیری‌ها (Audit Remediation)
+
+- **sharp@0.33.5**: حتی در نسخه‌های جدید، حتگ‌های `avif` و `webp` می‌توانند منجر به بارگیری آسیب‌پذیری شوند. **برنامه‌ریزی کنید برای ارتقاء به `sharp@0.35.5`** در ریلیز بعدی.
+- **zod@3.24.2**: نسخه 4.x با بهبودهای امنیتی و عملکرد جدید موجود است. **برنامه‌ریزی کنید برای ارتقاء به `zod@4.6.7`** در ریلیز بعدی.
+
+### رفع‌نشده (به‌روز رسانی در انتشار بعدی)
+
+- **react-quill-new**: استفاده از این کتابخانه منجر به وابستگی به `quill@7.3.2` (دارای حسگرهای high-severity) می‌شود. گزینه‌ها:
+  1. حذف `react-quill-new` و استفاده از Editor سفارشی یا کتابخانه دیگر مانند `@uiq/editor` یا `ckeditor5`
+  2. یا migration به `quill` با تنظیمات ایمنی
 
 ## خلاصه یک خطی
 

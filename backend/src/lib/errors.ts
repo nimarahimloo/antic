@@ -52,13 +52,24 @@ export function sendError(res: Response, err: unknown) {
   if (err && typeof err === "object" && "name" in err) {
     const name = String((err as { name: string }).name);
     if (name === "PrismaClientValidationError") {
-      console.error(err);
+      // Log only safe fields - never expose full error with potentially sensitive path info
+      console.error("Prisma validation error", { name, message: (err as { message?: string }).message });
       return res.status(400).json({
         error: "دادهٔ ارسالی با مدل دیتابیس سازگار نیست.",
       });
     }
   }
 
-  console.error(err);
+  // Log only safe fields for unknown errors
+  if (err && typeof err === 'object') {
+    const errObj = err as Record<string, unknown>;
+    console.error("Internal server error", {
+      name: errObj.name,
+      code: errObj.code,
+      message: typeof errObj.message === 'string' ? errObj.message : undefined,
+    });
+  } else {
+    console.error("Internal server error", err);
+  }
   return res.status(500).json({ error: "Internal server error" });
 }

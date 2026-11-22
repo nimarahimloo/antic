@@ -3,6 +3,13 @@
  * Works in both client and server components.
  */
 
+import type {
+  AIWorkspaceConversation,
+  AIWorkspaceFile,
+  AIWorkspaceProvider,
+  AIWorkspaceUsage,
+} from "@/types/ai-workspace";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api";
 const TOKEN_KEY = "antic_access_token";
 
@@ -11,6 +18,11 @@ export const AUTH_EVENT = "antic:auth:unauthorized";
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(TOKEN_KEY);
+}
+
+/** Browser-only access to the current application JWT for non-JSON transports. */
+export function getAccessToken(): string | null {
+  return getToken();
 }
 
 export function setToken(token: string | null) {
@@ -277,6 +289,47 @@ async function uploadFile(file: File, publicEndpoint: boolean) {
   return data;
 }
 
+async function uploadAIFile(file: File, conversationId?: string) {
+  const form = new FormData();
+  form.append("file", file);
+  if (conversationId) form.append("conversationId", conversationId);
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/ai/files`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(
+      (data as { error?: string }).error || "بارگذاری فایل ناموفق بود.",
+      { status: res.status, data },
+    );
+  }
+  return data as { file: AIWorkspaceFile };
+}
+
+async function downloadAIFile(id: string) {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/ai/files/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(
+      (data as { error?: string }).error || "دریافت فایل ناموفق بود.",
+      { status: res.status, data },
+    );
+  }
+  return res.blob();
+}
+
 export const api = {
   entities,
 
@@ -435,6 +488,112 @@ export const api = {
     },
     styles() {
       return request("/render/styles", { auth: false });
+    },
+  },
+
+  ai: {
+    async providers(): Promise<{ providers: AIWorkspaceProvider[] }> {
+      return request("/ai/providers") as Promise<{ providers: AIWorkspaceProvider[] }>;
+    },
+    async conversations(): Promise<{ conversations: AIWorkspaceConversation[] }> {
+      return request("/ai/conversations") as Promise<{
+        conversations: AIWorkspaceConversation[];
+      }>;
+    },
+    async createConversation(
+      body: { title?: string; provider?: string; model?: string } = {},
+    ): Promise<{ conversation: AIWorkspaceConversation }> {
+      return request("/ai/conversations", {
+        method: "POST",
+        body,
+      }) as Promise<{ conversation: AIWorkspaceConversation }>;
+    },
+    async conversation(
+      id: string,
+    ): Promise<{
+      conversation: AIWorkspaceConversation;
+      messages: Array<{
+        id: string;
+        role: "user" | "assistant" | "system";
+        parts: unknown[];
+        createdAt: string;
+      }>;
+      files: AIWorkspaceFile[];
+    }> {
+      return request(`/ai/conversations/${encodeURIComponent(id)}`) as Promise<{
+        conversation: AIWorkspaceConversation;
+        messages: Array<{
+          id: string;
+          role: "user" | "assistant" | "system";
+          parts: unknown[];
+          createdAt: string;
+        }>;
+        files: AIWorkspaceFile[];
+      }>;
+    },
+    async updateConversation(
+      id: string,
+      body: { title?: string; provider?: string; model?: string },
+    ): Promise<{ conversation: AIWorkspaceConversation }> {
+      return request(`/ai/conversations/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body,
+      }) as Promise<{ conversation: AIWorkspaceConversation }>;
+    },
+    async deleteConversation(id: string) {
+      return request(`/ai/conversations/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+    },
+    async usage(): Promise<AIWorkspaceUsage> {
+      return request("/ai/usage") as Promise<AIWorkspaceUsage>;
+    },
+    async uploadFile(file: File, conversationId?: string) {
+      return uploadAIFile(file, conversationId);
+    },
+    async downloadFile(id: string) {
+      return downloadAIFile(id);
+    },
+    async deleteFile(id: string) {
+      return request(`/ai/files/${encodeURIComponent(id)}`, { method: "DELETE" });
+    },
+    async images(conversationId?: string): Promise<{ files: AIWorkspaceFile[] }> {
+      const query = conversationId
+        ? `?conversationId=${encodeURIComponent(conversationId)}`
+        : "";
+      return request(`/ai/images${query}`) as Promise<{ files: AIWorkspaceFile[] }>;
+    },
+    async generateImage(
+      body: {
+        conversationId?: string;
+        prompt: string;
+        model?: string;
+        referenceFileIds?: string[];
+        width?: number;
+        height?: number;
+        steps?: number;
+        guidance?: number;
+        requestKey?: string;
+      },
+    ): Promise<{
+      file: AIWorkspaceFile;
+      reused: boolean;
+      model: string;
+      width: number;
+      height: number;
+      estimatedQuotaUnits: number;
+    }> {
+      return request("/ai/images/generate", {
+        method: "POST",
+        body,
+      }) as Promise<{
+        file: AIWorkspaceFile;
+        reused: boolean;
+        model: string;
+        width: number;
+        height: number;
+        estimatedQuotaUnits: number;
+      }>;
     },
   },
 

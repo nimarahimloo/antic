@@ -44,6 +44,20 @@ async function req(path, { method = "GET", body, token } = {}) {
   return { status: res.status, data };
 }
 
+async function reqForm(path, { method = "POST", token, form } = {}) {
+  const headers = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${BASE}${path}`, { method, headers, body: form });
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  return { status: res.status, data };
+}
+
 async function main() {
   console.log(`\nantic functional-test → ${BASE}\n`);
 
@@ -67,6 +81,77 @@ async function main() {
       fail("admin login", `${r.status} ${JSON.stringify(r.data)}`);
       console.log(logs.join("\n"));
       process.exit(1);
+    }
+  }
+
+  // —— AI workspace is admin-only and persists conversations without a provider call ——
+  {
+    const anonymous = await req("/api/ai/providers");
+    anonymous.status === 401
+      ? ok("AI workspace requires authentication")
+      : fail("AI workspace requires authentication", String(anonymous.status));
+
+    const providers = await req("/api/ai/providers", { token });
+    providers.status === 200 && Array.isArray(providers.data?.providers)
+      ? ok("AI provider registry", `${providers.data.providers.length} providers`)
+      : fail("AI provider registry", `${providers.status} ${JSON.stringify(providers.data)}`);
+
+    const created = await req("/api/ai/conversations", {
+      method: "POST",
+      token,
+      body: { title: `AI test ${Date.now()}` },
+    });
+    const conversationId = created.data?.conversation?.id;
+    created.status === 201 && conversationId
+      ? ok("create AI conversation", conversationId)
+      : fail("create AI conversation", `${created.status} ${JSON.stringify(created.data)}`);
+
+    if (conversationId) {
+      const detail = await req(`/api/ai/conversations/${conversationId}`, { token });
+      detail.status === 200 && Array.isArray(detail.data?.messages)
+        ? ok("load empty AI conversation")
+        : fail("load empty AI conversation", String(detail.status));
+
+      const removed = await req(`/api/ai/conversations/${conversationId}`, {
+        method: "DELETE",
+        token,
+      });
+      removed.status === 204
+        ? ok("delete AI conversation")
+        : fail("delete AI conversation", String(removed.status));
+    }
+  }
+
+  // —— private AI file upload/download ——
+  {
+    const form = new FormData();
+    const pixel = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    );
+    form.append("file", new Blob([pixel], { type: "image/png" }), "pixel.png");
+    const uploaded = await reqForm("/api/ai/files", { token, form });
+    const fileId = uploaded.data?.file?.id;
+    uploaded.status === 201 && fileId
+      ? ok("upload private AI file", fileId)
+      : fail("upload private AI file", `${uploaded.status} ${JSON.stringify(uploaded.data)}`);
+
+    if (fileId) {
+      const downloaded = await fetch(`${BASE}/api/ai/files/${fileId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const bytes = Buffer.from(await downloaded.arrayBuffer());
+      downloaded.status === 200 && bytes.length === pixel.length
+        ? ok("download private AI file", `${bytes.length} bytes`)
+        : fail("download private AI file", `${downloaded.status} ${bytes.length}`);
+
+      const removed = await req(`/api/ai/files/${fileId}`, {
+        method: "DELETE",
+        token,
+      });
+      removed.status === 204
+        ? ok("delete private AI file")
+        : fail("delete private AI file", String(removed.status));
     }
   }
 
@@ -224,6 +309,61 @@ async function main() {
     r.status === 200 && Array.isArray(r.data?.categories)
       ? ok("shop catalog categories")
       : fail("shop catalog categories", String(r.status));
+  }
+
+  // —— MCP catalog endpoint tests ——
+  {
+    const r = await req("/api/mcp");
+    r.status === 200 && r.data?.tools && Array.isArray(r.data.tools)
+      ? ok("MCP list tools")
+      : fail("MCP list tools", String(r.status));
+  }
+
+  {
+    const r = await req("/api/mcp/tools/list_categories");
+    r.status === 200 && Array.isArray(r.data?.content)
+      ? ok("MCP list_categories tool")
+      : fail("MCP list_categories tool", String(r.status));
+  }
+
+  {
+    const r = await req("/api/mcp/tools/search_models", {
+      method: "POST",
+      body: { query: "테스트" },
+    });
+    r.status === 200 && r.data?.content
+      ? ok("MCP search_models tool")
+      : fail("MCP search_models tool", String(r.status));
+  }
+
+  {
+    const existingId = categories[0]?.id;
+    if (existingId) {
+      const r = await req("/api/mcp/tools/get_model", {
+        method: "POST",
+        body: { id: existingId },
+      });
+      r.status === 200 && r.data?.content?.id
+        ? ok("MCP get_model tool (found)")
+        : fail("MCP get_model tool (found)", String(r.status));
+    }
+  }
+
+  {
+    const r = await req("/api/mcp/tools/get_model", {
+      method: "POST",
+      body: { id: "nonexistent-model-xyz-12345" },
+    });
+    r.status === 404 && r.data?.content?.found === false
+      ? ok("MCP get_model returns 404 for missing model", `status=${r.status}`)
+      : fail("MCP get_model returns 404 for missing model", `status=${r.status}`);
+  }
+
+  {
+    const r = await req("/api/mcp/tools/list_projects");
+    r.status === 200 && Array.isArray(r.data?.content)
+      ? ok("MCP list_projects tool")
+      : fail("MCP list_projects tool", String(r.status));
   }
 
   // —— anon cannot write ——

@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, FileText, Settings, LogOut, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, FileText, Settings, LogOut, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
 
 const ADMIN_NAV = [
   { label: "داشبورد", href: "/admin", icon: LayoutDashboard },
+  { label: "فضای کاری هوش مصنوعی", href: "/admin/workspace", icon: Sparkles },
   { label: "درخواست‌ها", href: "/admin/requests", icon: FileText },
   { label: "مدل‌ها", href: "/admin/models", icon: Package },
   { label: "پروژه‌ها", href: "/admin/projects", icon: FileText },

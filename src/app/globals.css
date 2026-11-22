@@ -232,4 +232,59 @@
   .eyebrow {
     @apply font-display text-xs font-bold uppercase text-primary;
   }
+
+  .workspace-markdown {
+    @apply text-foreground;
+  }
+
+  .workspace-markdown p {
+    @apply mb-3 last:mb-0;
+  }
+
+  .workspace-markdown ul {
+    @apply mb-3 mr-5 list-disc space-y-1;
+  }
+
+  .workspace-markdown ol {
+    @apply mb-3 mr-5 list-decimal space-y-1;
+  }
+
+  .workspace-markdown h1,
+  .workspace-markdown h2,
+  .workspace-markdown h3 {
+    @apply mb-2 mt-4 font-display font-bold text-foreground first:mt-0;
+  }
+
+  .workspace-markdown a {
+    @apply text-primary underline underline-offset-4;
+  }
+
+  .workspace-markdown code {
+    @apply rounded bg-secondary px-1.5 py-0.5 font-mono text-[12px] text-primary;
+  }
+
+  .workspace-markdown pre {
+    @apply my-3 overflow-x-auto rounded-xl border border-secondary/50 bg-background p-3 text-left;
+  }
+
+  .workspace-markdown pre code {
+    @apply bg-transparent p-0 text-xs text-foreground;
+  }
+
+  .workspace-markdown blockquote {
+    @apply my-3 border-r-2 border-primary/50 pr-3 text-muted-foreground;
+  }
+
+  .workspace-markdown table {
+    @apply my-3 w-full border-collapse overflow-hidden rounded-lg text-xs;
+  }
+
+  .workspace-markdown th,
+  .workspace-markdown td {
+    @apply border border-secondary/50 px-2 py-1.5 text-right;
+  }
+
+  .workspace-markdown th {
+    @apply bg-secondary/50 font-semibold;
+  }
 }

@@ -1,6 +1,11 @@
 import { Router } from "express";
-import { prisma } from "../lib/prisma.js";
 import { sendError } from "../lib/errors.js";
+import {
+  getCurtainModel,
+  listCurtainCategories,
+  listCurtainProjects,
+  searchCurtainModels,
+} from "../services/aiCatalog.js";
 
 /**
  * Minimal MCP-over-HTTP surface for catalog (read-only).
@@ -44,83 +49,32 @@ router.post("/tools/:name", async (req, res) => {
     const args = (req.body || {}) as Record<string, unknown>;
 
     if (name === "list_categories") {
-      const rows = await prisma.curtainCategory.findMany({ orderBy: { order: "asc" } });
-      return res.json({
-        content: rows.map((c) => ({
-          name: c.name,
-          slug: c.slug,
-          description: c.description,
-        })),
-      });
+      return res.json(await listCurtainCategories());
     }
 
     if (name === "search_models") {
-      const limit = Math.min(Number(args.limit) || 20, 50);
-      const q = String(args.query || "").trim();
-      const category = String(args.category_slug || "").trim();
-      const where: Record<string, unknown> = {};
-      if (category) where.categorySlug = category;
-      const rows = await prisma.curtainModel.findMany({
-        where,
-        take: 100,
-        orderBy: { updatedAt: "desc" },
-      });
-      const filtered = q
-        ? rows.filter((m) =>
-            `${m.name} ${m.code} ${m.fabric || ""} ${m.color || ""} ${m.description || ""}`
-              .toLowerCase()
-              .includes(q.toLowerCase())
-          )
-        : rows;
-      return res.json({
-        content: filtered.slice(0, limit).map((m) => ({
-          id: m.id,
-          code: m.code,
-          name: m.name,
-          category_slug: m.categorySlug,
-          color: m.color,
-          fabric: m.fabric,
-          url: `/curtain/${m.id}`,
-        })),
-      });
+      return res.json(
+        await searchCurtainModels({
+          query: String(args.query || ""),
+          category_slug: String(args.category_slug || ""),
+          limit: Number(args.limit) || 20,
+        }),
+      );
     }
 
     if (name === "get_model") {
-      const id = String(args.id || "");
-      const m = await prisma.curtainModel.findUnique({ where: { id } });
-      if (!m) return res.status(404).json({ error: "not found" });
-      return res.json({
-        content: {
-          id: m.id,
-          code: m.code,
-          name: m.name,
-          category_slug: m.categorySlug,
-          color: m.color,
-          fabric: m.fabric,
-          description: m.description,
-          image: m.image,
-          install_image: m.installImage,
-          url: `/curtain/${m.id}`,
-        },
-      });
+      const result = await getCurtainModel({ id: String(args.id || "") });
+      const found = result.content as { found?: boolean; message?: string };
+      if (found?.found === false) {
+        return res.status(404).json(result);
+      }
+      return res.json(result);
     }
 
     if (name === "list_projects") {
-      const limit = Math.min(Number(args.limit) || 20, 50);
-      const rows = await prisma.project.findMany({
-        take: limit,
-        orderBy: { updatedAt: "desc" },
-      });
-      return res.json({
-        content: rows.map((p) => ({
-          id: p.id,
-          title: p.title,
-          category_slug: p.categorySlug,
-          subcategory: p.subcategory,
-          description: p.description,
-          cover_image: p.coverImage,
-        })),
-      });
+      return res.json(
+        await listCurtainProjects({ limit: Number(args.limit) || 20 }),
+      );
     }
 
     res.status(404).json({ error: `Unknown tool: ${name}` });
