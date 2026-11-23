@@ -1,12 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Image as ImageIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Loader2, Upload, X, Image as ImageIcon } from "lucide-react";
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
+import { refreshRenderTemplates } from "@/hooks/useRenderTemplates";
+import { filterInstallCategories } from "@/lib/installCategories";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToast } from "@/lib/adminToast";
 import { OptimizedImage } from "@/components/ui/image";
+
+interface CurtainCategoryItem {
+  id?: string;
+  name: string;
+  slug: string;
+  mechanism?: string;
+}
 
 interface InstallReferenceRow {
   id: string;
@@ -17,158 +26,177 @@ interface InstallReferenceRow {
 }
 
 export function InstallReferenceManager() {
+  const [categories, setCategories] = useState<CurtainCategoryItem[]>([]);
   const [refs, setRefs] = useState<InstallReferenceRow[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [newStyle, setNewStyle] = useState("");
-  const [newNote, setNewNote] = useState("");
   const [error, setError] = useState("");
 
-  const load = useCallback(() => {
+  const installCats = useMemo(
+    () => filterInstallCategories(categories),
+    [categories],
+  );
+
+  const load = useCallback(async () => {
     setLoading(true);
-    api.entities.InstallReference.list("-updated_date", 200)
-      .then((rows) => setRefs((Array.isArray(rows) ? rows : []) as InstallReferenceRow[]))
-      .catch((e) => setError(apiErrorMessage(e)))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  async function addRef(file: File) {
-    if (!newStyle.trim() || !file) {
-      setError("نام سبک و عکس الزامی است");
-      return;
-    }
-    setSaving(true);
     setError("");
     try {
-      const compressed = await compressImage(file);
-      const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
-      const url = res?.file_url || res?.url || res?.path;
-      if (!url) throw new Error("آپلود ناموفق");
-      await api.entities.InstallReference.create({
-        style: newStyle.trim(),
-        image: url,
-        note: newNote || null,
-      });
-      setNewStyle("");
-      setNewNote("");
-      adminToast("create", "نمونه نصب", newStyle);
-      load();
+      const [cats, refs] = await Promise.all([
+        api.entities.CurtainCategory.list("order", 200).catch(() => [] as CurtainCategoryItem[]),
+        api.entities.InstallReference.list("-created_date", 400).catch(() => [] as InstallReferenceRow[]),
+      ]);
+      setCategories((Array.isArray(cats) ? cats : []) as CurtainCategoryItem[]);
+      setRefs((Array.isArray(refs) ? refs : []) as InstallReferenceRow[]);
+    } catch {
+      setError("بارگذاری ناموفق بود");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function upload(slug: string, files: File[]) {
+    if (!files?.length) return;
+    setBusy(slug);
+    setError("");
+    try {
+      for (const file of files) {
+        const compressed = await compressImage(file);
+        const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
+        const url = res?.file_url || res?.url || res?.path;
+        if (!url) throw new Error("آپلود ناموفق");
+        await api.entities.InstallReference.create({
+          style: slug,
+          image: url,
+          note: "real-install",
+        });
+      }
+      refreshRenderTemplates();
+      await load();
+      adminToast("create", "نمونه نصب واقعی", slug);
     } catch (e) {
       setError(apiErrorMessage(e));
     } finally {
-      setSaving(false);
+      setBusy(null);
     }
   }
 
-  async function deleteRef(id: string) {
-    if (!window.confirm("این نمونه نصب حذف شود؟")) return;
+  const remove = async (id: string) => {
     try {
       await api.entities.InstallReference.delete(id);
-      adminToast("delete", "نمونه نصب");
-      load();
-    } catch (e) {
-      setError(apiErrorMessage(e));
+      refreshRenderTemplates();
+      await load();
+      adminToast("delete", "نمونه نصب واقع");
+    } catch {
+      setError("حذف ناموفق");
     }
+  };
+
+  if (loading) {
+    return (
+      <div className="mt-6 flex justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
   }
+
+  const withRef = installCats.filter((c) =>
+    refs.some((r) => String(r.style || "").toLowerCase() === String(c.slug).toLowerCase())
+  ).length;
 
   return (
     <section className="mt-8 rounded-2xl border border-secondary/60 bg-card p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="font-display text-sm font-black text-foreground">نمونه‌های اجرا (نصب)</h2>
-          <p className="font-body text-xs text-muted-foreground">عکس نصب واقعی هر سبک پارچه</p>
+          <h2 className="font-display text-sm font-black text-foreground">نمونه‌های اجرای واقعی (قالب اصلی)</h2>
+          <p className="font-body text-xs text-muted-foreground">
+            برای هر دسته فنی کاتالوگ (شید، رومن، زبرا، …) یک عکس محصول واقعی آپلود کنید.
+            سیستم ناحیه پرده را پیدا می‌کند، chroma می‌سازد و پارچهٔ مدل را روی همان عکس می‌نشاند.
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            دسته‌های فضایی مثل پذیرایی / هتل اینجا نیستند — آن‌ها فقط برای نمونه‌کار پروژه‌اند.
+            پوشش: <strong>{withRef}/{installCats.length}</strong> دسته دارای عکس مرجع.
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={load}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-secondary/70 px-3 py-2 text-[10px] text-muted-foreground hover:bg-secondary/40"
-        >
-          <Loader2 className="h-3 w-3 animate-spin" />
-        </button>
       </div>
 
       {error && <p className="mb-3 text-[10px] text-destructive">{error}</p>}
 
-      <div className="space-y-3 mb-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            value={newStyle}
-            onChange={(e) => setNewStyle(e.target.value)}
-            placeholder="مثلاً pleated-manual"
-            className="w-32 rounded-xl border border-secondary bg-background px-3 py-2 font-body text-xs text-foreground outline-none focus:border-primary"
-          />
-          <input
-            type="text"
-            value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
-            placeholder="یادداشت (اختیاری)"
-            className="w-32 rounded-xl border border-secondary bg-background px-3 py-2 font-body text-xs text-foreground outline-none focus:border-primary"
-          />
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            disabled={saving}
-            onChange={(e) => {
-              const f = e.target.files?.[0] || null;
-              e.target.value = "";
-              if (f) void addRef(f);
-            }}
-          />
-          <label className="cursor-pointer inline-flex items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-3 py-2 font-body text-[10px] font-bold text-primary hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed">
-            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-            {saving ? "آپلود…" : "آپلود مرجع"}
-            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={saving} onChange={(e) => {
-              const f = e.target.files?.[0] || null;
-              e.target.value = "";
-              if (f) void addRef(f);
-            }} />
-          </label>
+      {!installCats.length ? (
+        <p className="rounded-xl border border-dashed border-secondary/70 p-6 text-center text-xs text-muted-foreground">
+          دسته فنی ثبت نشده. از «دسته‌بندی کاتالوگ» دسته با سازوکار نصب (شید، رومن، …) اضافه کنید.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {installCats.map((cat) => {
+            const slug = cat.slug;
+            const mine = refs.filter(
+              (r) => String(r.style || "").toLowerCase() === String(slug).toLowerCase()
+            );
+            return (
+              <div key={cat.id || slug} className="rounded-xl border border-secondary/60 bg-background p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-bold text-foreground">{cat.name}</p>
+                    <p className="font-mono text-[9px] text-muted-foreground" dir="ltr">
+                      {slug}
+                      {cat.mechanism ? ` · ${cat.mechanism}` : ""}
+                    </p>
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-1 rounded-lg border border-primary/50 px-2 py-1 text-[10px] text-primary">
+                    {busy === slug ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Upload className="h-3 w-3" />
+                    )}
+                    {mine.length ? "افزودن عکس" : "آپلود مرجع"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      disabled={busy === slug}
+                      onChange={(e) => {
+                        const list = [...(e.target.files || [])];
+                        e.target.value = "";
+                        if (list.length) void upload(slug, list);
+                      }}
+                    />
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {mine.length ? (
+                    mine.map((r) => (
+                      <div key={r.id} className="relative h-20 w-20 overflow-hidden rounded-lg border border-secondary/50">
+                        {r.image ? (
+                          <OptimizedImage src={r.image} alt={cat.name} fill className="object-cover" sizes="80px" />
+                        ) : (
+                          <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <button
+                          type="button"
+                          aria-label="حذف"
+                          onClick={() => remove(r.id)}
+                          className="absolute left-0.5 top-0.5 rounded-full bg-background/90 p-0.5 shadow"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="flex h-20 items-center text-[10px] text-muted-foreground">
+                      هنوز عکس مرجع نیست — یک عکس نصب واقعی آپلود کنید
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-[10px]">
-          <thead>
-            <tr className="border-b border-secondary/60 bg-background/50">
-              <th className="text-right px-3 py-2 font-body text-xs font-semibold text-muted-foreground">سبک</th>
-              <th className="text-right px-3 py-2 font-body text-xs font-semibold text-muted-foreground">عکس</th>
-              <th className="text-right px-3 py-2 font-body text-xs font-semibold text-muted-foreground">یادداشت</th>
-              <th className="text-right px-3 py-2 font-body text-xs font-semibold text-muted-foreground">عملیات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">بارگذاری…</td></tr>
-            ) : refs.length === 0 ? (
-              <tr><td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">نمونه‌ای ثبت نشده است</td></tr>
-            ) : (
-              refs.map((r) => (
-                <tr key={r.id} className="border-b border-secondary/40">
-                  <td className="px-3 py-2 font-body text-xs text-foreground">{r.style}</td>
-                  <td className="px-3 py-2">
-                    <div className="relative flex h-8 w-12 items-center justify-center overflow-hidden rounded border border-secondary/60 bg-background">
-                      {r.image ? <OptimizedImage src={r.image} alt="" fill className="object-cover" sizes="48px" /> : <ImageIcon className="h-3 w-3 text-muted-foreground" />}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 font-body text-xs text-muted-foreground truncate max-w-[80px]">{r.note || "—"}</td>
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => deleteRef(r.id)}
-                      className="rounded border border-destructive/40 px-2 py-1 text-[9px] text-destructive hover:bg-destructive/10"
-                    >
-                      حذف
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      )}
     </section>
   );
 }

@@ -25,7 +25,7 @@ interface RenderTemplateRow {
 }
 
 export function RenderTemplateManager() {
-  const [categories, setCategories] = useState<Array<{ id?: string; name: string; slug: string; mechanism?: string }>>([]);
+  const [categories, setCategories] = useState<CurtainCategoryItem[]>([]);
   const [templates, setTemplates] = useState<RenderTemplateRow[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");

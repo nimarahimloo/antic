@@ -10,8 +10,7 @@ import { adminToast } from "@/lib/adminToast";
 import { OptimizedImage } from "@/components/ui/image";
 import { RenderTemplateManager } from "@/components/admin/RenderTemplateManager";
 import { InstallReferenceManager } from "@/components/admin/InstallReferenceManager";
-
-const labelCls = "mb-1.5 block font-body text-xs text-muted-foreground";
+import { InstallReviewManager } from "@/components/admin/InstallReviewManager";
 
 interface VirtualWindowSetting {
   id: string;
@@ -128,12 +127,13 @@ export default function AdminWindowPage() {
 
   return (
     <div className="bg-background min-h-screen">
-      <div className="mx-auto max-w-4xl px-5 py-8 lg:px-10 lg:py-12">
-        <div className="flex items-center justify-between mb-6">
+      <div className="mx-auto max-w-6xl px-5 py-8 lg:px-10 lg:py-12">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="font-display text-2xl font-black text-foreground">تنظیمات پنجره</h1>
+            <h1 className="font-display text-2xl font-black text-foreground">قالب نصب و تنظیمات پنجره</h1>
             <p className="mt-1 font-body text-xs text-muted-foreground">
-              رنگ دیواره، فریم و ریل صحنهٔ پنجره + تصویر نمای (view) برای پیش‌نمایش مدل‌ها.
+              تنظیم رنگ دیواره، فریم و ریل صdnهٔ پنجره + تصویر نمای (view) برای پیش‌نمایش مدل‌ها.
+              قالب‌های رنگ سبز chroma و نمونه‌های اجراقعی را مدیریت می‌کند.
             </p>
           </div>
           <button
@@ -153,13 +153,14 @@ export default function AdminWindowPage() {
           </p>
         )}
 
-        <Card className="p-6">
+        {/* Virtual Window Settings */}
+        <Card className="p-6 mb-8">
           <div className="flex items-center gap-3 mb-4">
             <span className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/50 text-primary">
               <Palette className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="font-display text-sm font-black text-foreground">رنگ‌های صحنهٔ پنجره</h2>
+              <h2 className="font-display text-sm font-black text-foreground">رنگ‌های صdnهٔ پنجره</h2>
               <p className="font-body text-xs text-muted-foreground">ثبت رنگ پیش‌فرض برای رندر مدل‌های پرده</p>
             </div>
           </div>
@@ -171,7 +172,7 @@ export default function AdminWindowPage() {
               { key: "railColor" as keyof VirtualWindowSetting, label: "رنگ ریل", value: setting.railColor || "#C9A227" },
             ].map((field) => (
               <div key={field.key} className="rounded-xl border border-secondary/60 bg-background p-4">
-                <label className={labelCls}>{field.label}</label>
+                <label className="mb-1.5 block font-body text-xs text-muted-foreground">{field.label}</label>
                 <div className="mt-2 relative">
                   <input
                     type="color"
@@ -189,7 +190,8 @@ export default function AdminWindowPage() {
           </div>
         </Card>
 
-        <Card className="mt-6 p-6">
+        {/* View Image */}
+        <Card className="p-6 mb-8">
           <div className="flex items-center gap-3 mb-4">
             <span className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/50 text-primary">
               <ImageIcon className="h-5 w-5" />
@@ -241,8 +243,15 @@ export default function AdminWindowPage() {
             </div>
           </div>
         </Card>
+
+        {/* Chroma Templates */}
         <RenderTemplateManager />
+
+        {/* Install References */}
         <InstallReferenceManager />
+
+        {/* Install Review */}
+        <InstallReviewManager />
       </div>
     </div>
   );
