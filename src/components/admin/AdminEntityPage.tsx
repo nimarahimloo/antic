@@ -450,7 +450,7 @@ export default function AdminEntityPage({
                     </label>
                   ) : f.type === "image" ? (
                     <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
+                      <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
                         {form[f.key] ? (
                           <OptimizedImage src={String(form[f.key])} alt="" fill className="object-cover" sizes="80px" />
                         ) : (

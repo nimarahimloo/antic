@@ -145,7 +145,7 @@ export default function AdminPageHeroes({
                   <div className="sm:col-span-2">
                     <label className={labelCls}>تصویر پس‌زمینه</label>
                     <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex h-16 w-28 items-center justify-center overflow-hidden rounded-lg border border-secondary/60 bg-background">
+                      <div className="relative flex h-16 w-28 items-center justify-center overflow-hidden rounded-lg border border-secondary/60 bg-background">
                         {h.image ? (
                           <OptimizedImage src={h.image} alt="" fill className="object-cover" sizes="112px" />
                         ) : (
