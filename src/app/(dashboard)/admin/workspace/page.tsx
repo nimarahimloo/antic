@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Bot,
   Check,
+  CircleCheck,
   Download,
   FileImage,
   ImagePlus,
@@ -338,8 +339,6 @@ export default function AIWorkspacePage() {
   });
 
   const [providers, setProviders] = useState<AIWorkspaceProvider[]>([]);
-  const [providerId, setProviderId] = useState<AIWorkspaceProvider["id"]>("cloudflare");
-  const [modelId, setModelId] = useState("");
   const [conversations, setConversations] = useState<AIWorkspaceConversation[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [usage, setUsage] = useState<AIWorkspaceUsage | null>(null);
@@ -350,7 +349,6 @@ export default function AIWorkspacePage() {
   const [sendingFiles, setSendingFiles] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [imagePrompt, setImagePrompt] = useState("");
-  const [imageModel, setImageModel] = useState("");
   const [imageWidth, setImageWidth] = useState(1024);
   const [imageHeight, setImageHeight] = useState(1024);
   const [imageReferences, setImageReferences] = useState<AIWorkspaceFile[]>([]);
@@ -363,14 +361,6 @@ export default function AIWorkspacePage() {
 
   const configuredProviders = useMemo(
     () => providers.filter((provider) => provider.configured),
-    [providers],
-  );
-  const selectedProvider = useMemo(
-    () => providers.find((provider) => provider.id === providerId) || null,
-    [providerId, providers],
-  );
-  const imageProvider = useMemo(
-    () => providers.find((provider) => provider.id === "cloudflare"),
     [providers],
   );
   const isStreaming = status === "submitted" || status === "streaming";
@@ -402,15 +392,10 @@ export default function AIWorkspacePage() {
         const firstConfigured = providerResult.providers.find(
           (provider) => provider.configured,
         );
-        const initialProvider = firstConfigured || providerResult.providers[0];
-        if (initialProvider) {
-          setProviderId(initialProvider.id);
-          setModelId(initialProvider.models[0]?.id || "");
-          setImageModel(
-            providerResult.providers.find((provider) => provider.id === "cloudflare")
-              ?.imageModels[0]?.id || "",
-          );
+        if (!firstConfigured) {
+          // No configured provider — error will be shown by the "no providers" banner.
         }
+        // Image model is selected automatically by the backend fallback chain.
       })
       .catch((err) => {
         if (active) setWorkspaceError(errorMessage(err));
@@ -429,10 +414,8 @@ export default function AIWorkspacePage() {
 
   async function ensureConversation() {
     if (conversationId) return conversationId;
-    const result = await api.ai.createConversation({
-      provider: providerId,
-      model: modelId || selectedProvider?.models[0]?.id,
-    });
+    // Automatic routing: backend selects the best available free provider.
+    const result = await api.ai.createConversation({});
     setConversationId(result.conversation.id);
     setConversations((current) => [result.conversation, ...current]);
     return result.conversation.id;
@@ -445,8 +428,6 @@ export default function AIWorkspacePage() {
     try {
       const result = await api.ai.conversation(id);
       setConversationId(result.conversation.id);
-      setProviderId(result.conversation.provider);
-      setModelId(result.conversation.model);
       setMessages(result.messages as UIMessage[]);
       await refreshImages(result.conversation.id);
     } catch (err) {
@@ -470,31 +451,6 @@ export default function AIWorkspacePage() {
       }
     } catch (err) {
       setWorkspaceError(errorMessage(err));
-    }
-  }
-
-  function changeProvider(nextProviderId: AIWorkspaceProvider["id"]) {
-    const next = providers.find((provider) => provider.id === nextProviderId);
-    setProviderId(nextProviderId);
-    setModelId(next?.models[0]?.id || "");
-    clearError();
-    if (conversationId) {
-      void api.ai
-        .updateConversation(conversationId, {
-          provider: nextProviderId,
-          model: next?.models[0]?.id,
-        })
-        .catch((err) => setWorkspaceError(errorMessage(err)));
-    }
-  }
-
-  function changeModel(nextModelId: string) {
-    setModelId(nextModelId);
-    clearError();
-    if (conversationId) {
-      void api.ai
-        .updateConversation(conversationId, { model: nextModelId })
-        .catch((err) => setWorkspaceError(errorMessage(err)));
     }
   }
 
@@ -525,8 +481,8 @@ export default function AIWorkspacePage() {
     event.preventDefault();
     const text = input.trim();
     if ((!text && !attachments.length) || isStreaming) return;
-    if (!selectedProvider?.configured) {
-      setWorkspaceError(selectedProvider?.configurationMessage || "ارائه‌دهنده متصل نیست.");
+    if (!configuredProviders.length) {
+      setWorkspaceError("هیچ ارائه‌دهندهٔ Free پیکربندی نشده است.");
       return;
     }
 
@@ -567,8 +523,6 @@ export default function AIWorkspacePage() {
         {
           body: {
             conversationId: id,
-            provider: providerId,
-            model: modelId,
           },
         },
       );
@@ -603,18 +557,18 @@ export default function AIWorkspacePage() {
   async function generateImage() {
     const prompt = imagePrompt.trim();
     if (!prompt || generatingImage) return;
-    if (!imageProvider?.configured) {
-      setImageError(imageProvider?.configurationMessage || "Cloudflare متصل نیست.");
+    if (!configuredProviders.length) {
+      setImageError("هیچ ارائه‌دهندهٔ Free پیکربندی نشده است.");
       return;
     }
     setGeneratingImage(true);
     setImageError(null);
     try {
       const id = await ensureConversation();
+      // Automatic image fallback chain — backend selects the best available model.
       const result = await api.ai.generateImage({
         conversationId: id,
         prompt,
-        model: imageModel || imageProvider.imageModels[0]?.id,
         referenceFileIds: imageReferences.map((file) => file.id),
         width: imageWidth,
         height: imageHeight,
@@ -759,42 +713,18 @@ export default function AIWorkspacePage() {
         <section className="order-1 flex min-h-[720px] min-w-0 flex-col overflow-hidden rounded-2xl border border-secondary/50 bg-card xl:order-2">
           <div className="flex flex-col gap-3 border-b border-secondary/50 p-4 sm:flex-row sm:items-center">
             <div className="flex min-w-0 flex-1 gap-2">
-              <select
-                value={providerId}
-                onChange={(event) =>
-                  changeProvider(event.target.value as AIWorkspaceProvider["id"])
-                }
-                className="h-10 min-w-0 flex-1 rounded-xl border border-secondary/60 bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
-                aria-label="ارائه‌دهندهٔ هوش مصنوعی"
-              >
-                {providers.map((provider) => (
-                  <option key={provider.id} value={provider.id} disabled={!provider.configured}>
-                    {provider.label}
-                    {provider.configured ? "" : " — پیکربندی نشده"}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={modelId}
-                onChange={(event) => changeModel(event.target.value)}
-                className="h-10 min-w-0 flex-1 rounded-xl border border-secondary/60 bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
-                aria-label="مدل هوش مصنوعی"
-              >
-                {(selectedProvider?.models || []).map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span
-                className={cn(
-                  "h-2 w-2 rounded-full",
-                  selectedProvider?.configured ? "bg-emerald-500" : "bg-amber-500",
-                )}
-              />
-              {selectedProvider?.configured ? "متصل" : "آمادهٔ پیکربندی"}
+              {/* Automatic routing indicator — backend selects the best free provider. */}
+              {configuredProviders.length > 0 ? (
+                <span className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-700">
+                  <CircleCheck className="h-3 w-3 fill-current" />
+                  <span>روتینگ خودکار — بهترین ارائه‌دهنده رایگان انتخاب می‌شود</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700">
+                  <AlertCircle className="h-3 w-3 fill-current" />
+                  <span>هیچ ارائه‌دهنده-free پیکربندی نشده است</span>
+                </span>
+              )}
             </div>
           </div>
 
@@ -904,7 +834,7 @@ export default function AIWorkspacePage() {
               ) : (
                 <Button
                   type="submit"
-                  disabled={(!input.trim() && !attachments.length) || sendingFiles || !selectedProvider?.configured}
+                  disabled={(!input.trim() && !attachments.length) || sendingFiles || !configuredProviders.length}
                 >
                   {sendingFiles ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -947,21 +877,7 @@ export default function AIWorkspacePage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs text-muted-foreground">
-                مدل
-                <select
-                  value={imageModel}
-                  onChange={(event) => setImageModel(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-xl border border-secondary/60 bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
-                >
-                  {(imageProvider?.imageModels || []).map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <div className="flex items-center gap-2">
               <label className="text-xs text-muted-foreground">
                 اندازه
                 <select
@@ -1046,7 +962,9 @@ export default function AIWorkspacePage() {
               className="w-full"
               onClick={() => void generateImage()}
               disabled={
-                generatingImage || !imagePrompt.trim() || !imageProvider?.configured || !imageModel
+                generatingImage ||
+                !imagePrompt.trim() ||
+                !configuredProviders.length
               }
             >
               {generatingImage ? (

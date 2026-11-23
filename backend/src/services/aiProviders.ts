@@ -3,7 +3,7 @@ import { createGoogle } from "@ai-sdk/google";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { HttpError } from "../lib/errors.js";
 
-export type AIProviderId = "cloudflare" | "google" | "openrouter";
+export type AIProviderId = "cloudflare" | "google" | "nvidia" | "openrouter";
 
 export type AIModelInfo = {
   id: string;
@@ -102,6 +102,33 @@ const OPENROUTER_MODELS: AIModelInfo[] = [
   },
 ];
 
+// NVIDIA NIM — hosted, OpenAI-compatible inference on DGX Cloud.
+// All models are free to prototype with (no credit card). Free tier is
+// credit-metered (~1,000 initial credits, ~40 RPM). Source: build.nvidia.com.
+// Tool-capable models are prioritized for the AI Workspace chat route.
+const NVIDIA_MODELS: AIModelInfo[] = [
+  {
+    id: "nvidia/nemotron-3-super-120b-a12b",
+    label: "Nemotron 3.5 Super 120B (NVIDIA Free)",
+    supportsTools: true,
+  },
+  {
+    id: "nvidia/nemotron-3.5-lightning-30b-a3b",
+    label: "Nemotron 3.5 Lightning 30B (NVIDIA Free)",
+    supportsTools: true,
+  },
+  {
+    id: "mistralai/mistral-nemotron",
+    label: "Mistral-Nemotron (NVIDIA Free)",
+    supportsTools: true,
+  },
+  {
+    id: "meta/llama-3.1-8b-instruct",
+    label: "Llama 3.1 8B Instruct (NVIDIA Free)",
+    supportsTools: false,
+  },
+];
+
 const CLOUDFLARE_IMAGE_MODELS: AIImageModelInfo[] = [
   {
     id: "@cf/black-forest-labs/flux-2-klein-4b",
@@ -143,6 +170,10 @@ function openRouterApiKey() {
   return process.env.OPENROUTER_API_KEY?.trim();
 }
 
+function nvidiaApiKey() {
+  return process.env.NVIDIA_API_KEY?.trim();
+}
+
 export function isCloudflareConfigured() {
   const { accountId, apiToken } = cloudflareCredentials();
   return enabled("AI_ENABLE_CLOUDFLARE", true) && Boolean(accountId && apiToken);
@@ -150,6 +181,10 @@ export function isCloudflareConfigured() {
 
 export function isGoogleConfigured() {
   return enabled("AI_ENABLE_GOOGLE") && Boolean(googleApiKey());
+}
+
+export function isNVIDIAConfigured() {
+  return enabled("AI_ENABLE_NVIDIA", true) && Boolean(nvidiaApiKey());
 }
 
 export function isOpenRouterConfigured() {
@@ -160,6 +195,7 @@ export function listAIProviders(): AIProviderInfo[] {
   const { accountId, apiToken } = cloudflareCredentials();
   const cloudflareReady = isCloudflareConfigured();
   const googleReady = isGoogleConfigured();
+  const nvidiaReady = isNVIDIAConfigured();
   const openRouterReady = isOpenRouterConfigured();
 
   return [
@@ -185,6 +221,18 @@ export function listAIProviders(): AIProviderInfo[] {
           ? "GOOGLE_GENERATIVE_AI_API_KEY تنظیم نشده است."
           : "برای فعال‌سازی AI_ENABLE_GOOGLE=true را تنظیم کنید.",
       models: GOOGLE_MODELS,
+      imageModels: [],
+    },
+    {
+      id: "nvidia",
+      label: "NVIDIA NIM (Free)",
+      configured: nvidiaReady,
+      configurationMessage: nvidiaReady
+        ? "متصل — سهمیهٔ رایگان NVIDIA NIM فعال است (بدون کارت بانکی)."
+        : !nvidiaApiKey()
+          ? "NVIDIA_API_KEY تنظیم نشده است. کلید را از build.nvidia.com/settings دریافت کنید."
+          : "NVIDIA با AI_ENABLE_NVIDIA=false غیرفعال شده است.",
+      models: NVIDIA_MODELS,
       imageModels: [],
     },
     {
@@ -259,6 +307,18 @@ export function getChatModel(providerId: AIProviderId, modelId: string): Languag
     return provider(modelId);
   }
 
+  if (providerId === "nvidia") {
+    const apiKey = nvidiaApiKey();
+    if (!apiKey) throw new HttpError(503, "کلید NVIDIA API تنظیم نشده است.");
+    const provider = createOpenAICompatible({
+      name: "nvidia-nim",
+      baseURL: "https://integrate.api.nvidia.com/v1",
+      apiKey,
+      includeUsage: true,
+    });
+    return provider(modelId);
+  }
+
   const apiKey = openRouterApiKey();
   if (!apiKey) throw new HttpError(503, "کلید OpenRouter تنظیم نشده است.");
   const provider = createOpenAICompatible({
@@ -278,9 +338,12 @@ export function getChatModel(providerId: AIProviderId, modelId: string): Languag
 
 export function getDefaultChatModel(providerId: AIProviderId = "cloudflare") {
   const provider = providerInfo(providerId);
-  // برای گفتگوهای با ابزار (tool-calling) از gpt-oss-120b استفاده کن
-  // GLM-4.7-Flash فقط متن است و ابزار پشتیبانی نمی‌کند
-  return provider.models.find((m) => m.id.includes("gpt-oss-120b"))?.id ?? provider.models[0]?.id ?? "";
+  // tool-calling först: مدل با پشتیبانی از ابزار را انتخاب می‌کنیم
+  return (
+    provider.models.find((m) => m.supportsTools)?.id ??
+    provider.models[0]?.id ??
+    ""
+  );
 }
 
 export function getDefaultImageModel() {
