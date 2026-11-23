@@ -6,12 +6,20 @@ function envInt(name: string, fallback: number) {
   return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
 }
 
+/**
+ * Daily limits for the AI Workspace. All limits are conservative local guards
+ * so that no provider can ever generate unexpected charges. Every provider is
+ * free-only; limits are enforced per-provider and globally.
+ */
 export function getAILimits() {
   return {
     dailyChatRequests: envInt("AI_DAILY_CHAT_REQUESTS", 50),
-    dailyImageRequests: envInt("AI_DAILY_IMAGE_REQUESTS", 10),
+    /** Max generated images per day (requirement: up to 50). */
+    dailyImageCount: envInt("AI_DAILY_IMAGE_COUNT", 50),
     dailyTotalTokens: envInt("AI_DAILY_TOTAL_TOKENS", 200_000),
+    /** Per-provider daily unit (neuron/credit) guards. */
     dailyCloudflareQuotaUnits: envInt("AI_CLOUDFLARE_DAILY_QUOTA_UNITS", 9_000),
+    dailyNVIDIACredits: envInt("AI_NVIDIA_DAILY_CREDITS", 1_000),
   };
 }
 
@@ -21,18 +29,21 @@ export function utcDayStart(date = new Date()) {
   );
 }
 
-export async function reserveAIUsage(input: {
+export type ReserveAIUsageInput = {
   userId: string;
   provider: string;
   model: string;
   operation: "chat" | "image";
   estimatedUnits?: number;
-}) {
+};
+
+export async function reserveAIUsage(input: ReserveAIUsageInput) {
   const limits = getAILimits();
   const start = utcDayStart();
   const estimatedUnits = Math.max(0, Math.floor(input.estimatedUnits || 0));
 
   return prisma.$transaction(async (tx) => {
+    // Global daily request count for this operation type.
     const operationAggregate = await tx.aIUsage.aggregate({
       where: {
         userId: input.userId,
@@ -41,29 +52,26 @@ export async function reserveAIUsage(input: {
       },
       _count: { _all: true },
     });
-    const tokenAggregate = await tx.aIUsage.aggregate({
-      where: { userId: input.userId, createdAt: { gte: start } },
-      _sum: { totalTokens: true },
-    });
-    const providerAggregate = await tx.aIUsage.aggregate({
-      where: { provider: "cloudflare", createdAt: { gte: start } },
-      _sum: { units: true },
-    });
 
     const requestLimit =
       input.operation === "chat"
         ? limits.dailyChatRequests
-        : limits.dailyImageRequests;
+        : limits.dailyImageCount;
     if (operationAggregate._count._all >= requestLimit) {
       throw new HttpError(
         429,
         input.operation === "chat"
           ? "سقف درخواست‌های گفتگوی امروز تکمیل شده است."
-          : "سقف درخواست‌های تصویر امروز تکمیل شده است.",
+          : "سقف تولید تصاویر روزانه تکمیل شده است.",
         { limit: requestLimit, window: "utc-day" },
       );
     }
 
+    // Global daily token cap.
+    const tokenAggregate = await tx.aIUsage.aggregate({
+      where: { userId: input.userId, createdAt: { gte: start } },
+      _sum: { totalTokens: true },
+    });
     const usedTokens = tokenAggregate._sum.totalTokens || 0;
     if (usedTokens >= limits.dailyTotalTokens) {
       throw new HttpError(
@@ -73,17 +81,36 @@ export async function reserveAIUsage(input: {
       );
     }
 
-    const usedQuotaUnits = providerAggregate._sum.units || 0;
+    // Per-provider daily unit guard (quota-aware: skip provider at its limit).
+    const providerAggregate = await tx.aIUsage.aggregate({
+      where: {
+        provider: input.provider,
+        createdAt: { gte: start },
+      },
+      _sum: { units: true },
+    });
+    const usedUnits = providerAggregate._sum.units || 0;
+    const providerLimit =
+      input.provider === "cloudflare"
+        ? limits.dailyCloudflareQuotaUnits
+        : input.provider === "nvidia"
+          ? limits.dailyNVIDIACredits
+          : Infinity;
     if (
-      input.provider === "cloudflare" &&
-      usedQuotaUnits + estimatedUnits > limits.dailyCloudflareQuotaUnits
+      providerLimit !== Infinity &&
+      usedUnits + estimatedUnits > providerLimit
     ) {
       throw new HttpError(
         429,
-        "بودجهٔ محافظه‌کارانهٔ روزانهٔ Cloudflare تکمیل شده است.",
+        input.provider === "cloudflare"
+          ? "بودجهٔ محافظه‌کارانهٔ روزانهٔ Cloudflare تکمیل شده است."
+          : input.provider === "nvidia"
+            ? "سقف اعتبار روزانهٔ NVIDIA NIM تکمیل شده است."
+            : "سقف اعتبار روزانهٔ ارائه‌دهنده تکمیل شده است.",
         {
-          limit: limits.dailyCloudflareQuotaUnits,
-          used: usedQuotaUnits,
+          provider: input.provider,
+          limit: providerLimit,
+          used: usedUnits,
           reserved: estimatedUnits,
           window: "utc-day",
         },
@@ -143,9 +170,10 @@ export async function getAIUsageSummary(userId: string) {
     (row) => row.operation === "image" && row.status !== "error",
   ).length;
   const totalTokens = rows.reduce((sum, row) => sum + row.totalTokens, 0);
-  const providerUnits = rows
-    .filter((row) => row.provider === "cloudflare")
-    .reduce((sum, row) => sum + row.units, 0);
+  const providerUnits: Record<string, number> = {};
+  for (const row of rows) {
+    providerUnits[row.provider] = (providerUnits[row.provider] || 0) + (row.units || 0);
+  }
 
   return {
     window: {
@@ -155,15 +183,16 @@ export async function getAIUsageSummary(userId: string) {
     },
     limits: {
       chatRequests: limits.dailyChatRequests,
-      imageRequests: limits.dailyImageRequests,
+      imageCount: limits.dailyImageCount,
       totalTokens: limits.dailyTotalTokens,
       cloudflareQuotaUnits: limits.dailyCloudflareQuotaUnits,
+      nvidiaCredits: limits.dailyNVIDIACredits,
     },
     used: {
       chatRequests,
       imageRequests,
       totalTokens,
-      cloudflareQuotaUnits: providerUnits,
+      providerUnits,
     },
     recent: rows.map((row) => ({
       id: row.id,
@@ -179,4 +208,34 @@ export async function getAIUsageSummary(userId: string) {
       createdAt: row.createdAt.toISOString(),
     })),
   };
+}
+
+/**
+ * Per-provider usage for the current UTC day — used by the routing layer to
+ * skip providers that have exhausted their free-tier quota.
+ */
+export async function getProviderUsageToday() {
+  const start = utcDayStart();
+  const rows = await prisma.aIUsage.groupBy({
+    by: ["provider"],
+    where: { createdAt: { gte: start } },
+    _sum: { units: true },
+    _count: { _all: true },
+  });
+  const limits = getAILimits();
+  const providerLimit = (provider: string) =>
+    provider === "cloudflare"
+      ? limits.dailyCloudflareQuotaUnits
+      : provider === "nvidia"
+        ? limits.dailyNVIDIACredits
+        : Infinity;
+  return rows.map((row) => ({
+    provider: row.provider,
+    units: row._sum.units || 0,
+    requests: row._count._all,
+    limit: providerLimit(row.provider),
+    exceeded:
+      providerLimit(row.provider) !== Infinity &&
+      (row._sum.units || 0) >= providerLimit(row.provider),
+  }));
 }

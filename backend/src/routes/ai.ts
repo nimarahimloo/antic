@@ -22,7 +22,6 @@ import {
   getAIModelInfo,
   getChatModel,
   getDefaultChatModel,
-  getDefaultImageModel,
   listAIProviders,
   type AIProviderId,
 } from "../services/aiProviders.js";
@@ -39,9 +38,18 @@ import {
 import {
   completeAIUsage,
   getAIUsageSummary,
+  getProviderUsageToday,
   reserveAIUsage,
 } from "../services/aiUsage.js";
 import { generateWorkspaceImage } from "../services/aiImages.js";
+import {
+  classifyProviderError,
+  getBreakerStatus,
+  recordProviderFailure,
+  recordProviderSuccess,
+  selectChatRoute,
+  selectImageRoute,
+} from "../services/aiRouting.js";
 
 const router = Router();
 const upload = multer({
@@ -150,18 +158,25 @@ router.post("/conversations", async (req: AuthedRequest, res) => {
     const body = z
       .object({
         title: z.string().trim().min(1).max(120).optional(),
-        provider: z.enum(["cloudflare", "google", "openrouter"]).optional(),
-        model: z.string().trim().min(1).max(200).optional(),
       })
       .parse(req.body || {});
-    const provider = body.provider || "cloudflare";
-    const model = body.model || getDefaultChatModel(provider);
+
+    // Automatic routing: backend selects the best available free provider.
+    // No manual provider/model selection is required from the client.
+    const route = selectChatRoute();
+    if (!route.primary) {
+      throw new HttpError(
+        503,
+        "هیچ ارائه‌دهندهٔ هوش مصنوعی رایگان در حال حاضر در دسترس نیست.",
+      );
+    }
+
     const conversation = await prisma.aIConversation.create({
       data: {
         userId: ownerId,
         title: body.title || "گفتگوی جدید",
-        provider,
-        model,
+        provider: route.primary.providerId,
+        model: route.primary.modelId,
       },
     });
     res.status(201).json({
@@ -174,6 +189,12 @@ router.post("/conversations", async (req: AuthedRequest, res) => {
         updatedAt: conversation.updatedAt.toISOString(),
         messageCount: 0,
         fileCount: 0,
+        routing: {
+          candidates: route.candidates.map((c) => ({
+            provider: c.providerId,
+            model: c.modelId,
+          })),
+        },
       },
     });
   } catch (error) {
@@ -228,8 +249,6 @@ router.patch("/conversations/:id", async (req: AuthedRequest, res) => {
     const body = z
       .object({
         title: z.string().trim().min(1).max(120).optional(),
-        provider: z.enum(["cloudflare", "google", "openrouter"]).optional(),
-        model: z.string().trim().min(1).max(200).optional(),
       })
       .parse(req.body || {});
     const conversation = await prisma.aIConversation.update({
@@ -360,7 +379,6 @@ router.post("/images/generate", async (req: AuthedRequest, res) => {
       .object({
         conversationId: z.string().trim().min(1).optional(),
         prompt: z.string().trim().min(1).max(4_000),
-        model: z.string().trim().min(1).max(200).optional(),
         referenceFileIds: z.array(z.string().trim().min(1)).max(4).default([]),
         width: z.number().int().min(256).max(1_920).optional(),
         height: z.number().int().min(256).max(1_920).optional(),
@@ -371,11 +389,21 @@ router.post("/images/generate", async (req: AuthedRequest, res) => {
       .parse(req.body || {});
     const conversationId = body.conversationId || null;
     if (conversationId) await ownedConversation(conversationId, ownerId);
+
+    // Image generation fallback chain: try candidates in order until one succeeds.
+    const route = selectImageRoute();
+    if (!route.primary) {
+      throw new HttpError(
+        503,
+        "هیچ مدل تولید تصویر رایگان در حال حاضر در دسترس نیست.",
+      );
+    }
+
     const result = await generateWorkspaceImage({
       userId: ownerId,
       conversationId,
       prompt: body.prompt,
-      modelId: body.model || getDefaultImageModel(),
+      modelCandidates: route.candidates.map((c) => c.modelId),
       referenceFileIds: body.referenceFileIds,
       width: body.width || 1024,
       height: body.height || 1024,
@@ -386,7 +414,15 @@ router.post("/images/generate", async (req: AuthedRequest, res) => {
         String(req.headers["idempotency-key"] || "").trim() ||
         null,
     });
-    res.status(result.reused ? 200 : 201).json(result);
+    res.status(result.reused ? 200 : 201).json({
+      ...result,
+      routing: {
+        candidates: route.candidates.map((c) => ({
+          provider: c.providerId,
+          model: c.modelId,
+        })),
+      },
+    });
   } catch (error) {
     sendError(
       res,
@@ -396,13 +432,13 @@ router.post("/images/generate", async (req: AuthedRequest, res) => {
 });
 
 router.post("/chat", async (req: AuthedRequest, res) => {
-  let usageId: string | null = null;
   try {
     const ownerId = userId(req);
     const body = z
       .object({
         conversationId: z.string().trim().min(1),
-        provider: z.enum(["cloudflare", "google", "openrouter"]).optional(),
+        // provider/model are optional overrides; default is automatic routing.
+        provider: z.enum(["cloudflare", "google", "nvidia", "openrouter"]).optional(),
         model: z.string().trim().min(1).max(200).optional(),
         messages: z.array(z.unknown()).min(1),
         trigger: z.string().optional(),
@@ -412,9 +448,6 @@ router.post("/chat", async (req: AuthedRequest, res) => {
       .parse(req.body || {});
 
     const conversation = await ownedConversation(body.conversationId, ownerId);
-    const providerId = (body.provider || conversation.provider) as AIProviderId;
-    const modelId = body.model || conversation.model || getDefaultChatModel(providerId);
-    const modelInfo = getAIModelInfo(providerId, modelId);
     const toolDefinitions = createAITools();
     const validatedIncoming = await validateUIMessages({
       messages: body.messages,
@@ -479,159 +512,226 @@ router.post("/chat", async (req: AuthedRequest, res) => {
       ignoreIncompleteToolCalls: true,
     });
 
-    const activeTools: ToolSet = modelInfo.supportsTools
-      ? toolDefinitions
-      : {};
     const outputLimit = maxOutputTokens();
     const estimatedInputTokens = Math.ceil(
       JSON.stringify(modelMessages).length / 4,
     );
-    const estimatedQuotaUnits = estimateChatNeurons(
-      providerId,
-      modelId,
-      estimatedInputTokens,
-      outputLimit,
-    );
-    const usage = await reserveAIUsage({
-      userId: ownerId,
-      provider: providerId,
-      model: modelId,
-      operation: "chat",
-      estimatedUnits: estimatedQuotaUnits,
-    });
-    usageId = usage.id;
 
-    await prisma.aIConversation.update({
-      where: { id: conversation.id },
-      data: {
-        provider: providerId,
-        model: modelId,
-        ...(newUsers[0] && conversation.title === "گفتگوی جدید"
-          ? { title: titleFromMessage(newUsers[0]) }
-          : {}),
-      },
-    });
+    // ─── Automatic routing with failover ───
+    // If the caller explicitly chose a provider/model, use only that candidate.
+    // Otherwise, route across all healthy, configured free providers.
+    let candidates;
+    if (body.provider && body.model) {
+      const modelInfo = getAIModelInfo(body.provider, body.model);
+      candidates = [{ providerId: body.provider, modelId: body.model, model: modelInfo }];
+    } else {
+      const route = selectChatRoute();
+      if (!route.primary) {
+        throw new HttpError(
+          503,
+          "هیچ ارائه‌دهندهٔ هوش مصنوعی رایگان در حال حاضر در دسترس نیست.",
+        );
+      }
+      candidates = route.candidates;
+    }
 
-    const result = streamText({
-      model: getChatModel(providerId, modelId),
-      instructions: AI_SYSTEM_PROMPT,
-      messages: modelMessages,
-      tools: activeTools,
-      stopWhen: isStepCount(6),
-      maxOutputTokens: outputLimit,
-      temperature: 0.35,
-    });
+    let lastError: unknown = null;
+    let usedProviderId: AIProviderId | null = null;
+    let usedModelId = "";
 
-    res.set({
-      "Cache-Control": "no-cache, no-transform",
-      "X-Accel-Buffering": "no",
-      "X-AI-Conversation-Id": conversation.id,
-    });
+    for (const candidate of candidates) {
+      const { providerId, modelId, model } = candidate;
+      const activeTools: ToolSet = model.supportsTools
+        ? toolDefinitions
+        : {};
+      const estimatedQuotaUnits = estimateChatNeurons(
+        providerId,
+        modelId,
+        estimatedInputTokens,
+        outputLimit,
+      );
 
-    const uiStream = toUIMessageStream({
-      stream: result.stream,
-      tools: activeTools,
-      originalMessages: hydrated,
-      generateMessageId: createIdGenerator({ prefix: "msg", size: 18 }),
-      onError: (error) => {
-        // Log only safe fields - never expose prompts, attachments, or request bodies
-        if (error && typeof error === 'object') {
-          const err = error as Record<string, unknown>;
-          console.error("AI workspace stream error", {
-            name: err.name,
-            code: err.code,
-            status: err.status,
-            message: err.message,
-            requestId: err.requestId,
-          });
-        }
-        return "خطا در ارتباط با سرویس هوش مصنوعی. لطفاً دوباره تلاش کنید.";
-      },
-      onEnd: async ({ responseMessage, outcome, isAborted }) => {
-        try {
-          const usageData = await result.usage;
-          const inputTokens = usageData.inputTokens || 0;
-          const outputTokens = usageData.outputTokens || 0;
-          const totalTokens = usageData.totalTokens || 0;
-          const quotaUnits = estimateChatNeurons(
-            providerId,
-            modelId,
-            inputTokens,
-            outputTokens,
-          );
+      // Reserve quota for this candidate. 429 → try next candidate.
+      let usage;
+      try {
+        usage = await reserveAIUsage({
+          userId: ownerId,
+          provider: providerId,
+          model: modelId,
+          operation: "chat",
+          estimatedUnits: estimatedQuotaUnits,
+        });
+      } catch (error) {
+        recordProviderFailure(providerId, modelId);
+        lastError = error;
+        continue;
+      }
 
-          if (responseMessage?.parts?.length) {
-            await prisma.aIChatMessage.upsert({
-              where: { id: responseMessage.id },
-              create: {
-                id: responseMessage.id,
-                conversationId: conversation.id,
-                role: "assistant",
-                partsJson: JSON.stringify(responseMessage.parts),
-                provider: providerId,
-                model: modelId,
-                inputTokens,
-                outputTokens,
-                totalTokens,
-              },
-              update: {
-                partsJson: JSON.stringify(responseMessage.parts),
-                provider: providerId,
-                model: modelId,
-                inputTokens,
-                outputTokens,
-                totalTokens,
-              },
-            });
-          }
+      await prisma.aIConversation.update({
+        where: { id: conversation.id },
+        data: {
+          provider: providerId,
+          model: modelId,
+          ...(newUsers[0] && conversation.title === "گفتگوی جدید"
+            ? { title: titleFromMessage(newUsers[0]) }
+            : {}),
+        },
+      });
 
-          await completeAIUsage(usage.id, {
-            status:
-              outcome.status === "completed"
-                ? "success"
-                : outcome.status === "aborted" || isAborted
-                  ? "aborted"
-                  : "error",
-            inputTokens,
-            outputTokens,
-            totalTokens,
-            units: quotaUnits,
-            errorCode: outcome.status === "failed" ? "stream_failed" : undefined,
-          });
-          await prisma.aIConversation.update({
-            where: { id: conversation.id },
-            data: { updatedAt: new Date() },
-          });
-        } catch (error) {
-          // Log only safe fields - never expose prompts, attachments, or request bodies
-          if (error && typeof error === 'object') {
-            const err = error as Record<string, unknown>;
-            console.error("AI workspace persistence failed", {
-              name: err.name,
-              code: err.code,
-              message: typeof err.message === 'string' ? err.message : 'unknown error',
-              conversationId: conversation.id,
-            });
-          }
-        }
-      },
-    });
+      const result = streamText({
+        model: getChatModel(providerId, modelId),
+        instructions: AI_SYSTEM_PROMPT,
+        messages: modelMessages,
+        tools: activeTools,
+        stopWhen: isStepCount(6),
+        maxOutputTokens: outputLimit,
+        temperature: 0.35,
+      });
 
-    await pipeUIMessageStreamToResponse({
-      response: res,
-      stream: uiStream,
-      headers: {
+      res.set({
         "Cache-Control": "no-cache, no-transform",
         "X-Accel-Buffering": "no",
-      },
-    });
-  } catch (error) {
-    if (usageId) {
-      await completeAIUsage(usageId, {
-        status: "error",
-        errorCode: error instanceof HttpError ? String(error.status) : "route_error",
-      }).catch(() => undefined);
+        "X-AI-Conversation-Id": conversation.id,
+        "X-AI-Provider": providerId,
+        "X-AI-Model": modelId,
+      });
+
+      const uiStream = toUIMessageStream({
+        stream: result.stream,
+        tools: activeTools,
+        originalMessages: hydrated,
+        generateMessageId: createIdGenerator({ prefix: "msg", size: 18 }),
+        onError: (error) => {
+          if (error && typeof error === 'object') {
+            const err = error as Record<string, unknown>;
+            console.error("AI workspace stream error", {
+              name: err.name,
+              code: err.code,
+              status: err.status,
+              message: err.message,
+              requestId: err.requestId,
+            });
+          }
+          return "خطا در ارتباط با سرویس هوش مصنوعی. لطفاً دوباره تلاش کنید.";
+        },
+        onEnd: async ({ responseMessage, outcome, isAborted }) => {
+          try {
+            const usageData = await result.usage;
+            const inputTokens = usageData.inputTokens || 0;
+            const outputTokens = usageData.outputTokens || 0;
+            const totalTokens = usageData.totalTokens || 0;
+
+            // Reconcile actual provider-reported usage with local accounting.
+            // Cloudflare Workers AI reports actual Neurons in the API response;
+            // use those when available instead of local estimates. For other
+            // providers, fall back to the local estimate.
+            const estimatedUnits = estimateChatNeurons(
+              providerId,
+              modelId,
+              inputTokens,
+              outputTokens,
+            );
+            const actualNeurons = extractActualNeurons(usageData, providerId);
+            const quotaUnits =
+              providerId === "cloudflare" && actualNeurons !== null
+                ? actualNeurons
+                : estimatedUnits;
+
+            if (responseMessage?.parts?.length) {
+              await prisma.aIChatMessage.upsert({
+                where: { id: responseMessage.id },
+                create: {
+                  id: responseMessage.id,
+                  conversationId: conversation.id,
+                  role: "assistant",
+                  partsJson: JSON.stringify(responseMessage.parts),
+                  provider: providerId,
+                  model: modelId,
+                  inputTokens,
+                  outputTokens,
+                  totalTokens,
+                },
+                update: {
+                  partsJson: JSON.stringify(responseMessage.parts),
+                  provider: providerId,
+                  model: modelId,
+                  inputTokens,
+                  outputTokens,
+                  totalTokens,
+                },
+              });
+            }
+
+            await completeAIUsage(usage.id, {
+              status:
+                outcome.status === "completed"
+                  ? "success"
+                  : outcome.status === "aborted" || isAborted
+                    ? "aborted"
+                    : "error",
+              inputTokens,
+              outputTokens,
+              totalTokens,
+              units: quotaUnits,
+              errorCode: outcome.status === "failed" ? "stream_failed" : undefined,
+            });
+            await prisma.aIConversation.update({
+              where: { id: conversation.id },
+              data: { updatedAt: new Date() },
+            });
+          } catch (error) {
+            if (error && typeof error === 'object') {
+              const err = error as Record<string, unknown>;
+              console.error("AI workspace persistence failed", {
+                name: err.name,
+                code: err.code,
+                message: typeof err.message === 'string' ? err.message : 'unknown error',
+                conversationId: conversation.id,
+              });
+            }
+          }
+        },
+      });
+
+      try {
+        await pipeUIMessageStreamToResponse({
+          response: res,
+          stream: uiStream,
+          headers: {
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+          },
+        });
+        // Stream completed successfully.
+        recordProviderSuccess(providerId, modelId);
+        usedProviderId = providerId;
+        usedModelId = modelId;
+        return;
+      } catch (streamError) {
+        // If headers already sent, we are committed to this response and
+        // cannot fail over mid-stream.
+        if (res.headersSent) {
+          recordProviderFailure(providerId, modelId);
+          throw streamError;
+        }
+        // Not yet committed — try the next candidate.
+        recordProviderFailure(providerId, modelId);
+        await completeAIUsage(usage.id, {
+          status: "error",
+          errorCode: "stream_failed",
+        }).catch(() => undefined);
+        lastError = streamError;
+        continue;
+      }
     }
+
+    // All candidates exhausted.
+    if (lastError instanceof HttpError) throw lastError;
+    throw new HttpError(
+      502,
+      "هیچ ارائه‌دهندهٔ هوش مصنوعی درخواست را هندل نکرد.",
+    );
+  } catch (error) {
     if (!res.headersSent) {
       sendError(
         res,
@@ -640,7 +740,6 @@ router.post("/chat", async (req: AuthedRequest, res) => {
           : error,
       );
     } else {
-      // Log only safe fields - never expose prompts, attachments, or request bodies
       if (error && typeof error === 'object') {
         const err = error as Record<string, unknown>;
         console.error("AI workspace response failed after headers", {
@@ -653,5 +752,58 @@ router.post("/chat", async (req: AuthedRequest, res) => {
     }
   }
 });
+
+/** Diagnostic: circuit-breaker status for all provider/model candidates. */
+router.get("/breakers", async (_req: AuthedRequest, res) => {
+  res.json({ breakers: getBreakerStatus() });
+});
+
+/** Diagnostic: per-provider usage for the current UTC day. */
+router.get("/provider-usage", async (_req: AuthedRequest, res) => {
+  res.json(await getProviderUsageToday());
+});
+
+/**
+ * Extract actual Cloudflare Neurons from the Vercel AI SDK usage data.
+ *
+ * Cloudflare Workers AI reports actual Neuron consumption in the API
+ * response. The Vercel AI SDK may surface this as a provider-specific
+ * field on the usage object. When available, use the actual value
+ * instead of the local estimate for accurate quota accounting.
+ *
+ * Returns null when actual neurons cannot be determined, in which case
+ * the caller should fall back to estimateChatNeurons().
+ */
+function extractActualNeurons(
+  usageData: Record<string, unknown>,
+  providerId: AIProviderId,
+): number | null {
+  if (providerId !== "cloudflare") return null;
+
+  // Check common locations where the SDK might surface provider-specific
+  // usage metadata (e.g. Cloudflare's `neurons` field). Cast through
+  // `any` to avoid strict unknown-type errors when probing nested fields.
+  const raw = usageData as Record<string, unknown> & {
+    neurons?: unknown;
+    cloudflareNeurons?: unknown;
+    providerMetadata?: Record<string, unknown> | null;
+    usage?: Record<string, unknown> | null;
+  };
+
+  const candidates: unknown[] = [
+    raw.neurons,
+    raw.cloudflareNeurons,
+    raw.providerMetadata?.["neurons"],
+    raw.usage?.["neurons"],
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "number" && candidate >= 0) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
 
 export default router;

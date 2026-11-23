@@ -9,6 +9,7 @@ import {
   savePrivateAIFile,
   serializeAIFile,
 } from "./aiFiles.js";
+import { recordProviderFailure, recordProviderSuccess } from "./aiRouting.js";
 import { completeAIUsage, reserveAIUsage } from "./aiUsage.js";
 
 const CLOUDFLARE_AI_ROOT = "https://api.cloudflare.com/client/v4";
@@ -130,7 +131,7 @@ export async function generateWorkspaceImage(input: {
   userId: string;
   conversationId?: string | null;
   prompt: string;
-  modelId: string;
+  modelCandidates: string[];
   referenceFileIds: string[];
   width: number;
   height: number;
@@ -156,15 +157,7 @@ export async function generateWorkspaceImage(input: {
     }
   }
 
-  const model = getAIImageModelInfo(input.modelId);
-  const width = normaliseDimension(input.width, 1024);
-  const height = normaliseDimension(input.height, 1024);
-  const steps =
-    input.modelId.endsWith("flux-2-dev")
-      ? Math.min(Math.max(Math.floor(input.steps || 8), 1), 20)
-      : 4;
-  const guidance = Math.min(Math.max(Number(input.guidance || 3.5), 0), 10);
-
+  // Prepare references once (shared across all model candidates).
   const references: Buffer[] = [];
   for (const fileId of input.referenceFileIds) {
     const file = await getPrivateAIFile(input.userId, fileId);
@@ -174,109 +167,147 @@ export async function generateWorkspaceImage(input: {
     references.push(await prepareReference(await readPrivateAIFile(file)));
   }
 
-  const estimatedUnits = estimateImageQuotaUnits({
-    modelId: input.modelId,
-    width,
-    height,
-    referenceCount: references.length,
-    steps,
-  });
-  const usage = await reserveAIUsage({
-    userId: input.userId,
-    provider: "cloudflare",
-    model: input.modelId,
-    operation: "image",
-    estimatedUnits,
-  });
+  const width = normaliseDimension(input.width, 1024);
+  const height = normaliseDimension(input.height, 1024);
+  const guidance = Math.min(Math.max(Number(input.guidance || 3.5), 0), 10);
 
-  const { accountId, apiToken } = cloudflareCredentials();
-  const form = new FormData();
-  form.append("prompt", prompt);
-  form.append("width", String(width));
-  form.append("height", String(height));
-  form.append("guidance", String(guidance));
-  if (input.modelId.endsWith("flux-2-dev")) {
-    form.append("steps", String(steps));
-  }
-  references.forEach((buffer, index) => {
-    form.append(
-      `input_image_${index}`,
-      new Blob([new Uint8Array(buffer)], { type: "image/jpeg" }),
-      `reference-${index}.jpg`,
-    );
-  });
+  let lastError: unknown = null;
 
-  try {
-    const response = await fetch(
-      `${CLOUDFLARE_AI_ROOT}/accounts/${accountId}/ai/run/${input.modelId}`,
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiToken}` },
-        body: form,
-        signal: AbortSignal.timeout(120_000),
-      },
-    );
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      const message = extractBase64(payload);
-      throw new HttpError(
-        502,
-        message
-          ? "پاسخ نامعتبر از Cloudflare دریافت شد."
-          : `Cloudflare خطای ${response.status} برگرداند.`,
-      );
-    }
+  for (const modelId of input.modelCandidates) {
+    const model = getAIImageModelInfo(modelId);
+    const steps =
+      modelId.endsWith("flux-2-dev")
+        ? Math.min(Math.max(Math.floor(input.steps || 8), 1), 20)
+        : 4;
 
-    const base64 = extractBase64(payload);
-    if (!base64) {
-      throw new HttpError(502, "Cloudflare تصویری برنگرداند.");
-    }
-    const bytes = Buffer.from(base64, "base64");
-    if (!bytes.length || bytes.length > 20 * 1024 * 1024) {
-      throw new HttpError(502, "فایل تصویر دریافتی معتبر نیست.");
-    }
-    const mimeType = detectMimeType(bytes);
-    const extension = mimeType === "image/jpeg" ? ".jpg" : mimeType === "image/webp" ? ".webp" : ".png";
-    const file = await savePrivateAIFile({
-      userId: input.userId,
-      conversationId: input.conversationId,
-      kind: "output",
-      originalName: `ai-${Date.now()}${extension}`,
-      mimeType,
-      buffer: bytes,
-      provider: "cloudflare",
-      model: input.modelId,
-      prompt,
-      requestKey: input.requestKey || null,
-      metadata: {
-        width,
-        height,
-        steps,
-        guidance,
-        referenceCount: references.length,
-        estimatedQuotaUnits: estimatedUnits,
-      },
-    });
-
-    await completeAIUsage(usage.id, {
-      status: "success",
-      units: estimatedUnits,
-    });
-    return {
-      file: serializeAIFile(file),
-      reused: false,
-      model: model.id,
+    const estimatedUnits = estimateImageQuotaUnits({
+      modelId,
       width,
       height,
-      estimatedQuotaUnits: estimatedUnits,
-    };
-  } catch (error) {
-    await completeAIUsage(usage.id, {
-      status: "error",
-      errorCode: error instanceof HttpError ? String(error.status) : "provider_error",
+      referenceCount: references.length,
+      steps,
     });
-    if (error instanceof HttpError) throw error;
-    console.error("Cloudflare image generation failed", error);
-    throw new HttpError(502, "تولید تصویر با Cloudflare انجام نشد.");
+
+    // Reserve quota for this specific provider/model. If quota is exhausted,
+    // reserveAIUsage throws 429 → we catch and try the next candidate.
+    let usage;
+    try {
+      usage = await reserveAIUsage({
+        userId: input.userId,
+        provider: "cloudflare",
+        model: modelId,
+        operation: "image",
+        estimatedUnits,
+      });
+    } catch (error) {
+      lastError = error;
+      recordProviderFailure("cloudflare", modelId);
+      continue;
+    }
+
+    const { accountId, apiToken } = cloudflareCredentials();
+    const form = new FormData();
+    form.append("prompt", prompt);
+    form.append("width", String(width));
+    form.append("height", String(height));
+    form.append("guidance", String(guidance));
+    if (modelId.endsWith("flux-2-dev")) {
+      form.append("steps", String(steps));
+    }
+    references.forEach((buffer, index) => {
+      form.append(
+        `input_image_${index}`,
+        new Blob([new Uint8Array(buffer)], { type: "image/jpeg" }),
+        `reference-${index}.jpg`,
+      );
+    });
+
+    try {
+      const response = await fetch(
+        `${CLOUDFLARE_AI_ROOT}/accounts/${accountId}/ai/run/${modelId}`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiToken}` },
+          body: form,
+          signal: AbortSignal.timeout(120_000),
+        },
+      );
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message = extractBase64(payload);
+        throw new HttpError(
+          502,
+          message
+            ? "پاسخ نامعتبر از Cloudflare دریافت شد."
+            : `Cloudflare خطای ${response.status} برگرداند.`,
+        );
+      }
+
+      const base64 = extractBase64(payload);
+      if (!base64) {
+        throw new HttpError(502, "Cloudflare تصویری برنگرداند.");
+      }
+      const bytes = Buffer.from(base64, "base64");
+      if (!bytes.length || bytes.length > 20 * 1024 * 1024) {
+        throw new HttpError(502, "فایل تصویر دریافتی معتبر نیست.");
+      }
+      const mimeType = detectMimeType(bytes);
+      const extension =
+        mimeType === "image/jpeg"
+          ? ".jpg"
+          : mimeType === "image/webp"
+            ? ".webp"
+            : ".png";
+      const file = await savePrivateAIFile({
+        userId: input.userId,
+        conversationId: input.conversationId,
+        kind: "output",
+        originalName: `ai-${Date.now()}${extension}`,
+        mimeType,
+        buffer: bytes,
+        provider: "cloudflare",
+        model: modelId,
+        prompt,
+        requestKey: input.requestKey || null,
+        metadata: {
+          width,
+          height,
+          steps,
+          guidance,
+          referenceCount: references.length,
+          estimatedQuotaUnits: estimatedUnits,
+        },
+      });
+
+      await completeAIUsage(usage.id, {
+        status: "success",
+        units: estimatedUnits,
+      });
+      recordProviderSuccess("cloudflare", modelId);
+      return {
+        file: serializeAIFile(file),
+        reused: false,
+        model: model.id,
+        width,
+        height,
+        estimatedQuotaUnits: estimatedUnits,
+      };
+    } catch (error) {
+      await completeAIUsage(usage.id, {
+        status: "error",
+        errorCode: error instanceof HttpError ? String(error.status) : "provider_error",
+      });
+      recordProviderFailure("cloudflare", modelId);
+      lastError = error;
+      // If quota/rate-limit (429/402), try next candidate. Otherwise rethrow.
+      if (error instanceof HttpError && error.status !== 429 && error.status !== 402 && error.status !== 503) {
+        throw error;
+      }
+      continue;
+    }
   }
+
+  // All candidates exhausted.
+  if (lastError instanceof HttpError) throw lastError;
+  throw new HttpError(502, "تولید تصویر با هیچ ارائه‌دهندهٔ مجازی انجام نشد.");
 }
