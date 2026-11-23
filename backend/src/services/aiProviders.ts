@@ -278,9 +278,10 @@ export function getChatModel(providerId: AIProviderId, modelId: string): Languag
 
 export function getDefaultChatModel(providerId: AIProviderId = "cloudflare") {
   const provider = providerInfo(providerId);
-  // برای گفتگوهای با ابزار (tool-calling) از gpt-oss-120b استفاده کن
-  // GLM-4.7-Flash فقط متن است و ابزار پشتیبانی نمی‌کند
-  return provider.models.find((m) => m.id.includes("gpt-oss-120b"))?.id ?? provider.models[0]?.id ?? "";
+  // GLM-4.7-Flash has been verified against Workers AI's OpenAI-compatible
+  // endpoint: it returns function tool_calls and uses the lower neuron budget.
+  // Keep the larger GPT-OSS models available as explicit user selections.
+  return provider.models.find((m) => m.id === "@cf/zai-org/glm-4.7-flash")?.id ?? provider.models[0]?.id ?? "";
 }
 
 export function getDefaultImageModel() {
