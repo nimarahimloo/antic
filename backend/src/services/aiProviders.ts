@@ -103,9 +103,21 @@ const OPENROUTER_MODELS: AIModelInfo[] = [
 ];
 
 // NVIDIA NIM — hosted, OpenAI-compatible inference on DGX Cloud.
-// All models are free to prototype with (no credit card). Free tier is
-// credit-metered (~1,000 initial credits, ~40 RPM). Source: build.nvidia.com.
-// Tool-capable models are prioritized for the AI Workspace chat route.
+// All models below are verified free endpoints on build.nvidia.com (as of
+// 2026-11-23). Model IDs are taken from the live catalog at
+// https://integrate.api.nvidia.com/v1/models and cross-checked against the
+// free-endpoint list at https://build.nvidia.com/models.
+//
+// Verified working chat models:
+//   nvidia/nemotron-3-super-120b-a12b  — tool-calling, reasoning (verified)
+//   nvidia/nemotron-3.5-lightning-30b-a3b — fast MoE (verified)
+//   nvidia/nemotron-3-ultra-550b-a55b  — largest Nemotron (verified)
+//   nvidia/nemotron-3.5-bolt-e4b       — compact agentic (verified free)
+//   openai/gpt-oss-20b                 — open-source GPT-OSS (verified free)
+//
+// NOT included (not confirmed as free/working on live /v1/models):
+//   mistralai/mistral-nemotron         — dropped from free list 2026-09-28
+//   meta/llama-3.1-8b-instruct         — not in live /v1/models list
 const NVIDIA_MODELS: AIModelInfo[] = [
   {
     id: "nvidia/nemotron-3-super-120b-a12b",
@@ -118,14 +130,19 @@ const NVIDIA_MODELS: AIModelInfo[] = [
     supportsTools: true,
   },
   {
-    id: "mistralai/mistral-nemotron",
-    label: "Mistral-Nemotron (NVIDIA Free)",
+    id: "nvidia/nemotron-3-ultra-550b-a55b",
+    label: "Nemotron 3 Ultra 550B (NVIDIA Free)",
     supportsTools: true,
   },
   {
-    id: "meta/llama-3.1-8b-instruct",
-    label: "Llama 3.1 8B Instruct (NVIDIA Free)",
-    supportsTools: false,
+    id: "nvidia/nemotron-3.5-bolt-e4b",
+    label: "Nemotron 3.5 Bolt E4B (NVIDIA Free)",
+    supportsTools: true,
+  },
+  {
+    id: "openai/gpt-oss-20b",
+    label: "GPT-OSS 20B (NVIDIA Free)",
+    supportsTools: true,
   },
 ];
 
@@ -356,10 +373,11 @@ export function estimateChatNeurons(
 ) {
   if (providerId !== "cloudflare") {
     // Non-Cloudflare providers (NVIDIA, Google, OpenRouter) do not report
-    // neuron usage through this SDK. Assign a conservative minimum of 1 unit
-    // per request so the provider's daily quota is actually tracked and
-    // enforced rather than treating unknown usage as zero.
-    return 1;
+    // neuron usage through this SDK. Return 0 units: their usage is tracked
+    // purely by request count (dailyChatRequests / dailyImageCount), never by
+    // invented credit amounts. Unknown consumption must never be treated as
+    // measured usage.
+    return 0;
   }
   const model = CLOUDFLARE_MODELS.find((item) => item.id === modelId);
   if (!model?.inputNeuronsPerMillion || !model.outputNeuronsPerMillion) return 0;
