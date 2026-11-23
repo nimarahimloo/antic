@@ -85,13 +85,14 @@ export function OptimizedImage({
         src={FALLBACK_IMAGE_URL}
         alt={alt}
         fill={fill}
-        width={width}
-        height={height}
-        sizes={sizes}
+        width={fill && !width ? undefined : width}
+        height={fill && !height ? undefined : height}
+        sizes={sizes || (fill ? "100vw" : undefined)}
         priority={priority}
         quality={quality}
         placeholder={placeholder}
         blurDataURL={blurUrl}
+        unoptimized={fill && (width === undefined || height === undefined)}
         className={cn("object-cover", className)}
         style={style}
         loading={effectiveLoading}
@@ -107,13 +108,14 @@ export function OptimizedImage({
       src={src || FALLBACK_IMAGE_URL}
       alt={alt}
       fill={fill}
-      width={width}
-      height={height}
-      sizes={sizes}
+      width={fill && !width ? undefined : width}
+      height={fill && !height ? undefined : height}
+      sizes={sizes || (fill ? "100vw" : undefined)}
       priority={priority}
       quality={quality}
       placeholder={placeholder}
       blurDataURL={blurUrl}
+      unoptimized={fill && (width === undefined || height === undefined)}
       className={cn(
         "transition-opacity duration-300",
         isLoading && "opacity-0",
