@@ -109,21 +109,18 @@ const OPENROUTER_MODELS: AIModelInfo[] = [
 // free-endpoint list at https://build.nvidia.com/models.
 //
 // Verified working chat models:
-//   nvidia/nemotron-3-super-120b-a12b  — tool-calling, reasoning (verified)
 //   nvidia/nemotron-3.5-lightning-30b-a3b — fast MoE (verified)
-//   nvidia/nemotron-3-ultra-550b-a55b  — largest Nemotron (verified)
-//   nvidia/nemotron-3.5-bolt-e4b       — compact agentic (verified free)
-//   openai/gpt-oss-20b                 — open-source GPT-OSS (verified free)
+//   nvidia/nemotron-3-ultra-550b-a55b     — largest Nemotron (verified)
+//   nvidia/nemotron-3.5-bolt-e4b          — compact agentic (verified free)
+//   openai/gpt-oss-20b                    — open-source GPT-OSS (verified free)
+//
+// RETIRED (end of life 2026-10-03):
+//   nvidia/nemotron-3-super-120b-a12b     — no longer available (410 Gone)
 //
 // NOT included (not confirmed as free/working on live /v1/models):
 //   mistralai/mistral-nemotron         — dropped from free list 2026-09-28
 //   meta/llama-3.1-8b-instruct         — not in live /v1/models list
 const NVIDIA_MODELS: AIModelInfo[] = [
-  {
-    id: "nvidia/nemotron-3-super-120b-a12b",
-    label: "Nemotron 3.5 Super 120B (NVIDIA Free)",
-    supportsTools: true,
-  },
   {
     id: "nvidia/nemotron-3.5-lightning-30b-a3b",
     label: "Nemotron 3.5 Lightning 30B (NVIDIA Free)",
