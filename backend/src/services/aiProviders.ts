@@ -338,12 +338,10 @@ export function getChatModel(providerId: AIProviderId, modelId: string): Languag
 
 export function getDefaultChatModel(providerId: AIProviderId = "cloudflare") {
   const provider = providerInfo(providerId);
-  // tool-calling först: مدل با پشتیبانی از ابزار را انتخاب می‌کنیم
-  return (
-    provider.models.find((m) => m.supportsTools)?.id ??
-    provider.models[0]?.id ??
-    ""
-  );
+  // GLM-4.7-Flash has been verified against Workers AI's OpenAI-compatible
+  // endpoint: it returns function tool_calls and uses the lower neuron budget.
+  // Keep the larger GPT-OSS models available as explicit user selections.
+  return provider.models.find((m) => m.id === "@cf/zai-org/glm-4.7-flash")?.id ?? provider.models[0]?.id ?? "";
 }
 
 export function getDefaultImageModel() {
