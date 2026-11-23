@@ -278,7 +278,9 @@ export function getChatModel(providerId: AIProviderId, modelId: string): Languag
 
 export function getDefaultChatModel(providerId: AIProviderId = "cloudflare") {
   const provider = providerInfo(providerId);
-  return provider.models[0]?.id ?? "";
+  // برای گفتگوهای با ابزار (tool-calling) از gpt-oss-120b استفاده کن
+  // GLM-4.7-Flash فقط متن است و ابزار پشتیبانی نمی‌کند
+  return provider.models.find((m) => m.id.includes("gpt-oss-120b"))?.id ?? provider.models[0]?.id ?? "";
 }
 
 export function getDefaultImageModel() {
