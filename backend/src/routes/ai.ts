@@ -19,9 +19,7 @@ import { prisma } from "../lib/prisma.js";
 import { routeParam } from "../lib/routeParams.js";
 import {
   estimateChatNeurons,
-  getAIModelInfo,
   getChatModel,
-  getDefaultChatModel,
   listAIProviders,
   type AIProviderId,
 } from "../services/aiProviders.js";
@@ -161,22 +159,17 @@ router.post("/conversations", async (req: AuthedRequest, res) => {
       })
       .parse(req.body || {});
 
-    // Automatic routing: backend selects the best available free provider.
-    // No manual provider/model selection is required from the client.
+    // Conversations can be created without an assigned provider.
+    // Provider/model are assigned on the first inference request via
+    // automatic routing in POST /api/ai/chat.
     const route = selectChatRoute();
-    if (!route.primary) {
-      throw new HttpError(
-        503,
-        "هیچ ارائه‌دهندهٔ هوش مصنوعی رایگان در حال حاضر در دسترس نیست.",
-      );
-    }
 
     const conversation = await prisma.aIConversation.create({
       data: {
         userId: ownerId,
         title: body.title || "گفتگوی جدید",
-        provider: route.primary.providerId,
-        model: route.primary.modelId,
+        provider: route.primary?.providerId ?? undefined,
+        model: route.primary?.modelId ?? undefined,
       },
     });
     res.status(201).json({
@@ -194,6 +187,7 @@ router.post("/conversations", async (req: AuthedRequest, res) => {
             provider: c.providerId,
             model: c.modelId,
           })),
+          available: route.primary !== null,
         },
       },
     });
@@ -437,9 +431,8 @@ router.post("/chat", async (req: AuthedRequest, res) => {
     const body = z
       .object({
         conversationId: z.string().trim().min(1),
-        // provider/model are optional overrides; default is automatic routing.
-        provider: z.enum(["cloudflare", "google", "nvidia", "openrouter"]).optional(),
-        model: z.string().trim().min(1).max(200).optional(),
+        // provider/model are NOT accepted here: routing is always automatic
+        // backend-driven. Clients must not send them.
         messages: z.array(z.unknown()).min(1),
         trigger: z.string().optional(),
         messageId: z.string().optional(),
@@ -512,32 +505,42 @@ router.post("/chat", async (req: AuthedRequest, res) => {
       ignoreIncompleteToolCalls: true,
     });
 
+    // For the UI message stream, exclude any trailing assistant message to avoid
+    // the stream treating the new generation as a continuation of the previous
+    // assistant response. This ensures each user message gets a fresh assistant
+    // response with a unique message ID.
+    const uiMessages = (() => {
+      let lastUserIndex = -1;
+      for (let i = hydrated.length - 1; i >= 0; i--) {
+        if (hydrated[i].role === "user") {
+          lastUserIndex = i;
+          break;
+        }
+      }
+      if (lastUserIndex >= 0) {
+        return hydrated.slice(0, lastUserIndex + 1);
+      }
+      return hydrated;
+    })();
+
     const outputLimit = maxOutputTokens();
     const estimatedInputTokens = Math.ceil(
       JSON.stringify(modelMessages).length / 4,
     );
 
-    // ─── Automatic routing with failover ───
-    // If the caller explicitly chose a provider/model, use only that candidate.
-    // Otherwise, route across all healthy, configured free providers.
-    let candidates;
-    if (body.provider && body.model) {
-      const modelInfo = getAIModelInfo(body.provider, body.model);
-      candidates = [{ providerId: body.provider, modelId: body.model, model: modelInfo }];
-    } else {
-      const route = selectChatRoute();
-      if (!route.primary) {
-        throw new HttpError(
-          503,
-          "هیچ ارائه‌دهندهٔ هوش مصنوعی رایگان در حال حاضر در دسترس نیست.",
-        );
-      }
-      candidates = route.candidates;
-    }
-
     let lastError: unknown = null;
-    let usedProviderId: AIProviderId | null = null;
-    let usedModelId = "";
+
+    // ─── Automatic routing with failover (backend-driven only) ───
+    // No manual provider/model override is accepted. Always route across all
+    // healthy, configured free providers.
+    const route = selectChatRoute();
+    if (!route.primary) {
+      throw new HttpError(
+        503,
+        "هیچ ارائه‌دهندهٔ هوش مصنوعی رایگان در حال حاضر در دسترس نیست.",
+      );
+    }
+    const candidates = route.candidates;
 
     for (const candidate of candidates) {
       const { providerId, modelId, model } = candidate;
@@ -596,11 +599,17 @@ router.post("/chat", async (req: AuthedRequest, res) => {
         "X-AI-Model": modelId,
       });
 
-      const uiStream = toUIMessageStream({
+      // Use a generator that produces unique IDs per request by incorporating
+    // a timestamp and random component. This avoids the issue where
+    // createIdGenerator() resets its counter on each request.
+    const messageIdGenerator = () =>
+      `msg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 15)}`;
+
+    const uiStream = toUIMessageStream({
         stream: result.stream,
         tools: activeTools,
-        originalMessages: hydrated,
-        generateMessageId: createIdGenerator({ prefix: "msg", size: 18 }),
+        originalMessages: uiMessages,
+        generateMessageId: messageIdGenerator,
         onError: (error) => {
           if (error && typeof error === 'object') {
             const err = error as Record<string, unknown>;
@@ -614,7 +623,7 @@ router.post("/chat", async (req: AuthedRequest, res) => {
           }
           return "خطا در ارتباط با سرویس هوش مصنوعی. لطفاً دوباره تلاش کنید.";
         },
-        onEnd: async ({ responseMessage, outcome, isAborted }) => {
+        onEnd: async ({ responseMessage, outcome, isAborted, isContinuation }) => {
           try {
             const usageData = await result.usage;
             const inputTokens = usageData.inputTokens || 0;
@@ -704,8 +713,6 @@ router.post("/chat", async (req: AuthedRequest, res) => {
         });
         // Stream completed successfully.
         recordProviderSuccess(providerId, modelId);
-        usedProviderId = providerId;
-        usedModelId = modelId;
         return;
       } catch (streamError) {
         // If headers already sent, we are committed to this response and

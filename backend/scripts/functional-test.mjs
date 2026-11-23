@@ -320,7 +320,9 @@ async function main() {
   }
 
   {
-    const r = await req("/api/mcp/tools/list_categories");
+    const r = await req("/api/mcp/tools/list_categories", {
+      method: "POST",
+    });
     r.status === 200 && Array.isArray(r.data?.content)
       ? ok("MCP list_categories tool")
       : fail("MCP list_categories tool", String(r.status));
@@ -329,7 +331,7 @@ async function main() {
   {
     const r = await req("/api/mcp/tools/search_models", {
       method: "POST",
-      body: { query: "테스트" },
+      body: { query: "теست" },
     });
     r.status === 200 && r.data?.content
       ? ok("MCP search_models tool")
@@ -337,11 +339,12 @@ async function main() {
   }
 
   {
-    const existingId = categories[0]?.id;
-    if (existingId) {
+    // Use a real CurtainModel ID (not a CurtainCategory ID) for get_model
+    const existingModelId = modelId || categories[0]?.id;
+    if (existingModelId) {
       const r = await req("/api/mcp/tools/get_model", {
         method: "POST",
-        body: { id: existingId },
+        body: { id: existingModelId },
       });
       r.status === 200 && r.data?.content?.id
         ? ok("MCP get_model tool (found)")
@@ -360,7 +363,9 @@ async function main() {
   }
 
   {
-    const r = await req("/api/mcp/tools/list_projects");
+    const r = await req("/api/mcp/tools/list_projects", {
+      method: "POST",
+    });
     r.status === 200 && Array.isArray(r.data?.content)
       ? ok("MCP list_projects tool")
       : fail("MCP list_projects tool", String(r.status));
