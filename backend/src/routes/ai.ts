@@ -161,22 +161,17 @@ router.post("/conversations", async (req: AuthedRequest, res) => {
       })
       .parse(req.body || {});
 
-    // Automatic routing: backend selects the best available free provider.
-    // No manual provider/model selection is required from the client.
+    // Conversations can be created without an assigned provider.
+    // Provider/model are assigned on the first inference request via
+    // automatic routing in POST /api/ai/chat.
     const route = selectChatRoute();
-    if (!route.primary) {
-      throw new HttpError(
-        503,
-        "هیچ ارائه‌دهندهٔ هوش مصنوعی رایگان در حال حاضر در دسترس نیست.",
-      );
-    }
 
     const conversation = await prisma.aIConversation.create({
       data: {
         userId: ownerId,
         title: body.title || "گفتگوی جدید",
-        provider: route.primary.providerId,
-        model: route.primary.modelId,
+        provider: route.primary?.providerId ?? undefined,
+        model: route.primary?.modelId ?? undefined,
       },
     });
     res.status(201).json({
@@ -194,6 +189,7 @@ router.post("/conversations", async (req: AuthedRequest, res) => {
             provider: c.providerId,
             model: c.modelId,
           })),
+          available: route.primary !== null,
         },
       },
     });

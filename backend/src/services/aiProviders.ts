@@ -354,7 +354,13 @@ export function estimateChatNeurons(
   inputTokens: number,
   outputTokens: number,
 ) {
-  if (providerId !== "cloudflare") return 0;
+  if (providerId !== "cloudflare") {
+    // Non-Cloudflare providers (NVIDIA, Google, OpenRouter) do not report
+    // neuron usage through this SDK. Assign a conservative minimum of 1 unit
+    // per request so the provider's daily quota is actually tracked and
+    // enforced rather than treating unknown usage as zero.
+    return 1;
+  }
   const model = CLOUDFLARE_MODELS.find((item) => item.id === modelId);
   if (!model?.inputNeuronsPerMillion || !model.outputNeuronsPerMillion) return 0;
   return Math.max(

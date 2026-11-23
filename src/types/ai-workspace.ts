@@ -1,4 +1,8 @@
-export type AIProviderId = "cloudflare" | "google" | "openrouter";
+export type AIProviderId =
+  | "cloudflare"
+  | "google"
+  | "nvidia"
+  | "openrouter";
 
 export type AIWorkspaceModel = {
   id: string;
@@ -25,8 +29,8 @@ export type AIWorkspaceProvider = {
 export type AIWorkspaceConversation = {
   id: string;
   title: string;
-  provider: AIProviderId;
-  model: string;
+  provider: AIProviderId | null;
+  model: string | null;
   createdAt?: string;
   updatedAt?: string;
   messageCount?: number;
