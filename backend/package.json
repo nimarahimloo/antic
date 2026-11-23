@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.1"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
@@ -24,7 +28,10 @@
     "restore:admin": "node scripts/restore-adminActions.mjs"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.124",
+    "@ai-sdk/openai-compatible": "^3.0.94",
     "@prisma/client": "^6.5.0",
+    "ai": "^7.0.179",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

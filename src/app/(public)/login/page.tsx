@@ -22,8 +22,10 @@ function LoginForm() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
-      router.push(returnTo);
+      const res = await login(email, password);
+      const userRole = (res as { user?: { role?: string } })?.user?.role;
+      // ادمین به پنل مدیریت و کاربر عادی به مسیر مقصد (پیش‌فرض page اصلی) هدایت می‌شود.
+      router.push(userRole === "admin" ? "/admin" : returnTo);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "ورود ناموفق بود");

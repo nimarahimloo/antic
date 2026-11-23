@@ -145,7 +145,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     const res = await api.auth.login(email, password);
-    setUser(res as User);
+    // Backend issues { user, token } — extract the user object so `user.role` is populated correctly.
+    const userData =
+      res && typeof res === "object" && "user" in res ? (res as { user: unknown }).user : res;
+    setUser(userData as User);
     setIsAuthenticated(true);
     setAuthError(null);
     return res;

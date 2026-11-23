@@ -12,10 +12,12 @@ import mcpRoutes from "./routes/mcp.js";
 import renderRoutes from "./routes/render.js";
 import searchRoutes from "./routes/search.js";
 import accountRoutes from "./routes/account.js";
+import aiRoutes from "./routes/ai.js";
 import { HttpError, sendError } from "./lib/errors.js";
 import { prisma } from "./lib/prisma.js";
 import { buildSitemap } from "./lib/sitemap.js";
 import { wantsMarkdown, countTokens, pageMarkdown } from "./lib/markdown.js";
+import { isCloudflareConfigured } from "./services/aiProviders.js";
 
 const app = express();
 
@@ -115,7 +117,7 @@ app.get("/api/app/public-settings", async (_req, res) => {
         design_consultant: "local-catalog",
         mcp: true,
         install_engine: "server-chroma-composite",
-        image_generation_external: false,
+        image_generation_external: isCloudflareConfigured(),
       },
     },
   });
@@ -132,6 +134,7 @@ app.use("/api/agents", agentRoutes);
 app.use("/api/mcp", mcpRoutes);
 app.use("/api/render", renderRoutes);
 app.use("/api/search", searchRoutes);
+app.use("/api/ai", aiRoutes);
 
 /** Public XML sitemap at site root — regenerated from the DB on every request
  *  so it always reflects published / removed content. */

@@ -5,6 +5,7 @@ import ProductGrid from "@/components/ProductGrid";
 import PageHero from "@/components/PageHero";
 import { storeImage } from "@/lib/storeImage";
 import { mediaUrl } from "@/lib/mediaUrl";
+import { ThumbnailImage } from "@/components/ui/image";
 
 export default function ShopPage() {
   const s = useShop({ pageSize: 24 });
@@ -47,7 +48,7 @@ export default function ShopPage() {
                   }`}
                 >
                   {imgSrc ? (
-                    <img src={imgSrc} alt={c.name} className="h-full w-full object-cover" />
+                    <ThumbnailImage src={imgSrc} alt={c.name} size={80} className="object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-secondary/40 px-1">
                       <span className="font-display text-[10px] font-bold text-muted-foreground">{c.name}</span>

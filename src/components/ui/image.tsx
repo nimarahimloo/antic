@@ -1,183 +1,235 @@
 "use client";
 
-import { useState, useRef, useEffect, forwardRef } from "react";
+import Image from "next/image";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { useSize } from "@/hooks/useSize";
-import {
-  parseMediaUrl,
-  IMAGE_LOAD_MODE,
-  nextImageLoadMode,
-  getOriginalImageUrl,
-  type LoadMode,
-} from "./image-helpers";
 
 const FALLBACK_IMAGE_URL = "/images/placeholder.svg";
 
-const DEFAULT_TRANSFORM_WIDTH = 1200;
 
 interface ImageProps {
   src?: string;
-  fittingType?: "fill" | "fit";
-  originWidth?: number;
-  originHeight?: number;
-  focalPointX?: number;
-  focalPointY?: number;
+  alt?: string;
+  fill?: boolean;
+  width?: number;
+  height?: number;
+  sizes?: string;
+  priority?: boolean;
   quality?: number;
+  placeholder?: "blur" | "empty";
+  blurDataURL?: string;
+  className?: string;
+  style?: React.CSSProperties;
   onLoad?: () => void;
   onError?: (event: React.SyntheticEvent<HTMLImageElement>) => void;
-  alt?: string;
-  className?: string;
-  style?: React.CSSProperties;
+  loading?: "lazy" | "eager";
+  objectFit?: "cover" | "contain" | "fill" | "none" | "scale-down";
+  objectPosition?: string;
 }
 
-const ImageWrapper = forwardRef<HTMLSpanElement, { aspectRatio?: string; className?: string; style?: React.CSSProperties; children: React.ReactNode }>(({ aspectRatio, className, style, children }, ref) => (
-  <span ref={ref} className={cn("inline-block relative", className)} style={{ aspectRatio, ...style }}>
-    {children}
-  </span>
-));
-
-const ResponsiveImage = ({
-  parsed,
-  fittingType,
-  focalPoint,
-  quality,
+/**
+ * Next.js 16 Image Component Wrapper
+ * Provides optimized images with proper sizing, lazy loading, and fallbacks.
+ * 
+ * Usage:
+ * - For fixed dimensions: <Image src="..." width={400} height={300} />
+ * - For fill container: <Image src="..." fill className="object-cover" />
+ * - For responsive: <Image src="..." width={800} height={600} sizes="(max-width: 768px) 100vw, 50vw" />
+ */
+export function OptimizedImage({
+  src,
+  alt = "",
+  fill = false,
+  width,
+  height,
+  sizes,
+  priority = false,
+  quality = 85,
+  placeholder = "blur",
+  blurDataURL,
   className,
   style,
-  aspectRatio,
   onLoad,
-}: {
-  parsed: { baseUrl: string } | null;
-  fittingType: "fill" | "fit";
-  focalPoint?: { x: number; y: number };
-  quality?: number;
-  className?: string;
-  style?: React.CSSProperties;
-  aspectRatio?: string;
-  onLoad?: () => void;
-}) => {
-  const wrapperRef = useRef<HTMLSpanElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const size = useSize(wrapperRef);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    setLoaded(false);
-  }, [parsed?.baseUrl]);
-
-  const crop = fittingType !== "fit";
-  const options = size && {
-    width: size.width || DEFAULT_TRANSFORM_WIDTH,
-    height: size.height ? size.height : undefined,
-    crop,
-    focalPoint: crop ? focalPoint : undefined,
-    quality,
-  };
-
-  if (!options || !parsed) {
-    return null;
-  }
-
-  // For local images, we just use the original URL
-  const imageUrl = parsed.baseUrl;
-
-  return (
-    <ImageWrapper ref={wrapperRef} aspectRatio={aspectRatio} className={className} style={style}>
-      {options && !loaded && (
-        <img
-          src={imageUrl}
-          alt=""
-          aria-hidden="true"
-          className="w-full h-full inset-0 absolute"
-          style={{
-            objectFit: fittingType === "fit" ? "contain" : "cover",
-            filter: "blur(10px)",
-            transform: "scale(1.1)",
-          }}
-        />
-      )}
-      {options && (
-        <img
-          ref={imgRef}
-          src={imageUrl}
-          alt=""
-          loading="lazy"
-          className={cn(
-            "w-full h-full inset-0 absolute",
-            fittingType === "fit" ? "object-contain" : "object-cover"
-          )}
-          onLoad={(e) => {
-            setLoaded(true);
-            onLoad?.();
-          }}
-        />
-      )}
-    </ImageWrapper>
-  );
-};
-
-const Image = ({
-  src,
-  fittingType = "fill",
-  originWidth,
-  originHeight,
-  focalPointX,
-  focalPointY,
-  quality = 90,
   onError,
+  loading,
+  objectFit = "cover",
+  objectPosition = "center",
   ...props
-}: ImageProps) => {
-  const parsedSource = src && src !== FALLBACK_IMAGE_URL ? parseMediaUrl(src) : null;
-  const initialMode: LoadMode = parsedSource ? IMAGE_LOAD_MODE.OPTIMIZED : IMAGE_LOAD_MODE.ORIGINAL;
-  const [loadState, setLoadState] = useState<{ src: string; mode: LoadMode }>({ src: src || "", mode: initialMode });
-  const mode: LoadMode = loadState.src === src ? loadState.mode : initialMode;
-  const modeForComparison = mode;
+}: ImageProps) {
+  // When priority is true, loading must be "eager" (not "lazy")
+  const effectiveLoading = priority ? "eager" : (loading ?? "lazy");
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    setLoadState({ src: src || "", mode: initialMode });
-  }, [src, initialMode]);
+  // Generate blur data URL if not provided
+  const blurUrl = blurDataURL || `data:image/svg+xml;base64,${btoa(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+      <rect fill="#e5e5e5" width="10" height="10"/>
+    </svg>
+  `)}`;
 
   const handleError = (event: React.SyntheticEvent<HTMLImageElement>) => {
-    if (modeForComparison === IMAGE_LOAD_MODE.FALLBACK) return;
-    const nextMode = nextImageLoadMode(modeForComparison);
-    setLoadState({ src: src || "", mode: nextMode });
-    if (nextMode === IMAGE_LOAD_MODE.FALLBACK) onError?.(event);
+    setHasError(true);
+    onError?.(event);
   };
 
-  const imageProps = {
-    ...props,
-    onError: handleError,
+  const handleLoad = () => {
+    setIsLoading(false);
+    onLoad?.();
   };
 
-  if (!src) {
-    return <img src={FALLBACK_IMAGE_URL} {...imageProps} data-empty-image alt={props.alt || ""} />;
+  // If error, show fallback
+  if (hasError) {
+    return (
+      <Image
+        src={FALLBACK_IMAGE_URL}
+        alt={alt}
+        fill={fill}
+        width={fill && !width ? undefined : width}
+        height={fill && !height ? undefined : height}
+        sizes={sizes || (fill ? "100vw" : undefined)}
+        priority={priority}
+        quality={quality}
+        placeholder={placeholder}
+        blurDataURL={blurUrl}
+        unoptimized={fill && (width === undefined || height === undefined)}
+        className={cn("object-cover", className)}
+        style={style}
+        loading={effectiveLoading}
+        onLoad={handleLoad}
+        onError={handleError}
+        {...props}
+      />
+    );
   }
-
-  const parsed = modeForComparison === IMAGE_LOAD_MODE.OPTIMIZED ? parsedSource : null;
-
-  if (!parsed) {
-    const isErrorMode = modeForComparison === IMAGE_LOAD_MODE.FALLBACK;
-    const imageSrc = isErrorMode ? FALLBACK_IMAGE_URL : getOriginalImageUrl(src || "");
-    return <img src={imageSrc} {...imageProps} data-error-image={isErrorMode || undefined} alt={props.alt || ""} />;
-  }
-
-  const focalPoint =
-    typeof focalPointX === "number" && typeof focalPointY === "number"
-      ? { x: focalPointX, y: focalPointY }
-      : undefined;
-
-  const aspectRatio =
-    originWidth && originHeight ? `${originWidth} / ${originHeight}` : undefined;
 
   return (
-    <ResponsiveImage
-      parsed={parsed}
-      fittingType={fittingType}
-      focalPoint={focalPoint}
+    <Image
+      src={src || FALLBACK_IMAGE_URL}
+      alt={alt}
+      fill={fill}
+      width={fill && !width ? undefined : width}
+      height={fill && !height ? undefined : height}
+      sizes={sizes || (fill ? "100vw" : undefined)}
+      priority={priority}
       quality={quality}
-      aspectRatio={aspectRatio}
-      {...imageProps}
+      placeholder={placeholder}
+      blurDataURL={blurUrl}
+      unoptimized={fill && (width === undefined || height === undefined)}
+      className={cn(
+        "transition-opacity duration-300",
+        isLoading && "opacity-0",
+        !isLoading && "opacity-100",
+        className
+      )}
+      style={{
+        objectFit,
+        objectPosition,
+        ...style,
+      }}
+      loading={effectiveLoading}
+      onLoad={handleLoad}
+      onError={handleError}
+      {...props}
     />
   );
-};
+}
 
-export { Image };
+/**
+ * Convenience wrapper for common use cases
+ */
+export function ProductImage({
+  src,
+  alt,
+  priority = false,
+  className,
+  ...props
+}: Omit<ImageProps, "fill" | "width" | "height" | "sizes"> & {
+  priority?: boolean;
+  className?: string;
+}) {
+  return (
+    <OptimizedImage
+      src={src}
+      alt={alt}
+      width={400}
+      height={300}
+      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+      priority={priority}
+      className={cn("rounded-xl", className)}
+      {...props}
+    />
+  );
+}
+
+export function HeroImage({
+  src,
+  alt,
+  priority = true,
+  className,
+  ...props
+}: Omit<ImageProps, "fill" | "width" | "height" | "sizes"> & {
+  priority?: boolean;
+  className?: string;
+}) {
+  return (
+    <OptimizedImage
+      src={src}
+      alt={alt}
+      fill
+      priority={priority}
+      className={cn("object-cover", className)}
+      sizes="100vw"
+      {...props}
+    />
+  );
+}
+
+export function ThumbnailImage({
+  src,
+  alt,
+  size = 64,
+  className,
+  ...props
+}: Omit<ImageProps, "fill" | "width" | "height" | "sizes"> & {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <OptimizedImage
+      src={src}
+      alt={alt}
+      width={size}
+      height={size}
+      sizes={`${size}px`}
+      className={cn("rounded-lg object-cover", className)}
+      {...props}
+    />
+  );
+}
+
+export function AvatarImage({
+  src,
+  alt,
+  size = 40,
+  className,
+  ...props
+}: Omit<ImageProps, "fill" | "width" | "height" | "sizes"> & {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <OptimizedImage
+      src={src}
+      alt={alt}
+      width={size}
+      height={size}
+      sizes={`${size}px`}
+      className={cn("rounded-full object-cover ring-2 ring-primary/20", className)}
+      {...props}
+    />
+  );
+}
+
+
+export { OptimizedImage as Image };

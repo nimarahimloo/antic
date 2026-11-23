@@ -4,18 +4,21 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, FileText, Settings, LogOut, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, FileText, Settings, LogOut, ChevronLeft, ChevronRight, Sparkles, UploadCloud, Palette } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
 
 const ADMIN_NAV = [
   { label: "داشبورد", href: "/admin", icon: LayoutDashboard },
+  { label: "فضای کاری هوش مصنوعی", href: "/admin/workspace", icon: Sparkles },
   { label: "درخواست‌ها", href: "/admin/requests", icon: FileText },
   { label: "مدل‌ها", href: "/admin/models", icon: Package },
   { label: "پروژه‌ها", href: "/admin/projects", icon: FileText },
   { label: "دسته‌بندی‌ها", href: "/admin/categories", icon: Package },
+  { label: "هارمونی بافت و رنگ", href: "/admin/fabric-library", icon: Palette },
   { label: "محصولات", href: "/admin/products", icon: ShoppingBag },
   { label: "سفارش‌ها", href: "/admin/orders", icon: Package },
+  { label: "بارگذاری گروهی", href: "/admin/bulk-upload", icon: UploadCloud },
   { label: "تنظیمات پنجره", href: "/admin/window", icon: Settings },
   { label: "تنظیمات", href: "/admin/settings", icon: Settings },
 ];

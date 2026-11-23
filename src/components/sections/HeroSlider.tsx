@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDown, ChevronRight, ChevronLeft } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
+import { HeroImage } from "@/components/ui/image";
 
 const FALLBACK_SLIDES = [
   {
@@ -89,7 +90,7 @@ export default function HeroSlider() {
           transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
           className="absolute inset-0"
         >
-          <img src={slide.image} alt={`پرده برای ${slide.title}`} className="h-full w-full object-cover" />
+          <HeroImage src={slide.image} alt={`پرده برای ${slide.title}`} priority />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/45 to-background/20" />
           <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/60" />
         </motion.div>

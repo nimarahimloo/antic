@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Providers } from "@/lib/providers";
+import { vazirmatn } from "@/lib/fonts";
 import "@/app/globals.css";
-import "@/styles/fonts.css";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://antic-curtain.ir";
 
@@ -42,6 +42,12 @@ export const metadata: Metadata = {
   verification: {
     google: "google-site-verification-code",
   },
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/manifest.json",
 };
 
 export const viewport: Viewport = {
@@ -57,13 +63,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl" className="scroll-smooth">
+    <html lang="fa" dir="rtl" className={`${vazirmatn.variable} scroll-smooth`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="bg-background text-foreground font-body antialiased min-h-screen">
         <Providers>{children}</Providers>

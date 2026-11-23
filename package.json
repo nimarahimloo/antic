@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.1"
+  },
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
@@ -11,7 +15,9 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit"
   },
+  "packageManager": "bun@1.1",
   "dependencies": {
+    "@ai-sdk/react": "4.0.177",
     "@cloudflare/workers-types": "^5.20261110.1",
     "@hookform/resolvers": "^4.1.2",
     "@radix-ui/react-accordion": "^1.2.3",
@@ -44,6 +50,7 @@
     "@stripe/react-stripe-js": "^3.0.0",
     "@stripe/stripe-js": "^5.2.0",
     "@tanstack/react-query": "^5.84.1",
+    "ai": "7.0.173",
     "bcryptjs": "^3.0.2",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
@@ -72,6 +79,7 @@
     "react-quill-new": "^3.7.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^2.15.4",
+    "remark-gfm": "^4.0.1",
     "sharp": "^0.33.5",
     "sonner": "^2.0.1",
     "tailwind-merge": "^3.0.2",

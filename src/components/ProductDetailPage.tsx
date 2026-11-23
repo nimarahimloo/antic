@@ -5,15 +5,13 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useProductDetail } from "@/hooks/useProductDetail";
 import { useVariantOptions } from "@/hooks/useVariantOptions";
-import { useCart } from "@/context/CartContext";
 import { productGallery, storeImage } from "@/lib/storeImage";
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductSpecs from "@/components/product/ProductSpecs";
-import { ArrowRight, ShoppingBag, Minus, Plus, Check, Truck, ShieldCheck, Headphones, Store, BadgeCheck, Phone } from "lucide-react";
+import { ArrowRight, Phone, Truck, ShieldCheck, Headphones, Store, BadgeCheck } from "lucide-react";
 
 export default function ProductDetailPage({ slug }: { slug: string }) {
   const d = useProductDetail(slug);
-  const { checkout, loading: cartLoading } = useCart();
   const { optionGroups, modifierGroups } = useVariantOptions(
     d.options, d.modifiers, d.selectedOptions, d.modifierValues
   );
@@ -23,14 +21,10 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
     [d.product]
   );
   const focusUrl = d.focusMediaUrl ? (storeImage(d.focusMediaUrl) ?? "") : "";
-  const contactOnly = !d.price;
-
-  async function buyNow() {
-    if (contactOnly || !d.product || !d.canAdd || d.adding || cartLoading) return;
-    const result = await d.submit();
-    if (result === null) return;
-    await checkout();
-  }
+  
+  const handleContact = () => {
+    window.location.href = SITE_PHONE_HREF;
+  };
 
   if (d.error) {
     return (
@@ -103,19 +97,10 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
 
               <div className="mt-6 rounded-2xl border border-secondary/60 bg-background p-5">
                 <span className="font-body text-xs text-muted-foreground">قیمت</span>
-                <div className="mt-1.5 flex flex-wrap items-baseline gap-3">
-                  {d.price ? (
-                    <span className="font-display text-2xl font-black text-primary">{d.price}</span>
-                  ) : (
-                    <a href={SITE_PHONE_HREF} className="btn-gold mt-1 inline-flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      تماس بگیرید
-                    </a>
-                  )}
-                  {d.compareAtPrice && d.compareAtPrice !== d.price && (
-                    <span className="font-body text-sm text-muted-foreground line-through">{d.compareAtPrice}</span>
-                  )}
-                </div>
+                <button type="button" onClick={handleContact} className="btn-gold mt-1 inline-flex items-center gap-2 w-full">
+                  <Phone className="h-4 w-4" />
+                  تماس بگیرید
+                </button>
               </div>
 
               {d.product.plainDescription && (
@@ -187,47 +172,20 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
                 <p className="mt-5 font-body text-xs text-primary">برای ادامه، گزینه‌ها را انتخاب کنید.</p>
               )}
 
-              {contactOnly ? (
-                <a href={SITE_PHONE_HREF} className="btn-gold mt-8 w-full justify-center" style={{ minHeight: 48 }}>
-                  <Phone className="h-4 w-4" />
-                  تماس بگیرید
-                </a>
-              ) : (
-                <>
-                  <div className="mt-8 flex items-center gap-4">
-                    <div className="flex items-center rounded-full border border-secondary/70 bg-background">
-                      <button onClick={() => d.setQuantity(Math.max(1, (Number(d.quantity) || 1) - 1))} className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-primary" aria-label="کاهش">
-                        <Minus className="h-4 w-4" />
-                      </button>
-                      <span className="w-10 text-center font-display text-sm font-bold text-foreground">{d.quantity || 1}</span>
-                      <button onClick={() => d.setQuantity((Number(d.quantity) || 1) + 1)} className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-primary" aria-label="افزایش">
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <button
-                      onClick={d.submit}
-                      disabled={!d.canAdd || d.adding}
-                      className="btn-ghost-gold flex-1 justify-center disabled:opacity-50"
-                      style={{ minHeight: 48 }}
-                    >
-                      <ShoppingBag className="h-4 w-4" /> افزودن به سبد
-                    </button>
-                  </div>
+              <button
+                type="button"
+                onClick={handleContact}
+                className="btn-gold mt-8 w-full justify-center"
+                style={{ minHeight: 48 }}
+              >
+                <Phone className="h-4 w-4" />
+                تماس بگیرید
+              </button>
 
-                  <button
-                    onClick={buyNow}
-                    disabled={!d.canAdd || d.adding || cartLoading}
-                    className="btn-gold mt-3 w-full justify-center disabled:opacity-50"
-                    style={{ minHeight: 48 }}
-                  >
-                    خرید آنی
-                  </button>
-                </>
-              )}
-
-              {d.inStock && d.variant && !contactOnly && (
+              {d.inStock && d.variant && (
                 <p className="mt-4 flex items-center gap-2 font-body text-xs text-muted-foreground">
-                  <Check className="h-4 w-4 text-primary" /> موجود و آماده ارسال
+                  <svg className="h-4 w-4 text-primary" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                  موجود و آماده ارسال
                 </p>
               )}
 

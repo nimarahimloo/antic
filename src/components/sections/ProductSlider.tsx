@@ -2,15 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight, Phone, ShoppingBag } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Phone } from "lucide-react";
 import { searchProducts } from "@/rest/store-catalog";
 import { productImage } from "@/lib/storeImage";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
-
-function hasPriced(product: Record<string, unknown>) {
-  const amt = Number((product?.actualPriceRange as { minValue?: { amount: number } })?.minValue?.amount);
-  return Number.isFinite(amt) && amt > 0;
-}
 
 export default function ProductSlider() {
   const [products, setProducts] = useState<Record<string, unknown>[]>([]);
@@ -158,8 +153,6 @@ export default function ProductSlider() {
           {!loading &&
             products.map((p) => {
               const img = productImage(p);
-              const priced = hasPriced(p);
-              const priceLabel = (p?.actualPriceRange as { minValue?: { formattedAmount: string } })?.minValue?.formattedAmount;
               return (
                 <article
                   key={(p as { id: string }).id}
@@ -185,28 +178,14 @@ export default function ProductSlider() {
                       </h3>
                     </Link>
                     <div className="mt-auto flex items-center justify-between gap-2 pt-4">
-                      {priced ? (
-                        <span className="font-display text-sm font-bold text-primary">{priceLabel}</span>
-                      ) : (
-                        <span className="font-body text-xs text-muted-foreground">قیمت با ابعاد</span>
-                      )}
-                      {priced ? (
-                        <Link
-                          href={`/product/${(p as { slug: string }).slug}`}
-                          className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/50 text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
-                          aria-label="مشاهده محصول"
-                        >
-                          <ShoppingBag className="h-4 w-4" />
-                        </Link>
-                      ) : (
-                        <a
-                          href={SITE_PHONE_HREF}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-[11px] font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
-                        >
-                          <Phone className="h-3.5 w-3.5" />
-                          تماس بگیرید
-                        </a>
-                      )}
+                      <span className="font-body text-xs text-muted-foreground">برای اطلاع از قیمت تماس بگیرید</span>
+                      <a
+                        href={SITE_PHONE_HREF}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-[11px] font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                        تماس بگیرید
+                      </a>
                     </div>
                   </div>
                 </article>

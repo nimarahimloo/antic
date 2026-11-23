@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { Image } from "@/components/ui/image";
+import { OptimizedImage } from "@/components/ui/image";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 
 /** چهار بافت اصلی هارمونی — نام و کاور از جدول CurtainCategory */
@@ -40,11 +40,16 @@ export default function FabricLibrary() {
     return HARMONY_SLUGS.map((slug) => {
       const cat = bySlug.get(slug);
       const fb = FALLBACK_META[slug as keyof typeof FALLBACK_META];
+      // اولویت: تصویر/گرادیان تنظیم شده در ادمین، سپس فیلد image دسته، سپس گرادیان پیش‌فرض
+      const backgroundImage = cat?.backgroundImage || null;
+      const backgroundGradient = cat?.backgroundGradient || fb.tone;
       return {
         slug,
         name: cat?.name || fb.name,
         description: (cat?.description && String(cat.description).trim()) || fb.blurb,
         image: cat?.image || null,
+        backgroundImage,
+        backgroundGradient,
         tone: fb.tone,
         // نمونه‌های اجرا شده + کاور همان دسته
         href: `/projects/category/${encodeURIComponent(slug)}`,
@@ -81,13 +86,18 @@ export default function FabricLibrary() {
               className="group relative flex aspect-[3/4] flex-col overflow-hidden rounded-3xl border border-secondary/50 bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.35)] transition-all duration-500 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_20px_50px_-24px_rgba(201,162,39,0.35)]"
             >
               <div className="absolute inset-0">
-                {item.image ? (
-                  <Image
-                    src={item.image}
+                {item.backgroundImage ? (
+                  <OptimizedImage
+                    src={item.backgroundImage}
                     alt={item.name}
-                    className="h-full w-full transition-transform duration-700 group-hover:scale-105"
-                    fittingType="fill"
+                    fill
+                    className="h-full w-full transition-transform duration-700 group-hover:scale-105 object-cover"
+                    sizes="100vw"
+                    priority={false}
+                    quality={85}
                   />
+                ) : item.backgroundGradient ? (
+                  <div className={`h-full w-full bg-gradient-to-br ${item.backgroundGradient}`} />
                 ) : (
                   <div
                     className={`h-full w-full bg-gradient-to-br ${
