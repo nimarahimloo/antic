@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/lib/AuthContext";
+import { HeroImage } from "@/components/ui/image";
 
 interface PageHeroProps {
   pageKey: string;
@@ -42,7 +43,7 @@ export default function PageHero({
     >
       {image ? (
         <div className="absolute inset-0" aria-hidden>
-          <img src={image} alt="" className="h-full w-full object-cover" />
+          <HeroImage src={image} alt="" priority={false} />
           <div className="absolute inset-0 bg-gradient-to-l from-background via-background/85 to-background/50" />
           <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-background/20" />
         </div>

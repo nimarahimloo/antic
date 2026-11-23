@@ -65,18 +65,14 @@ function drawWeave(ctx: CanvasRenderingContext2D, w: number, h: number, base: { 
   ctx.globalAlpha = 0.2;
   for (let y = 0; y < h; y += 3) {
     ctx.fillStyle = rgb(light, 1);
-    // @ts-ignore
     ctx.fillRect(0, y, w, 1);
     ctx.fillStyle = rgb(dark, 1);
-    // @ts-ignore
     ctx.fillRect(0, y + 1.5, w, 1);
   }
   for (let x = 0; x < w; x += 3) {
     ctx.fillStyle = rgb(dark, 1);
-    // @ts-ignore
     ctx.fillRect(x, 0, 1, h);
     ctx.fillStyle = rgb(light, 1);
-    // @ts-ignore
     ctx.fillRect(x + 1.5, 0, 1, h);
   }
   ctx.globalAlpha = 1;
@@ -87,7 +83,6 @@ function drawVelvetNap(ctx: CanvasRenderingContext2D, w: number, h: number) {
   for (let x = 0; x < w; x += 2) {
     const v = Math.sin(x * 0.05) * 0.06;
     ctx.fillStyle = v > 0 ? `rgba(255,255,255,${v})` : `rgba(0,0,0,${-v})`;
-    // @ts-ignore
     ctx.fillRect(x, 0, 2, h);
   }
 }
@@ -101,7 +96,6 @@ function drawSilkSheen(ctx: CanvasRenderingContext2D, w: number, h: number) {
     grad.addColorStop(0.5, "rgba(255,255,255,0.22)");
     grad.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = grad;
-    // @ts-ignore
     ctx.fillRect(0, y, w, 45);
   }
 }
@@ -109,7 +103,6 @@ function drawSilkSheen(ctx: CanvasRenderingContext2D, w: number, h: number) {
 // شفافیت تور — پس‌زمینه روشن از پشت
 function drawSheerVeil(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.fillStyle = "rgba(255,255,255,0.28)";
-  // @ts-ignore
   ctx.fillRect(0, 0, w, h);
 }
 
@@ -123,7 +116,6 @@ export function renderFabricCanvas(canvas: HTMLCanvasElement, fabric: Record<str
   const tex = String(fabric?.texture || "").toLowerCase();
   const cat = String(fabric?.category_slug || "");
 
-  // @ts-ignore
   ctx.fillStyle = rgb(base, 1);
   ctx.fillRect(0, 0, w, h);
 

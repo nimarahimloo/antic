@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { ZoomIn, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { mediaKey } from "@/lib/storeImage";
+import { OptimizedImage, ProductImage } from "@/components/ui/image";
+import { cn } from "@/lib/utils";
 
 interface ImageItem {
   url: string;
@@ -73,11 +75,17 @@ export default function ProductGallery({ images, focusUrl, productName }: Produc
             onMouseMove={onMove}
             onClick={() => setLightbox(true)}
           >
-            <img
+            <OptimizedImage
               src={current.url}
               alt={current.altText || productName}
-              className="h-full w-full object-cover transition-transform duration-150"
-              style={hovering ? { transform: "scale(1.9)", transformOrigin: `${origin.x}% ${origin.y}%` } : undefined}
+              fill
+              className={cn(
+                "object-cover transition-transform duration-150",
+                hovering ? "scale-190" : "scale-100"
+              )}
+              style={hovering ? { transformOrigin: `${origin.x}% ${origin.y}%` } : undefined}
+              priority
+              quality={90}
             />
             <span className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-background/70 px-3 py-1.5 backdrop-blur-md">
               <ZoomIn className="h-3.5 w-3.5 text-primary" />
@@ -122,7 +130,7 @@ export default function ProductGallery({ images, focusUrl, productName }: Produc
                     : "border-secondary/60 hover:border-primary/60"
                 }`}
               >
-                <img src={img.url} alt={img.altText || ""} className="h-full w-full object-cover" />
+                <OptimizedImage src={img.url} alt={img.altText || ""} fill className="object-cover" sizes="64px" />
               </button>
             ))}
           </div>
@@ -165,12 +173,15 @@ export default function ProductGallery({ images, focusUrl, productName }: Produc
             <ChevronLeft className="h-6 w-6" />
           </button>
 
-          <img
-            src={current.url}
-            alt={current.altText || productName}
-            className="max-h-[78vh] max-w-full rounded-xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div onClick={(e) => e.stopPropagation()}>
+            <OptimizedImage
+              src={current.url}
+              alt={current.altText || productName}
+              className="max-h-[78vh] max-w-full rounded-xl object-contain"
+              priority
+              quality={90}
+            />
+          </div>
 
           <div className="mt-5 flex gap-2 overflow-x-auto no-scrollbar" onClick={(e) => e.stopPropagation()}>
             {images.map((img, i) => (
@@ -183,7 +194,7 @@ export default function ProductGallery({ images, focusUrl, productName }: Produc
                 }`}
                 aria-label={`تصویر ${i + 1}`}
               >
-                <img src={img.url} alt="" className="h-full w-full object-cover" />
+                <OptimizedImage src={img.url} alt="" fill className="object-cover" sizes="56px" />
               </button>
             ))}
           </div>

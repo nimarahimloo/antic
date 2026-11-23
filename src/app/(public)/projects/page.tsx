@@ -1,21 +1,22 @@
-"use client";
-
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { getCurtainCategories } from "@/lib/server-data";
 import ProjectsList from "@/components/ProjectsList";
 import PageLoading from "@/components/PageLoading";
+import ProjectsListClientWrapper from "./ProjectsListClientWrapper";
 
-function ProjectsContent() {
-  const searchParams = useSearchParams();
-  const category = searchParams.get("category") || undefined;
-  const subcategory = searchParams.get("subcategory") || undefined;
-  return <ProjectsList category={category} subcategory={subcategory} />;
-}
+export default async function ProjectsPage() {
+  let categories: Array<{ id: string; name: string; slug: string; image: string | null; description: string }> = [];
+  
+  try {
+    categories = await getCurtainCategories();
+  } catch {
+    // During build, API might not be available - return empty array
+    categories = [];
+  }
 
-export default function ProjectsPage() {
   return (
     <Suspense fallback={<PageLoading />}>
-      <ProjectsContent />
+      <ProjectsListClientWrapper categories={categories} />
     </Suspense>
   );
 }

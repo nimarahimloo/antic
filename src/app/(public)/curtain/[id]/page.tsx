@@ -1,14 +1,17 @@
-"use client";
-
-import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { Suspense } from "react";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Phone, CheckCircle2, ExternalLink } from "lucide-react";
-import { api } from "@/api/client";
-import { apiErrorMessage } from "@/lib/apiError";
+import { getCurtainModel, getProjectsByCategory } from "@/lib/server-data";
 import CurtainPreview from "@/components/catalog/CurtainPreview";
 import ProjectCard from "@/components/ProjectCard";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
+import CurtainDetailClient from "./CurtainDetailClient";
+import PageLoading from "@/components/PageLoading";
+
+interface CurtainDetailPageProps {
+  params: Promise<{ id: string }>;
+}
 
 interface CurtainModel {
   id?: string;
@@ -25,81 +28,67 @@ interface CurtainModel {
   description?: string;
 }
 
-export default function CurtainDetailPage() {
-  const params = useParams();
-  const id = params.id as string;
-  const [model, setModel] = useState<CurtainModel | null>(null);
-  const [notFound, setNotFound] = useState(false);
-  const [loadedId, setLoadedId] = useState<string | null>(null);
-  const [relatedProjects, setRelatedProjects] = useState<Array<{ id: string; title: string; cover_image?: string }>>([]);
-  const [projectsLoading, setProjectsLoading] = useState(true);
+async function getModel(id: string) {
+  const model = await getCurtainModel(id);
+  if (!model) return null;
 
-  useEffect(() => {
-    if (!id) return;
-    let alive = true;
-    api.entities.CurtainModel.get(id)
-      .then((m) => {
-        if (!alive) return;
-        if (m) setModel(m as CurtainModel);
-        else setNotFound(true);
-      })
-      .catch((err) => {
-        console.error("Failed to load curtain model:", apiErrorMessage(err));
-        if (!alive) return;
-        setNotFound(true);
-      })
-      .finally(() => {
-        if (alive) setLoadedId(id);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [id]);
-
-  // Fetch related projects based on curtain model's category
-  useEffect(() => {
-    if (!model?.category_slug) {
-      setRelatedProjects([]);
-      setProjectsLoading(false);
-      return;
+  // Fetch related projects
+  let relatedProjects: Array<{ id: string; title: string; cover_image?: string }> = [];
+  if ((model as CurtainModel).category_slug) {
+    try {
+      relatedProjects = (await getProjectsByCategory(String((model as CurtainModel).category_slug))) as Array<{ id: string; title: string; cover_image?: string }>;
+    } catch {
+      relatedProjects = [];
     }
-    setProjectsLoading(true);
-    const pf: Record<string, string> = { category_slug: model.category_slug };
-    api.entities.Project.filter(pf, {
-      sort: "-created_date",
-      limit: 6,
-    })
-      .then((data) => {
-        setRelatedProjects((Array.isArray(data) ? data : []) as Array<{ id: string; title: string; cover_image?: string }>);
-      })
-      .catch((err) => {
-        console.error("Failed to load related projects:", apiErrorMessage(err));
-        setRelatedProjects([]);
-      })
-      .finally(() => setProjectsLoading(false));
-  }, [model?.category_slug]);
-
-  const loading = loadedId !== id;
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
-      </div>
-    );
   }
 
-  if (notFound || !model) {
-    return (
-      <div className="mx-auto max-w-2xl px-5 py-24 text-center">
-        <h1 className="font-display text-2xl font-black text-foreground">مدل پیدا نشد</h1>
-        <Link href="/catalog" className="btn-gold mt-6 inline-flex items-center justify-center">
-          بازگشت به کاتالوگ
-        </Link>
-      </div>
-    );
+  return { model: model as CurtainModel, relatedProjects };
+}
+
+async function generateStaticParams() {
+  // Pre-render popular models (limit to avoid build time issues)
+  // During build, API might not be available
+  try {
+    const models = await import("@/lib/server-data").then(m => m.getCurtainModels({}, 100));
+    return models.slice(0, 50).map((model) => ({
+      id: String(model.id),
+    }));
+  } catch {
+    // During build, return empty to skip static generation
+    return [];
+  }
+}
+
+export async function generateMetadata({ params }: CurtainDetailPageProps) {
+  try {
+    const resolvedParams = await params;
+    const data = await getModel(resolvedParams.id);
+    if (!data?.model) return { title: "مدل پیدا نشد" };
+
+    const model = data.model;
+    return {
+      title: String(model.code || model.name || "پرده آنتیک"),
+      description: String(model.description || "").slice(0, 160),
+      openGraph: {
+        title: String(model.code || model.name || "پرده آنتیک"),
+        description: String(model.description || "").slice(0, 160),
+        images: model.image ? [String(model.image)] : [],
+      },
+    };
+  } catch {
+    return { title: "پرده آنتیک" };
+  }
+}
+
+async function CurtainDetailServer({ params }: CurtainDetailPageProps) {
+  const resolvedParams = await params;
+  const data = await getModel(resolvedParams.id);
+
+  if (!data?.model) {
+    notFound();
   }
 
+  const { model, relatedProjects } = data;
   const hasInstall = Boolean(model.install_image);
 
   return (
@@ -109,12 +98,12 @@ export default function CurtainDetailPage() {
           <Link href="/" className="transition-colors hover:text-primary">
             خانه
           </Link>
-          <ArrowRight className="h-3 w-3" />
+          <span className="mx-1" aria-hidden>›</span>
           <Link href="/catalog" className="transition-colors hover:text-primary">
             کاتالوگ
           </Link>
-          <ArrowRight className="h-3 w-3" />
-          <span className="text-foreground">{model.code || model.name}</span>
+          <span className="mx-1" aria-hidden>›</span>
+          <span className="text-foreground">{String(model.code || model.name)}</span>
         </nav>
       </div>
 
@@ -124,8 +113,8 @@ export default function CurtainDetailPage() {
             <CurtainPreview fabric={model} publicMode />
             {hasInstall && (
               <div className="mt-3 flex items-center gap-2 text-[11px] text-primary">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                نمای نصب این مدل
+                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                <span>نمای نصب این مدل</span>
               </div>
             )}
           </div>
@@ -135,37 +124,38 @@ export default function CurtainDetailPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   {model.code && (
-                    <p className="font-display text-sm font-bold text-primary">{model.code}</p>
+                    <p className="font-display text-sm font-bold text-primary">{String(model.code)}</p>
                   )}
                   <h1 className="mt-1 font-display text-2xl font-black leading-snug text-foreground">
-                    {model.name || model.code}
+                    {String(model.name || model.code)}
                   </h1>
                 </div>
                 {model.color_code && (
                   <span
                     className="h-12 w-12 shrink-0 rounded-xl border border-secondary/60"
-                    style={{ backgroundColor: model.color_code }}
-                    title={model.color || ""}
+                    style={{ backgroundColor: String(model.color_code) }}
+                    title={String(model.color || "")}
                   />
                 )}
               </div>
 
               <div className="mt-6 grid grid-cols-2 gap-3">
-                {model.fabric && <Spec label="نوع پارچه" value={model.fabric} />}
-                {model.color && <Spec label="رنگ" value={model.color} />}
-                {model.texture && <Spec label="بافت" value={model.texture} />}
-                {model.material && <Spec label="جنس" value={model.material} />}
-                {model.category_slug && <Spec label="دسته" value={model.category_slug} />}
+                {model.fabric && <Spec label="نوع پارچه" value={String(model.fabric)} />}
+                {model.color && <Spec label="رنگ" value={String(model.color)} />}
+                {model.texture && <Spec label="بافت" value={String(model.texture)} />}
+                {model.material && <Spec label="جنس" value={String(model.material)} />}
+                {model.category_slug && <Spec label="دسته" value={String(model.category_slug)} />}
               </div>
 
               {model.description && (
                 <p className="mt-6 font-body text-sm leading-8 text-muted-foreground">
-                  {model.description}
+                  {String(model.description)}
                 </p>
               )}
 
               <a href={SITE_PHONE_HREF} className="btn-gold mt-8 flex w-full items-center justify-center">
-                <Phone className="mr-2 h-4 w-4" /> مشاوره و سفارش
+                <svg className="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35-.03.74-.25 1.02l-2.2 2.2z"/></svg>
+                <span>مشاوره و سفارش</span>
               </a>
               <Link href="/catalog" className="btn-ghost-gold mt-3 flex w-full items-center justify-center">
                 بازگشت به کاتالوگ
@@ -173,38 +163,30 @@ export default function CurtainDetailPage() {
             </div>
 
             {/* Related Projects Section */}
-            {model.category_slug && (
+            {relatedProjects.length > 0 && (
               <div className="mt-10">
                 <div className="mb-4 flex items-center justify-between">
                   <h2 className="font-display text-lg font-black text-foreground">نمونه‌های اجرا شده مرتبط</h2>
                   <Link
-                    href={`/projects/category/${model.category_slug}`}
+                    href={`/projects/category/${String(model.category_slug)}`}
                     className="font-body text-xs text-primary hover:underline flex items-center gap-1"
                   >
-                    مشاهده همه <ExternalLink className="h-3 w-3" />
+                    مشاهده همه
+                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/></svg>
                   </Link>
                 </div>
-                {projectsLoading ? (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {[...Array(3)].map((_, i) => (
-                      <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-secondary/40" />
-                    ))}
-                  </div>
-                ) : relatedProjects.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {relatedProjects.map((p) => (
-                      <ProjectCard key={p.id} project={p} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-8 text-center rounded-2xl border border-dashed border-secondary/60 bg-card/40">
-                    <p className="font-body text-sm text-muted-foreground">
-                      هنوز نمونه اجرا برای این دسته ثبت نشده است.
-                    </p>
-                  </div>
-                )}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {relatedProjects.slice(0, 6).map((p) => (
+                    <ProjectCard key={p.id} project={p} />
+                  ))}
+                </div>
               </div>
             )}
+
+            {/* Client-side interactive components */}
+            <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" /></div>}>
+              <CurtainDetailClient model={model} relatedProjects={relatedProjects} />
+            </Suspense>
           </div>
         </div>
       </div>
@@ -218,5 +200,13 @@ function Spec({ label, value }: { label: string; value: string }) {
       <p className="font-body text-[10px] text-muted-foreground">{label}</p>
       <p className="font-display text-sm font-bold text-foreground">{value}</p>
     </div>
+  );
+}
+
+export default async function CurtainDetailPage({ params }: CurtainDetailPageProps) {
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <CurtainDetailServer params={params} />
+    </Suspense>
   );
 }

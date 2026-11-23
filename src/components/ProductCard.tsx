@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { useProductCard } from "@/hooks/useProductCard";
-import { useCart } from "@/context/CartContext";
 import { storeImage } from "@/lib/storeImage";
-import { ShoppingBag, Phone } from "lucide-react";
+import { Phone } from "lucide-react";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 
 interface Product {
@@ -27,12 +26,8 @@ interface Product {
 }
 
 export default function ProductCard({ product }: { product: Product }) {
-  const { addToCart, loading } = useCart();
   const {
     isSoldOut,
-    priceDisplay,
-    compareAtDisplay,
-    contactForPrice,
     colors,
     optionLabel,
     isQuickAddable,
@@ -42,10 +37,10 @@ export default function ProductCard({ product }: { product: Product }) {
 
   const hasOptions = product.modifiers?.some((m: { mandatory?: boolean }) => m.mandatory) || !isQuickAddable;
 
-  const handleAdd = (e: React.MouseEvent) => {
+  const handleContact = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isQuickAddable && !hasOptions) addToCart(product.id, "", 1);
+    window.location.href = SITE_PHONE_HREF;
   };
 
   return (
@@ -76,11 +71,6 @@ export default function ProductCard({ product }: { product: Product }) {
               ناموجود
             </span>
           )}
-          {compareAtDisplay && !isSoldOut && (
-            <span className="absolute right-3 top-3 rounded-full bg-primary px-3 py-1 font-display text-[10px] font-bold text-primary-foreground">
-              تخفیف
-            </span>
-          )}
         </div>
 
         <div className="p-5">
@@ -104,39 +94,21 @@ export default function ProductCard({ product }: { product: Product }) {
 
           <div className="mt-4 flex items-end justify-between gap-2">
             <div>
-              {priceDisplay ? (
-                <div className="flex items-baseline gap-2">
-                  <span className="font-display text-lg font-bold text-primary">{priceDisplay}</span>
-                  {compareAtDisplay && (
-                    <span className="font-body text-xs text-muted-foreground line-through">{compareAtDisplay}</span>
-                  )}
-                </div>
+              {isSoldOut ? (
+                <span className="font-body text-xs text-muted-foreground">ناموجود</span>
               ) : (
-                <span className="font-body text-xs text-muted-foreground">قیمت با ابعاد</span>
+                <span className="font-body text-xs text-muted-foreground">برای اطلاع از قیمت تماس بگیرید</span>
               )}
             </div>
-            {contactForPrice ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.location.href = SITE_PHONE_HREF;
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-[11px] font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
-              >
-                <Phone className="h-3.5 w-3.5" />
-                تماس بگیرید
-              </button>
-            ) : (
-              <button
-                onClick={handleAdd}
-                disabled={loading || isSoldOut || !isQuickAddable || hasOptions}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/50 text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="افزودن به سبد"
-              >
-                <ShoppingBag className="h-4 w-4" />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleContact}
+              disabled={isSoldOut}
+              className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-[11px] font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Phone className="h-3.5 w-3.5" />
+              تماس بگیرید
+            </button>
           </div>
         </div>
       </article>

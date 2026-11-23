@@ -5,6 +5,7 @@ import { Upload, Loader2, Image as ImageIcon } from "lucide-react";
 import { compressImage } from "@/lib/compressImage";
 import { api } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
+import { OptimizedImage } from "@/components/ui/image";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -146,7 +147,7 @@ export default function AdminPageHeroes({
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex h-16 w-28 items-center justify-center overflow-hidden rounded-lg border border-secondary/60 bg-background">
                         {h.image ? (
-                          <img src={h.image} alt="" className="h-full w-full object-cover" />
+                          <OptimizedImage src={h.image} alt="" fill className="object-cover" sizes="112px" />
                         ) : (
                           <Upload className="h-4 w-4 text-muted-foreground" />
                         )}

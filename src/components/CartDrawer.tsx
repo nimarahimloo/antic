@@ -3,6 +3,10 @@
 import { useEffect, useMemo } from "react";
 import { useCart } from "@/context/CartContext";
 import { storeImage } from "@/lib/storeImage";
+import { ThumbnailImage } from "@/components/ui/image";
+
+// Feature flag: Cart functionality is disabled, only contact via phone is available
+const CART_ENABLED = false;
 
 export function formatToman(amount: number | string | null | undefined): string {
   if (amount == null || Number.isNaN(Number(amount))) return "";
@@ -10,6 +14,7 @@ export function formatToman(amount: number | string | null | undefined): string 
 }
 
 export default function CartDrawer() {
+  if (!CART_ENABLED) return null;
   const { cart, isOpen, setIsOpen, removeItem, updateQuantity, checkout, loading, error, clearError } =
     useCart();
 
@@ -85,7 +90,7 @@ export default function CartDrawer() {
               return (
                 <div key={item.id} className="flex gap-3 border-b border-border py-3">
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-sm bg-card">
-                    {image && <img src={image} alt="" className="h-full w-full object-cover" />}
+                    {image && <ThumbnailImage src={image} alt="" size={64} className="object-cover" />}
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="truncate font-semibold">{item.name?.original}</span>

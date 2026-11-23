@@ -82,17 +82,20 @@ model CurtainModel {
 }
 
 model CurtainCategory {
-  id            String   @id @default(cuid())
-  name          String
-  slug          String   @unique
-  description   String?
-  image         String?
-  order         Int      @default(0)
-  subcategories String?
-  inCatalog     Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  mechanism     String?
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  description     String?
+  image           String?
+  order           Int      @default(0)
+  subcategories   String?
+  inCatalog       Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  mechanism       String?
+  // هارمونی بافت و رنگ - پس‌زمینه کارت‌ها در سکشن فابریک لایبرری
+  backgroundImage String?
+  backgroundGradient String?
 }
 
 model PortfolioCategory {

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Phone, Mail, MapPin, Instagram, ShieldCheck, BadgeCheck } from "lucide-react";
+import { Phone, Mail, MapPin, Instagram } from "lucide-react";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { SITE_PHONE_HREF, SITE_PHONE_DISPLAY, SITE_EMAIL } from "@/lib/siteContact";
 import { useAuth } from "@/lib/AuthContext";
+import { ThumbnailImage } from "@/components/ui/image";
 
 const DEFAULT_LOGO = "/brand/mark.svg";
 
@@ -23,7 +24,7 @@ export default function Footer() {
         <div className="grid gap-12 md:grid-cols-4">
           <div className="md:col-span-1">
             <div className="flex items-center gap-3">
-              <img src={logoSrc} alt="Antic Curtain" className="h-11 w-11 object-contain" width={44} height={44} />
+              <ThumbnailImage src={logoSrc} alt="Antic Curtain" size={44} className="object-contain" />
               <div className="flex flex-col leading-none">
                 <span className="font-display text-lg font-bold text-foreground">پرده آنتیک</span>
                 <span className="mt-1 font-body text-[10px] tracking-wider text-primary">ANTIC CURTAIN</span>
@@ -104,36 +105,9 @@ export default function Footer() {
 
         <div className="gold-rule my-12" />
 
-        <div className="flex flex-col items-center gap-6 md:flex-row md:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <a
-              href="#"
-              className="group flex items-center gap-3 rounded-xl border border-secondary/70 bg-card/60 px-4 py-3 transition-colors hover:border-primary/60"
-              aria-label="نماد اعتماد الکترونیکی اینماد"
-            >
-              <ShieldCheck className="h-9 w-9 text-primary" strokeWidth={1.5} />
-              <div className="leading-tight">
-                <p className="font-display text-sm font-black text-foreground">اینماد</p>
-                <p className="font-body text-[10px] text-muted-foreground">نماد اعتماد الکترونیکی</p>
-              </div>
-            </a>
-            <a
-              href="#"
-              className="group flex items-center gap-3 rounded-xl border border-secondary/70 bg-card/60 px-4 py-3 transition-colors hover:border-primary/60"
-              aria-label="ساماندهی"
-            >
-              <BadgeCheck className="h-9 w-9 text-primary" strokeWidth={1.5} />
-              <div className="leading-tight">
-                <p className="font-display text-sm font-black text-foreground">ساماندهی</p>
-                <p className="font-body text-[10px] text-muted-foreground">سامانه نداهندگان</p>
-              </div>
-            </a>
-          </div>
-
-          <div className="text-center md:text-right">
-            <p className="font-body text-xs text-muted-foreground">© ۱۴۰۵ پرده آنتیک — تمامی حقوق محفوظ است.</p>
-            <p className="mt-1 font-body text-xs text-primary">ANTIQUE DRAPERY</p>
-          </div>
+        <div className="flex flex-col items-center gap-4 md:flex-row md:justify-between">
+          <p className="font-body text-xs text-muted-foreground">© ۱۴۰۵ پرده آنتیک — تمامی حقوق محفوظ است.</p>
+          <p className="font-body text-xs text-primary">ANTIQUE DRAPERY</p>
         </div>
       </div>
     </footer>

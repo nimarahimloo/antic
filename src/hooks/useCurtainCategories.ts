@@ -20,6 +20,8 @@ interface Category {
   subcategories: Array<{ name: string; slug: string }>;
   inCatalog: boolean;
   in_catalog: boolean;
+  backgroundImage: string | null;
+  backgroundGradient: string | null;
 }
 
 let cache: Category[] | null = null;
@@ -68,6 +70,8 @@ export function normalizeCategory(row: Record<string, unknown>): Category | null
     subcategories: parseSubs(row.subcategories),
     inCatalog,
     in_catalog: inCatalog,
+    backgroundImage: row.backgroundImage ? String(row.backgroundImage) : null,
+    backgroundGradient: row.backgroundGradient ? String(row.backgroundGradient) : null,
   };
 }
 

@@ -84,6 +84,7 @@ export default function FloatingBot({
   const sendingRef = useRef(false);
   const allowReceiveSound = useRef(false);
   const bootstrapped = useRef(false);
+  const localIdCounter = useRef(0);
 
   const scrollToEnd = useCallback((smooth = true) => {
     requestAnimationFrame(() => {
@@ -223,7 +224,8 @@ export default function FloatingBot({
     playSendSound();
 
     const attachments = pendingImage ? [{ type: "image", url: pendingImage }] : undefined;
-    const localId = `local-${Date.now()}`;
+    localIdCounter.current += 1;
+    const localId = `local-${localIdCounter.current}-${Math.random().toString(36).slice(2, 8)}`;
     const optimistic: Message = {
       role: "user",
       content: content || (attachments ? "📷 تصویر" : ""),
@@ -242,14 +244,14 @@ export default function FloatingBot({
     try {
       const id = await ensureConversation();
       if (!id) throw new Error("no conversation");
-      const started = Date.now();
+      const started = performance.now();
       const conv = await api.agents.addMessage(id, {
         role: "user",
         content: content || (attachments ? "[تصویر]" : ""),
         attachments,
         context: context || undefined,
       });
-      const wait = Math.max(0, 650 - (Date.now() - started));
+      const wait = Math.max(0, 650 - (performance.now() - started));
       if (wait) await new Promise((r) => setTimeout(r, wait));
 
       const next = (conv.messages || []).map((m) => ({

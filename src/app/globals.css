@@ -26,10 +26,10 @@
     --ring: 46 67% 47%;
     --radius: 0.75rem;
 
-    /* سه فونت محلی — فایل‌ها در public/fonts */
-    --font-body: "Yekan Bakh", Tahoma, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-    --font-heading: "Peyda", "Yekan Bakh", Tahoma, ui-sans-serif, system-ui, sans-serif;
-    --font-display: "Kalameh", "Peyda", "Yekan Bakh", Tahoma, ui-sans-serif, system-ui, sans-serif;
+    /* فونت‌های محلی در public/fonts - برای fallback */
+    --font-yekan: "Yekan Bakh", Tahoma, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    --font-peyda: "Peyda", "Yekan Bakh", Tahoma, ui-sans-serif, system-ui, sans-serif;
+    --font-kalameh: "Kalameh", "Peyda", "Yekan Bakh", Tahoma, ui-sans-serif, system-ui, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
     --gold: #C9A227;
@@ -44,6 +44,15 @@
     --sidebar-accent-foreground: 38 36% 96%;
     --sidebar-border: 0 0% 16.5%;
     --sidebar-ring: 46 67% 47%;
+  }
+}
+
+/* Font variables from next/font - injected via RootLayout */
+@layer base {
+  :root {
+    --font-body: var(--font-vazirmatn), var(--font-yekan);
+    --font-heading: var(--font-vazirmatn), var(--font-peyda);
+    --font-display: var(--font-vazirmatn), var(--font-kalameh);
   }
 }
 

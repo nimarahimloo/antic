@@ -12,6 +12,13 @@ import { apiErrorMessage } from "@/lib/apiError";
 import { api } from "@/api/client";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 import { getRootCategories, parseSubs } from "@/lib/categoryTree";
+import {
+  CatalogCardSkeleton,
+  ProjectCardSkeleton,
+  CurtainPreviewSkeleton,
+  CategoryScrollerSkeleton,
+  SubcategoryFilterSkeleton,
+} from "./InteractiveCatalogSkeletons";
 
 /**
  * کاتالوگ تعاملی — صفحات models
@@ -92,6 +99,13 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
     const el = scrollerRef.current;
     if (!el) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    
+    // Don't start dragging if clicking on a category button or its children
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-card]') || target.closest('button')) {
+      return;
+    }
+    
     dragRef.current = {
       active: true,
       startX: e.clientX,
@@ -132,12 +146,14 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
     setIsDragging(false);
   };
 
-  const onClickCapture = (_e: React.MouseEvent) => {
+  const onClickCapture = (e: React.MouseEvent) => {
     if (dragRef.current.moved) {
-      // e.preventDefault();
-      // e.stopPropagation();
+      // A drag happened, suppress the click
+      e.preventDefault();
+      e.stopPropagation();
       dragRef.current.moved = false;
     }
+    // If not moved, let the click propagate normally to the button
   };
 
   useEffect(() => {
@@ -451,10 +467,12 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
                   <Phone className="h-4 w-4" /> مشاوره و سفارش
                 </a>
               </motion.div>
+            ) : loading ? (
+              <CurtainPreviewSkeleton />
             ) : (
               <div className="flex min-h-[320px] items-center justify-center rounded-3xl border border-dashed border-secondary/60 bg-card/40 p-8 text-center">
                 <p className="font-body text-sm text-muted-foreground">
-                  {loading ? "در حال بارگذاری…" : "یک مدل را از سمت راست انتخاب کنید"}
+                  یک مدل را از سمت راست انتخاب کنید
                 </p>
               </div>
             )}
@@ -484,7 +502,7 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
               {loading ? (
                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                   {[...Array(6)].map((_, i) => (
-                    <div key={i} className="aspect-[4/5] animate-pulse rounded-xl bg-secondary/40" />
+                    <CatalogCardSkeleton key={i} />
                   ))}
                 </div>
               ) : gridItems.length > 0 ? (

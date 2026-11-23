@@ -7,6 +7,7 @@ import { compressImage } from "@/lib/compressImage";
 import { analyzeFabric } from "@/components/catalog/photo/fabricAnalyzer";
 import { adminToast } from "@/lib/adminToast";
 import { apiErrorMessage } from "@/lib/apiError";
+import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -451,7 +452,7 @@ export default function AdminEntityPage({
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
                         {form[f.key] ? (
-                          <img src={String(form[f.key])} alt="" className="h-full w-full object-cover" />
+                          <OptimizedImage src={String(form[f.key])} alt="" fill className="object-cover" sizes="80px" />
                         ) : (
                           <Upload className="h-5 w-5 text-muted-foreground" />
                         )}
@@ -522,7 +523,7 @@ export default function AdminEntityPage({
                       <div className="flex flex-wrap gap-2">
                         {(Array.isArray(form[f.key]) ? (form[f.key] as unknown[]) : []).map((url, i) => (
                           <div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg border border-secondary/60">
-                            <img src={String(url)} alt="" className="h-full w-full object-cover" />
+                            <ThumbnailImage src={String(url)} alt="" size={64} className="object-cover" />
                             <button
                               type="button"
                               className="absolute inset-0 bg-black/50 text-[10px] text-white opacity-0 hover:opacity-100"

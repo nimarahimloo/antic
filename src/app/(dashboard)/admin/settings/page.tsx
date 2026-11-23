@@ -12,6 +12,7 @@ import AdminPageHeroes, {
   normalizePageHeroes,
   serializePageHeroes,
 } from "@/components/admin/AdminPageHeroes";
+import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -204,9 +205,9 @@ export default function AdminSettingsPage() {
             </div>
           ) : (
             <div className="mt-4 flex flex-wrap items-center gap-4">
-              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
+              <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
                 {logoUrl ? (
-                  <img src={logoUrl} alt="لوگو" className="h-full w-full object-contain" />
+                  <OptimizedImage src={logoUrl} alt="لوگو" fill className="object-contain" sizes="80px" />
                 ) : (
                   <img src="/brand/mark.svg" alt="پیش‌فرض" className="h-12 w-12 object-contain opacity-70" />
                 )}
@@ -266,8 +267,8 @@ export default function AdminSettingsPage() {
                     <div className="sm:col-span-2">
                       <label className={labelCls}>تصویر</label>
                       <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-lg border border-secondary/60 bg-background">
-                          {s.image ? <img src={s.image} alt="" className="h-full w-full object-cover" /> : <Upload className="h-4 w-4 text-muted-foreground" />}
+                        <div className="relative flex h-16 w-24 items-center justify-center overflow-hidden rounded-lg border border-secondary/60 bg-background">
+                          {s.image ? <OptimizedImage src={s.image} alt="" fill className="object-cover" sizes="96px" /> : <Upload className="h-4 w-4 text-muted-foreground" />}
                         </div>
                         <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-3 py-2 font-body text-xs font-bold text-primary">
                           {uploadingSlide === idx ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
