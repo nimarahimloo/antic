@@ -218,6 +218,7 @@ export function RenderTemplateManager() {
                   <div className="flex-1">
                     <input
                       type="file"
+                      id={`upload-${cat.slug}`}
                       accept="image/*"
                       multiple
                       className="hidden"
@@ -229,6 +230,7 @@ export function RenderTemplateManager() {
                       }}
                     />
                     <label
+                      htmlFor={`upload-${cat.slug}`}
                       className="flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg border border-primary/50 py-1.5 text-[10px] font-bold text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {busy === cat.slug ? (

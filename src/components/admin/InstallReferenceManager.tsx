@@ -146,7 +146,10 @@ export function InstallReferenceManager() {
                       {cat.mechanism ? ` · ${cat.mechanism}` : ""}
                     </p>
                   </div>
-                  <label className="flex cursor-pointer items-center gap-1 rounded-lg border border-primary/50 px-2 py-1 text-[10px] text-primary">
+                  <label
+                    htmlFor={`install-ref-upload-${slug}`}
+                    className="flex cursor-pointer items-center gap-1 rounded-lg border border-primary/50 px-2 py-1 text-[10px] text-primary"
+                  >
                     {busy === slug ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
@@ -155,6 +158,7 @@ export function InstallReferenceManager() {
                     {mine.length ? "افزودن عکس" : "آپلود مرجع"}
                     <input
                       type="file"
+                      id={`install-ref-upload-${slug}`}
                       accept="image/*"
                       multiple
                       className="hidden"
