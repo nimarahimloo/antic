@@ -9,6 +9,13 @@ function autoApproveThreshold() {
   return Number.isFinite(n) ? n : 7;
 }
 
+type FailedModel = {
+  id: string;
+  code?: string | null;
+  name?: string | null;
+  error: string;
+};
+
 type JobState = {
   running: boolean;
   processed: number;
@@ -18,6 +25,7 @@ type JobState = {
   currentModelId?: string;
   startedAt?: number;
   avgScore?: number;
+  failedModels: FailedModel[];
 };
 
 const state: JobState = {
@@ -25,6 +33,7 @@ const state: JobState = {
   processed: 0,
   failed: 0,
   total: 0,
+  failedModels: [],
 };
 
 export function getQueueState() {
@@ -228,6 +237,7 @@ export async function runBatch(opts?: {
   (async () => {
     let scoreSum = 0;
     let scoreN = 0;
+    state.failedModels = [];
     for (const m of targets) {
       state.currentModelId = m.id;
       try {
@@ -240,8 +250,15 @@ export async function runBatch(opts?: {
         }
       } catch (e) {
         state.failed++;
-        state.lastError = e instanceof Error ? e.message : String(e);
-        console.error("[render-batch]", m.id, state.lastError);
+        const msg = e instanceof Error ? e.message : String(e);
+        state.lastError = msg;
+        state.failedModels.push({
+          id: m.id,
+          code: m.code ?? null,
+          name: m.name ?? null,
+          error: msg,
+        });
+        console.error("[render-batch]", m.id, msg);
       }
     }
     state.running = false;

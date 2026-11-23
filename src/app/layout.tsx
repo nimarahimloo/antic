@@ -63,7 +63,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl" className={`${vazirmatn.variable} scroll-smooth`}>
+    <html lang="fa" dir="rtl" className={`${vazirmatn.variable} scroll-smooth`} data-scroll-behavior="smooth">
       <head>
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="manifest" href="/manifest.json" />

@@ -108,8 +108,20 @@ router.get("/stats", requireAdmin, async (_req, res) => {
     const templateRows = await prisma.renderTemplate.findMany({
       select: { style: true },
     });
-    const templateStyles = new Set(templateRows.map((t) => t.style));
-    const missingTemplates = ALL_STYLE_KEYS.filter((k) => !templateStyles.has(k));
+    const templateStyles = new Set(templateRows.map((t) => t.style.toLowerCase()));
+
+    // استایل‌هایی که برای مدل‌های پردازش‌شونده (دارف پارچه و بدون نصب) realاً تمپلت ندارند
+    const missingTemplateStyles = new Set<string>();
+    for (const m of models) {
+      if (!m.image || m.installImage) continue;
+      const style = resolveStyle(m).toLowerCase();
+      const catSlug = (m.categorySlug || "").toLowerCase();
+      // resolveTemplateCandidates هر دو را جستجو می‌کند؛ اگر هیچ‌کدام وجود نداشته باشد، تمپلت مفقود است
+      if (!templateStyles.has(style) && !templateStyles.has(catSlug)) {
+        missingTemplateStyles.add(style);
+      }
+    }
+    const missingTemplates = [...missingTemplateStyles];
 
     res.json({
       total: models.length,
@@ -229,6 +241,23 @@ router.post("/template/all-categories", requireAdmin, async (_req: AuthedRequest
           data: { style: cat.slug, image: gen.publicPath },
         });
       }
+
+      // همچنین تمپلیت با کلید مکانیزم ذخیره شود تا رندرینگ پیدا کند
+      const mechExisting = await prisma.renderTemplate.findFirst({
+        where: { style: mechanism },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (mechExisting) {
+        await prisma.renderTemplate.update({
+          where: { id: mechExisting.id },
+          data: { image: gen.publicPath },
+        });
+      } else {
+        await prisma.renderTemplate.create({
+          data: { style: mechanism, image: gen.publicPath },
+        });
+      }
+
       results.push({ slug: cat.slug, name: cat.name, mechanism, path: gen.publicPath });
     }
     res.json({ ok: true, count: results.length, results });
