@@ -88,6 +88,8 @@ export default function CategoryCarousel() {
     const el = scrollerRef.current;
     if (!el) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    // اگر کلیک روی یک لینک است، درگ را شروع نکن ( navigaton را مسدود نکن)
+    if ((e.target as HTMLElement).closest('a, [href]')) return;
     dragRef.current = {
       active: true,
       startX: e.clientX,
@@ -130,6 +132,8 @@ export default function CategoryCarousel() {
 
   const onClickCapture = (e: React.MouseEvent) => {
     if (dragRef.current.moved) {
+      // اگر کلیک روی یک لینک است، ن.navigation را مسدود نکن
+      if ((e.target as HTMLElement).closest('a, [href]')) return;
       e.preventDefault();
       e.stopPropagation();
       dragRef.current.moved = false;

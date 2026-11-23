@@ -146,7 +146,7 @@ export default function ProductGallery({ images, focusUrl, productName }: Produc
             type="button"
             onClick={() => setLightbox(false)}
             aria-label="بستن"
-            className="absolute top-5 left-5 flex h-10 w-10 items-center justify-center rounded-full bg-secondary/60 text-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+            className="z-20 absolute top-5 left-5 flex h-10 w-10 items-center justify-center rounded-full bg-secondary/60 text-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
           >
             <X className="h-5 w-5" />
           </button>
@@ -157,7 +157,7 @@ export default function ProductGallery({ images, focusUrl, productName }: Produc
               go(-1);
             }}
             aria-label="تصویر قبلی"
-            className="absolute top-1/2 right-4 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-secondary/60 text-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+            className="z-20 absolute top-1/2 right-4 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-secondary/60 text-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
           >
             <ChevronRight className="h-6 w-6" />
           </button>
@@ -168,16 +168,17 @@ export default function ProductGallery({ images, focusUrl, productName }: Produc
               go(1);
             }}
             aria-label="تصویر بعدی"
-            className="absolute top-1/2 left-4 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-secondary/60 text-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+            className="z-20 absolute top-1/2 left-4 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-secondary/60 text-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
 
-          <div onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-[90vw] max-h-[78vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
             <OptimizedImage
               src={current.url}
               alt={current.altText || productName}
-              className="max-h-[78vh] max-w-full rounded-xl object-contain"
+              fill
+              className="rounded-xl object-contain"
               priority
               quality={90}
             />
