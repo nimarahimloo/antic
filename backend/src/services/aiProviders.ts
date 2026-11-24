@@ -305,10 +305,13 @@ export function getChatModel(providerId: AIProviderId, modelId: string): Languag
     const baseURL =
       process.env.CLOUDFLARE_AI_BASE_URL?.replace(/\/$/, "") ||
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`;
+    const gatewayId =
+      process.env.CLOUDFLARE_AI_GATEWAY_ID?.trim() || "nvidia-m";
     const provider = createOpenAICompatible({
       name: "cloudflare-workers-ai",
       baseURL,
       apiKey: apiToken,
+      headers: { "cf-aig-gateway-id": gatewayId },
       includeUsage: true,
     });
     return provider(modelId);
