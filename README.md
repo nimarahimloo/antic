@@ -76,7 +76,7 @@ PUBLIC_BASE_URL="https://your-domain.ir"   # یا آدرس API اگر جداست
 - ابزارهای داخلی Workspace از طریق AI SDK مستقیماً همان توابع دامنهٔ `aiCatalog` را اجرا می‌کنند؛ Workspace برای فراخوانی ابزارهای داخلی به Worker خودش HTTP نمی‌زند و هیچ network hop اضافه‌ای به سایت تحمیل نمی‌کند.
 - Worker موجود `mcp.pardehantic.ir/mcp` فقط درگاه MCP عمومی برای کلاینت‌های خارجی است: Streamable HTTP را مدیریت می‌کند و ابزارهای فقط‌خواندنی کاتالوگ/پروژه را به Backend bridge می‌کند؛ Worker مسئول inference، انتخاب مدل، فایل‌های خصوصی یا مدیریت Gateway نیست.
 - مسیر `POST /api/mcp/tools/:name` فقط از Worker معتبر با `MCP_WORKER_TOKEN` درخواست می‌پذیرد؛ همان secret باید در محیط Backend و در تنظیمات Secretهای Worker با نام یکسان تنظیم شود. مقدار واقعی هرگز در Git ذخیره نشود.
-- چت Cloudflare و تولید تصویر FLUX.2 هر دو از شناسهٔ `CLOUDFLARE_AI_GATEWAY_ID` استفاده می‌کنند. Providerهای مستقل Google/NVIDIA/OpenRouter همچنان از endpoint اختصاصی خودشان عبور می‌کنند و نباید به‌عنوان ترافیک عبوری از Cloudflare Gateway گزارش شوند..
+- چت Cloudflare و تولید تصویر FLUX.2 هر دو از شناسهٔ `CLOUDFLARE_AI_GATEWAY_ID` استفاده می‌کنند. Providerهای مستقل Google/NVIDIA/OpenRouter همچنان از endpoint اختصاصی خودشان عبور می‌کنند و نباید به‌عنوان ترافیک عبوری از Cloudflare Gateway گزارش شوند.
 - تولید و ویرایش تصویر با FLUX.2 و حداکثر چهار تصویر مرجع
 - فایل‌های ورودی و خروجی خصوصی در `AI_PRIVATE_DIR`؛ این فایل‌ها زیر `/uploads` عمومی قرار نمی‌گیرند
 - محدودیت روزانهٔ درخواست، توکن و بودجهٔ محافظه‌کارانهٔ Cloudflare
