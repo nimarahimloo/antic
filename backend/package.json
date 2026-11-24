@@ -26,7 +26,8 @@
     "chroma:ensure": "node scripts/ensure-chroma.mjs",
     "typecheck": "tsc --noEmit",
     "postdeploy": "node scripts/ensure-chroma.mjs",
-    "restore:admin": "node scripts/restore-adminActions.mjs"
+    "restore:admin": "node scripts/restore-adminActions.mjs",
+    "test:order-pricing": "node --import tsx --test scripts/order-pricing.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.124",
