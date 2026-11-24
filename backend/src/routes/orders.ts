@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { HttpError, sendError } from "../lib/errors.js";
 import { routeParam } from "../lib/routeParams.js";
 import { requireAdmin, optionalAuth, type AuthedRequest } from "../middleware/auth.js";
+import { buildPricedCheckout } from "../services/orderPricing.js";
 
 const router = Router();
 
@@ -50,11 +51,9 @@ const checkoutSchema = z.object({
   items: z
     .array(
       z.object({
-        productId: z.string(),
-        name: z.string(),
-        quantity: z.number().int().positive(),
-        unitPrice: z.number().nonnegative(),
-        image: z.string().optional(),
+        productId: z.string().min(1).max(128),
+        variantId: z.string().min(1).max(160).optional(),
+        quantity: z.number().int().positive().max(999),
       })
     )
     .min(1),
@@ -63,11 +62,21 @@ const checkoutSchema = z.object({
 router.post("/checkout", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const body = checkoutSchema.parse(req.body);
-    const amountToman = body.items.reduce(
-      (s, i) => s + Math.round(i.unitPrice) * i.quantity,
-      0
-    );
-    if (amountToman < 1000) throw new HttpError(400, "مبلغ سفارش خیلی کم است.");
+    const products = await prisma.product.findMany({
+      where: { id: { in: [...new Set(body.items.map((item) => item.productId))] } },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        image: true,
+        visible: true,
+        inStock: true,
+        stock: true,
+        variantsJson: true,
+      },
+    });
+    const pricedCheckout = buildPricedCheckout(body.items, products);
+    const { items, amountToman } = pricedCheckout;
 
     const amountRial = amountToman * 10;
     const MERCHANT = merchantId();
@@ -84,7 +93,7 @@ router.post("/checkout", optionalAuth, async (req: AuthedRequest, res) => {
         customerEmail: body.customerEmail || null,
         customerAddress: body.customerAddress || null,
         note: body.note || null,
-        itemsJson: JSON.stringify(body.items),
+        itemsJson: JSON.stringify(items),
         amountToman,
         amountRial,
         gateway: "zarinpal",
