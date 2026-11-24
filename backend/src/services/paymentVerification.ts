@@ -13,3 +13,20 @@ export function requireMatchingPaymentAuthority(
   }
   return storedAuthority;
 }
+
+export type PaymentCallbackAction = "already_paid" | "cancel" | "verify" | "ignore";
+
+/**
+ * Keeps callback handling monotonic: paid orders cannot be downgraded by replayed NOK
+ * callbacks, and terminal failed/cancelled orders cannot be reopened by stale callbacks.
+ */
+export function classifyPaymentCallback(
+  orderStatus: string,
+  callbackStatus: string
+): PaymentCallbackAction {
+  if (orderStatus === "paid") return "already_paid";
+  if (orderStatus !== "pending") return "ignore";
+  if (callbackStatus === "NOK") return "cancel";
+  if (callbackStatus === "OK") return "verify";
+  return "ignore";
+}
