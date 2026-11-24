@@ -79,8 +79,20 @@ router.get("/", (_req, res) => {
 
 router.post("/tools/:name", async (req, res) => {
   try {
+    requireMcpWorker(req);
     const name = req.params.name;
-    const args = (req.body || {}) as Record<string, unknown>;
+    const schema = toolSchemas[name as keyof typeof toolSchemas];
+    if (!schema) {
+      return res.status(404).json({ error: "Unknown tool" });
+    }
+    const parsed = schema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Invalid tool arguments",
+        details: parsed.error.flatten(),
+      });
+    }
+    const args = parsed.data as Record<string, unknown>;
 
     if (name === "list_categories") {
       return res.json(await listCurtainCategories());
