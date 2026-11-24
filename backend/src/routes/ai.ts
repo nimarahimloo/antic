@@ -533,7 +533,7 @@ router.post("/chat", async (req: AuthedRequest, res) => {
     // ─── Automatic routing with failover (backend-driven only) ───
     // No manual provider/model override is accepted. Always route across all
     // healthy, configured free providers.
-    const route = selectChatRoute();
+    const route = selectChatRoute({ requireTools: true });
     if (!route.primary) {
       throw new HttpError(
         503,
