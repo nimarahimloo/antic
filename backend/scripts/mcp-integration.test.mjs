@@ -20,10 +20,10 @@ await new Promise((resolve, reject) => {
 
 const address = backendServer.address();
 assert.ok(address && typeof address === "object", "Backend must bind to an ephemeral TCP port");
-const backendBase = \`http://127.0.0.1:\${address.port}\`;
+const backendBase = "http://127.0.0.1:" + address.port;
 const workerEnv = {
   MCP_WORKER_TOKEN: workerToken,
-  MCP_BACKEND_URL: \`\${backendBase}/api/mcp/tools\`,
+  MCP_BACKEND_URL: backendBase + "/api/mcp/tools",
 };
 
 let category;
@@ -59,19 +59,20 @@ async function callTool(id, name, args = {}, overrides = {}) {
 }
 
 function decodeToolText(payload) {
-  const text = payload?.result?.content?.[0]?.text;
+  const text = payload && payload.result && payload.result.content &&
+    payload.result.content[0] && payload.result.content[0].text;
   assert.equal(typeof text, "string", "MCP tool result must include a text content block");
   return JSON.parse(text);
 }
 
-test("MCP client → Cloudflare Worker → authenticated Express backend → Prisma catalog", async (t) => {
+test("MCP client -> Worker -> authenticated Backend -> Prisma catalog", async (t) => {
   try {
     await prisma.$connect();
 
     category = await prisma.curtainCategory.create({
       data: {
-        name: \`MCP Integration Category \${marker}\`,
-        slug: \`mcp-it-\${marker}\`,
+        name: "MCP Integration Category " + marker,
+        slug: "mcp-it-" + marker,
         description: "Created by isolated MCP integration test",
         mechanism: "integration-test",
         subcategories: "[]",
@@ -81,8 +82,8 @@ test("MCP client → Cloudflare Worker → authenticated Express backend → Pri
 
     model = await prisma.curtainModel.create({
       data: {
-        code: \`MCP-IT-\${marker}\`,
-        name: \`MCP Integration Model \${marker}\`,
+        code: "MCP-IT-" + marker,
+        name: "MCP Integration Model " + marker,
         categorySlug: category.slug,
         image: "https://example.invalid/mcp-integration-test.png",
         fabric: "integration-test-fabric",
@@ -92,7 +93,7 @@ test("MCP client → Cloudflare Worker → authenticated Express backend → Pri
 
     project = await prisma.project.create({
       data: {
-        title: \`MCP Integration Project \${marker}\`,
+        title: "MCP Integration Project " + marker,
         categorySlug: category.slug,
         description: "Created by isolated MCP integration test",
       },
@@ -112,7 +113,7 @@ test("MCP client → Cloudflare Worker → authenticated Express backend → Pri
       assert.equal(payload.result.serverInfo.name, "pardehantic-catalog-mcp");
     });
 
-    await t.test("MCP tools/list returns the backend-backed tool contract", async () => {
+    await t.test("MCP tools/list returns the tool contract", async () => {
       const { response, payload } = await mcpRequest({
         jsonrpc: "2.0",
         id: 2,
@@ -126,7 +127,7 @@ test("MCP client → Cloudflare Worker → authenticated Express backend → Pri
       );
     });
 
-    await t.test("list_categories reaches the real Prisma database", async () => {
+    await t.test("list_categories reads the real Prisma database", async () => {
       const { response, payload } = await callTool(3, "list_categories");
       assert.equal(response.status, 200);
       assert.equal(payload.result.isError, false);
@@ -136,7 +137,7 @@ test("MCP client → Cloudflare Worker → authenticated Express backend → Pri
       assert.ok(rows.some((row) => row.id === category.id && row.slug === category.slug));
     });
 
-    await t.test("search_models returns the seeded integration fixture", async () => {
+    await t.test("search_models returns the integration fixture", async () => {
       const { response, payload } = await callTool(4, "search_models", {
         query: marker,
         limit: 5,
@@ -171,7 +172,7 @@ test("MCP client → Cloudflare Worker → authenticated Express backend → Pri
     });
 
     await t.test("Backend rejects a direct unauthenticated bridge request", async () => {
-      const response = await fetch(\`\${backendBase}/api/mcp/tools/list_categories\`, {
+      const response = await fetch(backendBase + "/api/mcp/tools/list_categories", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: "{}",
@@ -179,7 +180,7 @@ test("MCP client → Cloudflare Worker → authenticated Express backend → Pri
       assert.equal(response.status, 401);
     });
 
-    await t.test("a Worker with the wrong origin credential cannot read the Backend", async () => {
+    await t.test("a Worker with the wrong origin credential cannot read Backend data", async () => {
       const { response, payload } = await callTool(
         7,
         "list_categories",
@@ -193,7 +194,7 @@ test("MCP client → Cloudflare Worker → authenticated Express backend → Pri
       assert.equal(error.status, 401);
     });
 
-    await t.test("Backend Zod validation rejects invalid tool arguments end to end", async () => {
+    await t.test("Backend schema validation rejects invalid arguments end to end", async () => {
       const { response, payload } = await callTool(8, "search_models", {
         query: "x".repeat(161),
       });
@@ -204,9 +205,9 @@ test("MCP client → Cloudflare Worker → authenticated Express backend → Pri
       assert.equal(error.status, 400);
     });
 
-    await t.test("missing records are returned as MCP tool errors", async () => {
+    await t.test("missing database records are returned as MCP tool errors", async () => {
       const { response, payload } = await callTool(9, "get_model", {
-        id: \`missing-\${marker}\`,
+        id: "missing-" + marker,
       });
       assert.equal(response.status, 200);
       assert.equal(payload.result.isError, true);
@@ -216,12 +217,15 @@ test("MCP client → Cloudflare Worker → authenticated Express backend → Pri
       assert.match(error.error, /پیدا نشد/);
     });
   } finally {
-    if (project) await prisma.project.deleteMany({ where: { id: project.id } });
-    if (model) await prisma.curtainModel.deleteMany({ where: { id: model.id } });
-    if (category) await prisma.curtainCategory.deleteMany({ where: { id: category.id } });
-    await prisma.$disconnect();
-    await new Promise((resolve, reject) => {
-      backendServer.close((error) => (error ? reject(error) : resolve()));
-    });
+    try {
+      if (project) await prisma.project.deleteMany({ where: { id: project.id } });
+      if (model) await prisma.curtainModel.deleteMany({ where: { id: model.id } });
+      if (category) await prisma.curtainCategory.deleteMany({ where: { id: category.id } });
+    } finally {
+      await prisma.$disconnect();
+      await new Promise((resolve, reject) => {
+        backendServer.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
   }
 });
