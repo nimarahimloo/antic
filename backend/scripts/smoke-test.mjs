@@ -144,19 +144,58 @@ async function main() {
       : fail("catalog categories", `${r.status}`);
   }
 
-  // 10. Payment must fail closed when no real merchant is configured.
-  if (!process.env.ZARINPAL_MERCHANT_ID) {
-    const r = await req("/api/orders/checkout", {
+  // 10. Checkout never trusts client price/name/image fields.
+  {
+    const unknown = await req("/api/orders/checkout", {
       method: "POST",
       body: {
         customerName: "Smoke Buyer",
         customerPhone: "09121112233",
-        items: [{ productId: "p1", name: "Test", quantity: 1, unitPrice: 50000 }],
+        items: [{
+          productId: "missing-product-smoke",
+          quantity: 1,
+          name: "Fake",
+          unitPrice: 1000,
+          image: "https://attacker.invalid/fake.webp",
+        }],
       },
     });
-    r.status === 503
-      ? ok("checkout rejects missing payment gateway")
-      : fail("checkout rejects missing payment gateway", `${r.status} ${JSON.stringify(r.data)}`);
+    unknown.status === 404
+      ? ok("checkout rejects products not present in catalog")
+      : fail("checkout rejects products not present in catalog", `${unknown.status} ${JSON.stringify(unknown.data)}`);
+  }
+
+  // Use a real seeded product; with no merchant configured the safe response is 503,
+  // after the server has resolved the product and canonical price from the database.
+  if (!process.env.ZARINPAL_MERCHANT_ID) {
+    const catalog = await req("/api/catalog/products?limit=100&inStockOnly=true");
+    const product = Array.isArray(catalog.data?.products)
+      ? catalog.data.products.find((item) =>
+          Number(item.actualPriceRange?.minValue?.amount) > 0 &&
+          item.inventory?.availabilityStatus === "IN_STOCK"
+        )
+      : null;
+    if (!product) {
+      fail("checkout pricing fixture", "no priced in-stock product available in seeded catalog");
+    } else {
+      const r = await req("/api/orders/checkout", {
+        method: "POST",
+        body: {
+          customerName: "Smoke Buyer",
+          customerPhone: "09121112233",
+          items: [{
+            productId: product.id,
+            quantity: 1,
+            name: "Tampered name",
+            unitPrice: 1,
+            image: "https://attacker.invalid/fake.webp",
+          }],
+        },
+      });
+      r.status === 503
+        ? ok("checkout resolves trusted catalog item before payment gateway guard")
+        : fail("checkout pricing/payment guard", `${r.status} ${JSON.stringify(r.data)}`);
+    }
   }
 
   // 11. Admin orders list

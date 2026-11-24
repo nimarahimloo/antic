@@ -4,6 +4,8 @@ import { prisma } from "../lib/prisma.js";
 import { HttpError, sendError } from "../lib/errors.js";
 import { routeParam } from "../lib/routeParams.js";
 import { requireAdmin, optionalAuth, type AuthedRequest } from "../middleware/auth.js";
+import { buildPricedCheckout } from "../services/orderPricing.js";
+import { classifyPaymentCallback, requireMatchingPaymentAuthority } from "../services/paymentVerification.js";
 
 const router = Router();
 
@@ -42,32 +44,41 @@ function startPayUrl(authority: string) {
 }
 
 const checkoutSchema = z.object({
-  customerName: z.string().min(2),
-  customerPhone: z.string().min(8),
-  customerEmail: z.string().email().optional().or(z.literal("")),
-  customerAddress: z.string().optional(),
-  note: z.string().optional(),
+  customerName: z.string().min(2).max(120),
+  customerPhone: z.string().min(8).max(32),
+  customerEmail: z.string().max(254).email().optional().or(z.literal("")),
+  customerAddress: z.string().max(2000).optional(),
+  note: z.string().max(2000).optional(),
   items: z
     .array(
       z.object({
-        productId: z.string(),
-        name: z.string(),
-        quantity: z.number().int().positive(),
-        unitPrice: z.number().nonnegative(),
-        image: z.string().optional(),
+        productId: z.string().min(1).max(128),
+        variantId: z.string().min(1).max(160).optional(),
+        quantity: z.number().int().positive().max(999),
       })
     )
-    .min(1),
+    .min(1)
+    .max(50),
 });
 
 router.post("/checkout", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const body = checkoutSchema.parse(req.body);
-    const amountToman = body.items.reduce(
-      (s, i) => s + Math.round(i.unitPrice) * i.quantity,
-      0
-    );
-    if (amountToman < 1000) throw new HttpError(400, "مبلغ سفارش خیلی کم است.");
+    const products = await prisma.product.findMany({
+      where: { id: { in: [...new Set(body.items.map((item) => item.productId))] } },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        image: true,
+        visible: true,
+        inStock: true,
+        stock: true,
+        variantsJson: true,
+      },
+    });
+    const pricedCheckout = buildPricedCheckout(body.items, products);
+    const { items, amountToman } = pricedCheckout;
 
     const amountRial = amountToman * 10;
     const MERCHANT = merchantId();
@@ -84,7 +95,7 @@ router.post("/checkout", optionalAuth, async (req: AuthedRequest, res) => {
         customerEmail: body.customerEmail || null,
         customerAddress: body.customerAddress || null,
         note: body.note || null,
-        itemsJson: JSON.stringify(body.items),
+        itemsJson: JSON.stringify(items),
         amountToman,
         amountRial,
         gateway: "zarinpal",
@@ -168,15 +179,29 @@ router.get("/zarinpal/callback", async (req, res) => {
       return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${orderId}`);
     }
 
-    if (status !== "OK") {
-      await prisma.order.update({ where: { id: orderId }, data: { status: "cancelled" } });
-      return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${orderId}`);
+    // Bind both successful and failed callbacks to the authority stored at checkout.
+    // A forged NOK callback must not be able to cancel another order.
+    let callbackAuthority: string;
+    try {
+      callbackAuthority = requireMatchingPaymentAuthority(order.authority, authority);
+    } catch {
+      return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${encodeURIComponent(orderId)}`);
     }
 
-    if (order.status === "paid") {
+    const callbackAction = classifyPaymentCallback(order.status, status);
+    if (callbackAction === "already_paid") {
       return res.redirect(
-        `${FRONT}/checkout/result?Status=OK&orderId=${orderId}&RefID=${order.refId || ""}`
+        `${FRONT}/checkout/result?Status=OK&orderId=${encodeURIComponent(orderId)}&RefID=${encodeURIComponent(order.refId || "")}`
       );
+    }
+
+    if (callbackAction === "cancel") {
+      await prisma.order.update({ where: { id: orderId }, data: { status: "cancelled" } });
+      return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${encodeURIComponent(orderId)}`);
+    }
+
+    if (callbackAction !== "verify") {
+      return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${encodeURIComponent(orderId)}`);
     }
 
     if (!MERCHANT && !demoPaymentsEnabled()) {
@@ -195,13 +220,14 @@ router.get("/zarinpal/callback", async (req, res) => {
       );
     }
 
+    const verifiedAuthority = callbackAuthority;
     const verifyRes = await fetch(zarinpalApi("verify.json"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         merchant_id: MERCHANT,
         amount: order.amountRial,
-        authority: authority || order.authority,
+        authority: verifiedAuthority,
       }),
     });
 
@@ -214,7 +240,7 @@ router.get("/zarinpal/callback", async (req, res) => {
       const refId = String(verify?.data?.ref_id ?? "");
       await prisma.order.update({
         where: { id: orderId },
-        data: { status: "paid", refId, authority: authority || order.authority },
+        data: { status: "paid", refId, authority: verifiedAuthority },
       });
       return res.redirect(
         `${FRONT}/checkout/result?Status=OK&orderId=${orderId}&RefID=${refId}`

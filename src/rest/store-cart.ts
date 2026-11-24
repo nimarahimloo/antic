@@ -215,18 +215,31 @@ export async function checkout(customer: Record<string, unknown> = {}): Promise<
     return "/checkout";
   }
 
-  const items = cart.lineItems.map((l) => ({
-    productId: l.source?.catalogReference?.catalogItemId,
-    name: l.name?.original || "محصول",
-    quantity: l.quantityInfo?.confirmedQuantity || 1,
-    unitPrice: Number(l.pricing?.unitPrice?.amount || 0),
-    image: l.attributes?.image?.url,
+  // The server resolves product names, images, variant prices and totals from Prisma.
+  // Local cart prices are display-only and are never sent as payment authority.
+  const items = cart.lineItems.map((line) => ({
+    productId: line.source?.catalogReference?.catalogItemId,
+    variantId: line.source?.catalogReference?.options?.variantId,
+    quantity: line.quantityInfo?.confirmedQuantity || 1,
   }));
+
+  const customerAddress = [
+    customer.address,
+    customer.city,
+    customer.postalCode ? `کد پستی: ${customer.postalCode}` : "",
+  ].filter((value) => typeof value === "string" && value.trim()).join("، ");
 
   const res = await fetch(`${API}/orders/checkout`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...customer, items }),
+    body: JSON.stringify({
+      customerName: customer.customerName,
+      customerPhone: customer.customerPhone,
+      customerEmail: customer.customerEmail,
+      customerAddress,
+      note: customer.notes,
+      items,
+    }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "خطا در ثبت سفارش");
