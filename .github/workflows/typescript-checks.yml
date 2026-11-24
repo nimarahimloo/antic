@@ -46,6 +46,8 @@ jobs:
       - run: npm run typecheck
       - name: Server-authoritative checkout pricing tests
         run: npm run test:order-pricing
+      - name: Payment callback security tests
+        run: npm run test:payment-security
 
   worker:
     name: Cloudflare MCP Worker tests
