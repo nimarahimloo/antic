@@ -80,10 +80,10 @@ function textContent(value) {
   return [{ type: "text", text: JSON.stringify(value) }];
 }
 
-async function callCatalogTool(name, args) {
+async function callCatalogTool(name, args, env) {
   const response = await fetch(`${UPSTREAM}/${encodeURIComponent(name)}`, {
     method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
+    headers: {\n      "content-type": "application/json",\n      accept: "application/json",\n      "x-mcp-worker-token": env.MCP_WORKER_TOKEN || ""\n    },
     body: JSON.stringify(args),
     signal: AbortSignal.timeout(15000)
   });
@@ -103,7 +103,7 @@ async function callCatalogTool(name, args) {
   return { content: textContent(payload.content), isError: false };
 }
 
-async function handleRpc(message) {
+async function handleRpc(message, currentEnv) {
   if (!isRecord(message) || message.jsonrpc !== "2.0" || typeof message.method !== "string") {
     return { response: rpcError(isRecord(message) ? message.id : null, -32600, "Invalid JSON-RPC request") };
   }
@@ -125,7 +125,7 @@ async function handleRpc(message) {
       response: rpcResult(message.id, {
         protocolVersion: version,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "pardehantic-ai-mcp", version: "1.2.0" },
+        serverInfo: { name: "pardehantic-catalog-mcp", version: "1.3.0" },
         instructions: "این سرور فقط ابزارهای خواندنی کاتالوگ و نمونه‌کارهای عمومی پرده آنتیک را ارائه می‌کند."
       }),
       protocolVersion: version
@@ -151,7 +151,7 @@ async function handleRpc(message) {
       return { response: rpcError(message.id, -32602, "Tool arguments must be an object") };
     }
     try {
-      const result = await callCatalogTool(name, args);
+      const result = await callCatalogTool(name, args, currentEnv);
       return { response: rpcResult(message.id, result) };
     } catch {
       return {
@@ -169,7 +169,7 @@ async function handleRpc(message) {
 }
 
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
@@ -221,7 +221,7 @@ export default {
       return json(rpcError(null, -32600, "JSON-RPC batch requests are not supported"), 400);
     }
 
-    const handled = await handleRpc(message);
+    if (!env?.MCP_WORKER_TOKEN) {\n      return json(rpcError(null, -32603, "MCP origin credential is not configured"), 503);\n    }\n\n    const handled = await handleRpc(message, env);
     if (handled.notification || !handled.response) {
       return new Response(null, { status: 202, headers: JSON_HEADERS });
     }
