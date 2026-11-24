@@ -5,7 +5,7 @@ import { HttpError, sendError } from "../lib/errors.js";
 import { routeParam } from "../lib/routeParams.js";
 import { requireAdmin, optionalAuth, type AuthedRequest } from "../middleware/auth.js";
 import { buildPricedCheckout } from "../services/orderPricing.js";
-import { requireMatchingPaymentAuthority } from "../services/paymentVerification.js";
+import { classifyPaymentCallback, requireMatchingPaymentAuthority } from "../services/paymentVerification.js";
 
 const router = Router();
 
@@ -188,21 +188,19 @@ router.get("/zarinpal/callback", async (req, res) => {
       return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${encodeURIComponent(orderId)}`);
     }
 
-    // A replayed failure callback must never downgrade an already-paid order.
-    if (order.status === "paid") {
+    const callbackAction = classifyPaymentCallback(order.status, status);
+    if (callbackAction === "already_paid") {
       return res.redirect(
         `${FRONT}/checkout/result?Status=OK&orderId=${encodeURIComponent(orderId)}&RefID=${encodeURIComponent(order.refId || "")}`
       );
     }
 
-    if (status === "NOK") {
-      if (order.status === "pending") {
-        await prisma.order.update({ where: { id: orderId }, data: { status: "cancelled" } });
-      }
+    if (callbackAction === "cancel") {
+      await prisma.order.update({ where: { id: orderId }, data: { status: "cancelled" } });
       return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${encodeURIComponent(orderId)}`);
     }
 
-    if (status !== "OK") {
+    if (callbackAction !== "verify") {
       return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${encodeURIComponent(orderId)}`);
     }
 
