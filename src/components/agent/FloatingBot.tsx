@@ -333,7 +333,7 @@ export default function FloatingBot({
           <span className="absolute inset-0 animate-ping rounded-full bg-current opacity-20" />
           <Sparkles className="relative h-6 w-6" />
           {unread > 0 && (
-            <span className="absolute -left-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 font-display text-[10px] font-bold text-destructive-foreground">
+            <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 font-display text-[10px] font-bold text-destructive-foreground">
               {unread > 9 ? "۹+" : unread}
             </span>
           )}
@@ -388,13 +388,14 @@ export default function FloatingBot({
           </header>
 
           {errorBanner && (
-            <div className="shrink-0 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-center font-body text-[11px] text-destructive">
+            <div className="shrink-0 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-center font-body text-[11px] text-destructive dir-rtl">
               {errorBanner}
             </div>
           )}
 
           <div
             ref={listRef}
+            dir="rtl"
             className="flex-1 space-y-3.5 overflow-y-auto overscroll-contain bg-gradient-to-b from-background/50 to-card px-3 py-3"
           >
             {loading && messages.length === 0 ? (
@@ -441,7 +442,7 @@ export default function FloatingBot({
               <div className="min-w-0 flex-1 text-right">
                 <p className="truncate font-body text-[11px] text-muted-foreground">آماده ارسال</p>
               </div>
-              <button type="button" className="text-xs font-bold text-destructive" onClick={() => setPendingImage(null)}>
+              <button type="button" className="mr-2 text-xs font-bold text-destructive" onClick={() => setPendingImage(null)}>
                 حذف
               </button>
             </div>
