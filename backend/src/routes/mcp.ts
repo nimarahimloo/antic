@@ -8,9 +8,9 @@ import {
 } from "../services/aiCatalog.js";
 
 /**
- * Minimal MCP-over-HTTP surface for catalog (read-only).
- * Not a full MCP transport — enough for Connect page demos and simple clients.
- * Tools: list_categories, search_models, list_projects, get_model
+ * Internal read-only catalog tool bridge consumed by the edge MCP Worker.
+ * The Worker implements the public Streamable HTTP MCP transport.
+ * Tools: list_categories, search_models, list_projects, get_model.
  */
 const router = Router();
 
