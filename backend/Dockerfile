@@ -38,7 +38,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
-# generated prisma client
+# Generated Prisma client and the idempotent first-start bootstrap.
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
@@ -47,5 +47,5 @@ RUN mkdir -p /app/uploads /app/data && chown -R nextjs:nodejs /app/uploads /app/
 USER nextjs
 EXPOSE 3001
 
-# همگام‌سازی اسکیمای SQLite با حجم پیش‌فرض، سپس اجرای سرور
-CMD ["sh", "-c", "npx prisma db push --schema=prisma/schema.prisma --skip-generate && node dist/src/index.js"]
+# Schema sync and seed are idempotent; seed preserves existing records and passwords.
+CMD ["sh", "-c", "npx prisma db push --schema=prisma/schema.prisma --skip-generate && npx tsx prisma/seed.ts && node dist/src/index.js"]
