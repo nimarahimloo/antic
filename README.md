@@ -74,6 +74,7 @@ PUBLIC_BASE_URL="https://your-domain.ir"   # یا آدرس API اگر جداست
 
 - گفتگوی streaming با AI SDK 7 و ذخیرهٔ دائمی پیام‌ها در Prisma/SQLite
 - ابزارهای واقعی `list_categories`، `search_models`، `get_model` و `list_projects` (همان منبع دادهٔ MCP)
+- Worker موجود `mcp.pardehantic.ir/mcp` با Streamable HTTP، همین ابزارهای خواندنی را از منبع دادهٔ Backend در اختیار کلاینت‌های MCP می‌گذارد؛ این endpoint عمومی فقط کاتالوگ و نمونه‌کارهای عمومی را می‌خواند و به inference یا فایل‌های خصوصی دسترسی ندارد.
 - تولید و ویرایش تصویر با FLUX.2 و حداکثر چهار تصویر مرجع
 - فایل‌های ورودی و خروجی خصوصی در `AI_PRIVATE_DIR`؛ این فایل‌ها زیر `/uploads` عمومی قرار نمی‌گیرند
 - محدودیت روزانهٔ درخواست، توکن و بودجهٔ محافظه‌کارانهٔ Cloudflare
