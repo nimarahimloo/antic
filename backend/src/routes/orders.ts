@@ -5,6 +5,7 @@ import { HttpError, sendError } from "../lib/errors.js";
 import { routeParam } from "../lib/routeParams.js";
 import { requireAdmin, optionalAuth, type AuthedRequest } from "../middleware/auth.js";
 import { buildPricedCheckout } from "../services/orderPricing.js";
+import { requireMatchingPaymentAuthority } from "../services/paymentVerification.js";
 
 const router = Router();
 
@@ -204,13 +205,14 @@ router.get("/zarinpal/callback", async (req, res) => {
       );
     }
 
+    const verifiedAuthority = requireMatchingPaymentAuthority(order.authority, authority);
     const verifyRes = await fetch(zarinpalApi("verify.json"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         merchant_id: MERCHANT,
         amount: order.amountRial,
-        authority: authority || order.authority,
+        authority: verifiedAuthority,
       }),
     });
 
@@ -223,7 +225,7 @@ router.get("/zarinpal/callback", async (req, res) => {
       const refId = String(verify?.data?.ref_id ?? "");
       await prisma.order.update({
         where: { id: orderId },
-        data: { status: "paid", refId, authority: authority || order.authority },
+        data: { status: "paid", refId, authority: verifiedAuthority },
       });
       return res.redirect(
         `${FRONT}/checkout/result?Status=OK&orderId=${orderId}&RefID=${refId}`
