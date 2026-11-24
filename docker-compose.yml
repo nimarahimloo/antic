@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # Next.js rewrites را در زمان build ثابت می‌کند
+        # Next.js rewrites are compiled at build time.
         BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:3001}
     environment:
       NODE_ENV: production
@@ -30,9 +30,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3001"
-      # مسیر مطلق: Prisma مسیر نسبی SQLite را نسبت به فایل schema حساب می‌کند
       DATABASE_URL: "file:/app/data/dev.db"
-      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string-in-production}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to a strong random value before starting Compose}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3001}
@@ -52,9 +51,10 @@ services:
       AI_DAILY_TOTAL_TOKENS: ${AI_DAILY_TOTAL_TOKENS:-200000}
       AI_CLOUDFLARE_DAILY_QUOTA_UNITS: ${AI_CLOUDFLARE_DAILY_QUOTA_UNITS:-9000}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@antic.local}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD to a strong initial admin password before starting Compose}
       ZARINPAL_MERCHANT_ID: ${ZARINPAL_MERCHANT_ID:-}
       ZARINPAL_SANDBOX: ${ZARINPAL_SANDBOX:-true}
+      MCP_WORKER_TOKEN: ${MCP_WORKER_TOKEN:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
