@@ -179,15 +179,31 @@ router.get("/zarinpal/callback", async (req, res) => {
       return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${orderId}`);
     }
 
-    if (status !== "OK") {
-      await prisma.order.update({ where: { id: orderId }, data: { status: "cancelled" } });
-      return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${orderId}`);
+    // Bind both successful and failed callbacks to the authority stored at checkout.
+    // A forged NOK callback must not be able to cancel another order.
+    let callbackAuthority: string;
+    try {
+      callbackAuthority = requireMatchingPaymentAuthority(order.authority, authority);
+    } catch {
+      return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${encodeURIComponent(orderId)}`);
     }
 
+    // A replayed failure callback must never downgrade an already-paid order.
     if (order.status === "paid") {
       return res.redirect(
-        `${FRONT}/checkout/result?Status=OK&orderId=${orderId}&RefID=${order.refId || ""}`
+        `${FRONT}/checkout/result?Status=OK&orderId=${encodeURIComponent(orderId)}&RefID=${encodeURIComponent(order.refId || "")}`
       );
+    }
+
+    if (status === "NOK") {
+      if (order.status === "pending") {
+        await prisma.order.update({ where: { id: orderId }, data: { status: "cancelled" } });
+      }
+      return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${encodeURIComponent(orderId)}`);
+    }
+
+    if (status !== "OK") {
+      return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${encodeURIComponent(orderId)}`);
     }
 
     if (!MERCHANT && !demoPaymentsEnabled()) {
@@ -206,7 +222,7 @@ router.get("/zarinpal/callback", async (req, res) => {
       );
     }
 
-    const verifiedAuthority = requireMatchingPaymentAuthority(order.authority, authority);
+    const verifiedAuthority = callbackAuthority;
     const verifyRes = await fetch(zarinpalApi("verify.json"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
