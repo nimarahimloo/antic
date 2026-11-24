@@ -109,6 +109,22 @@ async function readLimitedBody(request) {
 }
 
 async function callCatalogTool(name, args, env) {
+  const cacheable = name === "list_categories" || name === "list_projects";
+  const cacheKey = cacheable && env.MCP_CATALOG_CACHE
+    ? `mcp:catalog:v1:${name}:${JSON.stringify(Object.keys(args).sort().map((key) => [key, args[key]]))}`
+    : null;
+
+  if (cacheKey) {
+    try {
+      const cached = await env.MCP_CATALOG_CACHE.get(cacheKey, "json", { cacheTtl: 30 });
+      if (isRecord(cached) && Object.prototype.hasOwnProperty.call(cached, "content")) {
+        return { content: textContent(cached.content), isError: false };
+      }
+    } catch {
+      // KV is optional; the Backend remains authoritative.
+    }
+  }
+
   const backendEndpoint = (env.MCP_BACKEND_URL || UPSTREAM).replace(/\/+$/, "");
   const response = await fetch(`${backendEndpoint}/${encodeURIComponent(name)}`, {
     method: "POST",
@@ -131,6 +147,18 @@ async function callCatalogTool(name, args, env) {
 
   if (!isRecord(payload) || !("content" in payload)) {
     return { isError: true, content: textContent({ error: "پاسخ نامعتبر از سرویس کاتالوگ دریافت شد." }) };
+  }
+
+  if (cacheKey) {
+    try {
+      await env.MCP_CATALOG_CACHE.put(
+        cacheKey,
+        JSON.stringify({ content: payload.content }),
+        { expirationTtl: 60 },
+      );
+    } catch {
+      // A cache write failure must not fail a successful catalog response.
+    }
   }
 
   return { content: textContent(payload.content), isError: false };
@@ -158,7 +186,7 @@ async function handleRpc(message, currentEnv) {
       response: rpcResult(message.id, {
         protocolVersion: version,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "pardehantic-catalog-mcp", version: "1.3.0" },
+        serverInfo: { name: "pardehantic-catalog-mcp", version: "1.3.1" },
         instructions: "این سرور فقط ابزارهای خواندنی کاتالوگ و نمونه‌کارهای عمومی پرده آنتیک را ارائه می‌کند."
       }),
       protocolVersion: version

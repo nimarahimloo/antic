@@ -170,6 +170,105 @@ test('tools/call forwards tool arguments and Worker credential to backend', asyn
   });
 });
 
+test('public catalog list tools use KV cache with a short TTL', async () => {
+  const values = new Map();
+  const kvOptions = [];
+  const kv = {
+    async get(key, type, options) {
+      assert.equal(type, 'json');
+      assert.equal(options.cacheTtl, 30);
+      const value = values.get(key);
+      return value === undefined ? null : JSON.parse(value);
+    },
+    async put(key, value, options) {
+      kvOptions.push(options);
+      values.set(key, value);
+    }
+  };
+  let upstreamCalls = 0;
+
+  await withFetchMock(async () => {
+    upstreamCalls += 1;
+    return Response.json({ content: [{ id: 'category-1', slug: 'curtains' }] });
+  }, async () => {
+    const message = {
+      jsonrpc: '2.0', id: 40, method: 'tools/call',
+      params: { name: 'list_categories', arguments: {} }
+    };
+    const first = await invoke(message, { env: { MCP_WORKER_TOKEN: TOKEN, MCP_CATALOG_CACHE: kv } });
+    const second = await invoke({ ...message, id: 41 }, {
+      env: { MCP_WORKER_TOKEN: TOKEN, MCP_CATALOG_CACHE: kv }
+    });
+
+    assert.equal(first.response.status, 200);
+    assert.equal(second.response.status, 200);
+    assert.equal(first.payload.result.isError, false);
+    assert.equal(second.payload.result.isError, false);
+    assert.deepEqual(
+      JSON.parse(second.payload.result.content[0].text),
+      [{ id: 'category-1', slug: 'curtains' }]
+    );
+  });
+
+  assert.equal(upstreamCalls, 1, 'the second list call should be served from KV');
+  assert.equal(kvOptions.length, 1);
+  assert.equal(kvOptions[0].expirationTtl, 60);
+});
+
+test('KV read and write failures fail open to the Backend', async () => {
+  let upstreamCalls = 0;
+  const brokenKv = {
+    async get() { throw new Error('KV read unavailable'); },
+    async put() { throw new Error('KV write unavailable'); }
+  };
+
+  await withFetchMock(async () => {
+    upstreamCalls += 1;
+    return Response.json({ content: [{ id: 'project-1' }] });
+  }, async () => {
+    const { response, payload } = await invoke({
+      jsonrpc: '2.0', id: 42, method: 'tools/call',
+      params: { name: 'list_projects', arguments: { limit: 10 } }
+    }, {
+      env: { MCP_WORKER_TOKEN: TOKEN, MCP_CATALOG_CACHE: brokenKv }
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.result.isError, false);
+    assert.deepEqual(JSON.parse(payload.result.content[0].text), [{ id: 'project-1' }]);
+  });
+
+  assert.equal(upstreamCalls, 1);
+});
+
+test('search_models bypasses KV so search results remain fresh', async () => {
+  let kvCalls = 0;
+  let upstreamCalls = 0;
+  const kv = {
+    async get() { kvCalls += 1; return null; },
+    async put() { kvCalls += 1; }
+  };
+
+  await withFetchMock(async () => {
+    upstreamCalls += 1;
+    return Response.json({ content: [{ id: 'model-' + upstreamCalls }] });
+  }, async () => {
+    for (const id of [43, 44]) {
+      const { response, payload } = await invoke({
+        jsonrpc: '2.0', id, method: 'tools/call',
+        params: { name: 'search_models', arguments: { query: 'linen' } }
+      }, {
+        env: { MCP_WORKER_TOKEN: TOKEN, MCP_CATALOG_CACHE: kv }
+      });
+      assert.equal(response.status, 200);
+      assert.equal(payload.result.isError, false);
+    }
+  });
+
+  assert.equal(upstreamCalls, 2);
+  assert.equal(kvCalls, 0);
+});
+
 test('backend 404 is returned as an MCP tool error', async () => {
   await withFetchMock(async () => new Response(JSON.stringify({ error: 'not found' }), { status: 404 }), async () => {
     const { payload } = await invoke({
