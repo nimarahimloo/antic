@@ -109,7 +109,8 @@ async function readLimitedBody(request) {
 }
 
 async function callCatalogTool(name, args, env) {
-  const response = await fetch(`${UPSTREAM}/${encodeURIComponent(name)}`, {
+  const backendEndpoint = (currentEnv.MCP_BACKEND_URL || UPSTREAM).replace(/\\/+$/, "");
+  const response = await fetch(`${backendEndpoint}/${encodeURIComponent(name)}`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
