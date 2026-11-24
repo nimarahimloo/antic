@@ -83,7 +83,11 @@ function textContent(value) {
 async function callCatalogTool(name, args, env) {
   const response = await fetch(`${UPSTREAM}/${encodeURIComponent(name)}`, {
     method: "POST",
-    headers: {\n      "content-type": "application/json",\n      accept: "application/json",\n      "x-mcp-worker-token": env.MCP_WORKER_TOKEN || ""\n    },
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+      "x-mcp-worker-token": env.MCP_WORKER_TOKEN || ""
+    },
     body: JSON.stringify(args),
     signal: AbortSignal.timeout(15000)
   });
@@ -221,7 +225,11 @@ export default {
       return json(rpcError(null, -32600, "JSON-RPC batch requests are not supported"), 400);
     }
 
-    if (!env?.MCP_WORKER_TOKEN) {\n      return json(rpcError(null, -32603, "MCP origin credential is not configured"), 503);\n    }\n\n    const handled = await handleRpc(message, env);
+    if (!env?.MCP_WORKER_TOKEN) {
+      return json(rpcError(null, -32603, "MCP origin credential is not configured"), 503);
+    }
+
+    const handled = await handleRpc(message, env);
     if (handled.notification || !handled.response) {
       return new Response(null, { status: 202, headers: JSON_HEADERS });
     }
