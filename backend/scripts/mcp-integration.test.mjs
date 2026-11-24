@@ -208,10 +208,12 @@ test("MCP client → Cloudflare Worker → authenticated Express backend → Pri
       const { response, payload } = await callTool(9, "get_model", {
         id: \`missing-\${marker}\`,
       });
-      assert.equal(response.status, 404);
-      assert.equal(payload.error.code, undefined);
-      assert.equal(payload.isError, true);
-      assert.match(payload.content[0].text, /پیدا نشد/);
+      assert.equal(response.status, 200);
+      assert.equal(payload.result.isError, true);
+
+      const error = decodeToolText(payload);
+      assert.equal(error.status, 404);
+      assert.match(error.error, /پیدا نشد/);
     });
   } finally {
     if (project) await prisma.project.deleteMany({ where: { id: project.id } });
