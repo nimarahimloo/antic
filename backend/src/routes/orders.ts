@@ -44,11 +44,11 @@ function startPayUrl(authority: string) {
 }
 
 const checkoutSchema = z.object({
-  customerName: z.string().min(2),
-  customerPhone: z.string().min(8),
-  customerEmail: z.string().email().optional().or(z.literal("")),
-  customerAddress: z.string().optional(),
-  note: z.string().optional(),
+  customerName: z.string().min(2).max(120),
+  customerPhone: z.string().min(8).max(32),
+  customerEmail: z.string().max(254).email().optional().or(z.literal("")),
+  customerAddress: z.string().max(2000).optional(),
+  note: z.string().max(2000).optional(),
   items: z
     .array(
       z.object({
@@ -57,7 +57,8 @@ const checkoutSchema = z.object({
         quantity: z.number().int().positive().max(999),
       })
     )
-    .min(1),
+    .min(1)
+    .max(50),
 });
 
 router.post("/checkout", optionalAuth, async (req: AuthedRequest, res) => {
