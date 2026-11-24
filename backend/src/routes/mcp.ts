@@ -73,9 +73,17 @@ router.post("/tools/:name", async (req, res) => {
     }
     const args = parsed.data as Record<string, unknown>;
 
-    return res.json(
-      await executeCatalogTool(name as keyof typeof catalogToolSchemas, args),
+    const result = await executeCatalogTool(
+      name as keyof typeof catalogToolSchemas,
+      args,
     );
+    if (name === "get_model" && result && typeof result === "object" && "content" in result) {
+      const content = (result as { content?: unknown }).content;
+      if (content && typeof content === "object" && "found" in content && content.found === false) {
+        return res.status(404).json(result);
+      }
+    }
+    return res.json(result);
   } catch (err) {
     sendError(res, err);
   }
