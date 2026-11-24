@@ -1,17 +1,19 @@
-name: TypeScript checks
+name: Release readiness
 
 on:
   pull_request:
     branches: [main]
   push:
     branches:
-      - fix/flux2-bypass-ai-gateway
+      - main
+      - release/docker-runtime-gates
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: typescript-${{ github.event.pull_request.number || github.ref }}
+  group: release-readiness-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -19,30 +21,39 @@ jobs:
     name: Frontend TypeScript
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: TypeScript check
-        run: npm run typecheck
+      - run: npm ci
+      - run: npm run typecheck
+
+  backend:
+    name: Backend TypeScript
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
 
   worker:
     name: Cloudflare MCP Worker tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Run Worker tests
-        run: node --test cloudflare/workers/nvidia-mcp-server/worker.test.mjs
+      - run: node --test cloudflare/workers/nvidia-mcp-server/worker.test.mjs
 
   mcp-integration:
     name: MCP client-to-backend integration
@@ -54,39 +65,67 @@ jobs:
       DATABASE_URL: file:/tmp/antic-mcp-integration.db
       MCP_WORKER_TOKEN: ci-integration-only-credential
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - name: Install backend dependencies
-        run: npm ci
-      - name: Generate Prisma client
-        run: npx prisma generate --schema=prisma/schema.prisma
-      - name: Create isolated integration database
-        run: npx prisma db push --schema=prisma/schema.prisma --skip-generate
-      - name: Run full MCP integration test
-        run: node --import tsx --test scripts/mcp-integration.test.mjs
+      - run: npm ci
+      - run: npx prisma generate --schema=prisma/schema.prisma
+      - run: npx prisma db push --schema=prisma/schema.prisma --skip-generate
+      - run: node --import tsx --test scripts/mcp-integration.test.mjs
 
-  backend:
-    name: Backend TypeScript
+  docker-runtime:
+    name: Docker Compose build and runtime smoke tests
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
+    env:
+      JWT_SECRET: ci-only-jwt-secret-0123456789-abcdefghijklmnopqrstuvwxyz
+      ADMIN_EMAIL: admin@antic.local
+      ADMIN_PASSWORD: ci-only-admin-password-strong
+      CORS_ORIGIN: http://localhost:3000
+      FRONTEND_URL: http://localhost:3000
+      PUBLIC_BASE_URL: http://localhost:3001
+      ZARINPAL_SANDBOX: "true"
+      MCP_WORKER_TOKEN: ci-only-mcp-worker-token
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-      - name: Install dependencies
-        run: npm ci
-      - name: TypeScript check
-        run: npm run typecheck
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Build and start production containers
+        run: docker compose up --build --detach
+      - name: Wait for backend health
+        shell: bash
+        run: |
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:3001/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs --no-color backend frontend
+          exit 1
+      - name: Verify frontend and backend HTTP
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null
+          curl --fail --silent --show-error http://127.0.0.1:3001/api/health
+      - name: Run backend smoke tests against containers
+        env:
+          BASE: http://127.0.0.1:3001
+        run: node backend/scripts/smoke-test.mjs
+      - name: Run backend functional tests against containers
+        env:
+          BASE: http://127.0.0.1:3001
+          ADMIN_EMAIL: admin@antic.local
+          ADMIN_PASSWORD: ci-only-admin-password-strong
+        run: node backend/scripts/functional-test.mjs
+      - name: Collect container logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop containers
+        if: always()
+        run: docker compose down --volumes --remove-orphans
