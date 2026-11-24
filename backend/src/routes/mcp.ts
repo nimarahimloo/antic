@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { timingSafeEqual } from "node:crypto";
-import { z } from "zod";
 import { HttpError, sendError } from "../lib/errors.js";
+import { catalogToolSchemas, executeCatalogTool } from "../services/catalogToolRegistry.js";
 import {
   getCurtainModel,
   listCurtainCategories,
@@ -15,21 +15,6 @@ import {
  * Tools: list_categories, search_models, list_projects, get_model.
  */
 const router = Router();
-
-const toolSchemas = {
-  list_categories: z.object({}).strict(),
-  search_models: z.object({
-    query: z.string().max(160).optional(),
-    category_slug: z.string().max(100).optional(),
-    limit: z.number().int().min(1).max(50).optional(),
-  }).strict(),
-  get_model: z.object({
-    id: z.string().trim().min(1).max(128),
-  }).strict(),
-  list_projects: z.object({
-    limit: z.number().int().min(1).max(50).optional(),
-  }).strict(),
-};
 
 function requireMcpWorker(req: import("express").Request) {
   const expected = process.env.MCP_WORKER_TOKEN?.trim();
@@ -81,7 +66,7 @@ router.post("/tools/:name", async (req, res) => {
   try {
     requireMcpWorker(req);
     const name = req.params.name;
-    const schema = toolSchemas[name as keyof typeof toolSchemas];
+    const schema = catalogToolSchemas[name as keyof typeof catalogToolSchemas];
     if (!schema) {
       return res.status(404).json({ error: "Unknown tool" });
     }
@@ -94,36 +79,10 @@ router.post("/tools/:name", async (req, res) => {
     }
     const args = parsed.data as Record<string, unknown>;
 
-    if (name === "list_categories") {
-      return res.json(await listCurtainCategories());
-    }
-
-    if (name === "search_models") {
-      return res.json(
-        await searchCurtainModels({
-          query: String(args.query || ""),
-          category_slug: String(args.category_slug || ""),
-          limit: Number(args.limit) || 20,
-        }),
-      );
-    }
-
-    if (name === "get_model") {
-      const result = await getCurtainModel({ id: String(args.id || "") });
-      const found = result.content as { found?: boolean; message?: string };
-      if (found?.found === false) {
-        return res.status(404).json(result);
-      }
-      return res.json(result);
-    }
-
-    if (name === "list_projects") {
-      return res.json(
-        await listCurtainProjects({ limit: Number(args.limit) || 20 }),
-      );
-    }
-
-    res.status(404).json({ error: "Unknown tool" });
+    return res.json(
+      await executeCatalogTool(name as keyof typeof catalogToolSchemas, args),
+    );
+;
   } catch (err) {
     sendError(res, err);
   }
