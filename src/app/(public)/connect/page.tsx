@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import {
   Plug,
@@ -83,10 +83,7 @@ function ClientPanel({ steps, note }: { steps: React.ReactNode[]; note?: string 
 function ConnectPageContent() {
   const [copied, setCopied] = useState(false);
 
-  const serverUrl = useMemo(() => {
-    if (typeof window === "undefined") return "";
-    return new URL("/api/mcp", window.location.origin).toString();
-  }, []);
+  const serverUrl = "https://mcp.pardehantic.ir/mcp";
 
   const copyUrl = async () => {
     try {
