@@ -350,6 +350,7 @@ export default function AIWorkspacePage() {
   const [sendingFiles, setSendingFiles] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [imagePrompt, setImagePrompt] = useState("");
+  const [selectedImageModel, setSelectedImageModel] = useState("auto");
   const [imageWidth, setImageWidth] = useState(1024);
   const [imageHeight, setImageHeight] = useState(1024);
   const [imageReferences, setImageReferences] = useState<AIWorkspaceFile[]>([]);
@@ -588,6 +589,7 @@ export default function AIWorkspacePage() {
       const result = await api.ai.generateImage({
         conversationId: id,
         prompt,
+        ...(selectedImageModel !== "auto" ? { model: selectedImageModel } : {}),
         referenceFileIds: imageReferences.map((file) => file.id),
         width: imageWidth,
         height: imageHeight,
@@ -916,8 +918,26 @@ export default function AIWorkspacePage() {
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-muted-foreground">
+            <div className="space-y-3">
+              <label className="block text-xs text-muted-foreground">
+                مدل تصویر
+                <select
+                  value={selectedImageModel}
+                  onChange={(event) => setSelectedImageModel(event.target.value)}
+                  disabled={generatingImage}
+                  className="mt-1 h-10 w-full rounded-xl border border-secondary/60 bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
+                >
+                  <option value="auto">انتخاب خودکار با جایگزینی مدل</option>
+                  {configuredProviders.flatMap((provider) =>
+                    provider.imageModels.map((model) => (
+                      <option key={provider.id + "::" + model.id} value={model.id}>
+                        {provider.label} · {model.label}
+                      </option>
+                    )),
+                  )}
+                </select>
+              </label>
+              <label className="block text-xs text-muted-foreground">
                 اندازه
                 <select
                   value={`${imageWidth}x${imageHeight}`}
