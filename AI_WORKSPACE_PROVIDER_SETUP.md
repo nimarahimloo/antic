@@ -7,7 +7,7 @@ card, billing upgrade, or paid infrastructure is required or authorized.
 ## Provider Priority Order
 
 The routing layer (`backend/src/services/aiRouting.ts`) selects providers
-in this priority order:
+in this priority order for automatic mode:
 
 1. **NVIDIA NIM** (priority #1 — first-class provider)
 2. **Cloudflare Workers AI** (operational primary)

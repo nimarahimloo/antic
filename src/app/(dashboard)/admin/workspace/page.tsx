@@ -339,6 +339,7 @@ export default function AIWorkspacePage() {
   });
 
   const [providers, setProviders] = useState<AIWorkspaceProvider[]>([]);
+  const [selectedModelKey, setSelectedModelKey] = useState("auto");
   const [conversations, setConversations] = useState<AIWorkspaceConversation[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [usage, setUsage] = useState<AIWorkspaceUsage | null>(null);
@@ -363,6 +364,16 @@ export default function AIWorkspacePage() {
     () => providers.filter((provider) => provider.configured),
     [providers],
   );
+  const selectedModel = useMemo(() => {
+    if (selectedModelKey === "auto") return null;
+    for (const provider of configuredProviders) {
+      const model = provider.models.find(
+        (item) => provider.id + "::" + item.id === selectedModelKey && item.supportsTools,
+      );
+      if (model) return { provider: provider.id, model: model.id };
+    }
+    return null;
+  }, [configuredProviders, selectedModelKey]);
   const isStreaming = status === "submitted" || status === "streaming";
 
   async function refreshConversations() {
@@ -428,6 +439,11 @@ export default function AIWorkspacePage() {
     try {
       const result = await api.ai.conversation(id);
       setConversationId(result.conversation.id);
+      setSelectedModelKey(
+        result.conversation.provider && result.conversation.model
+          ? result.conversation.provider + "::" + result.conversation.model
+          : "auto",
+      );
       setMessages(result.messages as UIMessage[]);
       await refreshImages(result.conversation.id);
     } catch (err) {
@@ -523,6 +539,9 @@ export default function AIWorkspacePage() {
         {
           body: {
             conversationId: id,
+            ...(selectedModel
+              ? { provider: selectedModel.provider, model: selectedModel.model }
+              : {}),
           },
         },
       );
@@ -624,6 +643,7 @@ export default function AIWorkspacePage() {
             type="button"
             onClick={() => {
               setConversationId(null);
+              setSelectedModelKey("auto");
               setMessages([]);
               setImageReferences([]);
               setImageOutputs([]);
@@ -712,17 +732,36 @@ export default function AIWorkspacePage() {
 
         <section className="order-1 flex min-h-[720px] min-w-0 flex-col overflow-hidden rounded-2xl border border-secondary/50 bg-card xl:order-2">
           <div className="flex flex-col gap-3 border-b border-secondary/50 p-4 sm:flex-row sm:items-center">
-            <div className="flex min-w-0 flex-1 gap-2">
-              {/* Automatic routing indicator — backend selects the best free provider. */}
-              {configuredProviders.length > 0 ? (
-                <span className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-700">
-                  <CircleCheck className="h-3 w-3 fill-current" />
-                  <span>روتینگ خودکار — بهترین ارائه‌دهنده رایگان انتخاب می‌شود</span>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="shrink-0 font-semibold">مدل گفتگو</span>
+                <select
+                  value={selectedModelKey}
+                  onChange={(event) => setSelectedModelKey(event.target.value)}
+                  disabled={isStreaming || !configuredProviders.length}
+                  className="max-w-full rounded-lg border border-secondary bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-primary"
+                  aria-label="انتخاب خودکار یا دستی مدل هوش مصنوعی"
+                >
+                  <option value="auto">انتخاب خودکار و جابه‌جایی هنگام خطا</option>
+                  {configuredProviders.map((provider) => (
+                    <optgroup key={provider.id} label={provider.label}>
+                      {provider.models.filter((model) => model.supportsTools).map((model) => (
+                        <option key={provider.id + "::" + model.id} value={provider.id + "::" + model.id}>
+                          {model.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+              {selectedModel ? (
+                <span className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
+                  انتخاب دستی · {selectedModel.provider}
                 </span>
               ) : (
-                <span className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700">
-                  <AlertCircle className="h-3 w-3 fill-current" />
-                  <span>هیچ ارائه‌دهنده-free پیکربندی نشده است</span>
+                <span className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-700">
+                  <CircleCheck className="h-3 w-3 fill-current" />
+                  <span>روتینگ خودکار با Failover</span>
                 </span>
               )}
             </div>
