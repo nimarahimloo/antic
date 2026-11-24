@@ -80,6 +80,34 @@ function textContent(value) {
   return [{ type: "text", text: JSON.stringify(value) }];
 }
 
+async function readLimitedBody(request) {
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let body = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_BODY_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+
+      body += decoder.decode(value, { stream: true });
+    }
+
+    return body + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 async function callCatalogTool(name, args, env) {
   const response = await fetch(`${UPSTREAM}/${encodeURIComponent(name)}`, {
     method: "POST",
@@ -204,13 +232,17 @@ export default {
       return new Response(null, { status: 405, headers: { ...JSON_HEADERS, allow: "POST, OPTIONS" } });
     }
 
+    if (!env?.MCP_WORKER_TOKEN) {
+      return json(rpcError(null, -32603, "MCP origin credential is not configured"), 503);
+    }
+
     const declaredLength = Number(request.headers.get("content-length") || 0);
     if (declaredLength > MAX_BODY_BYTES) {
       return json(rpcError(null, -32600, "Request too large"), 413);
     }
 
-    const raw = await request.text();
-    if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) {
+    const raw = await readLimitedBody(request);
+    if (raw === null) {
       return json(rpcError(null, -32600, "Request too large"), 413);
     }
 
@@ -223,10 +255,6 @@ export default {
 
     if (Array.isArray(message)) {
       return json(rpcError(null, -32600, "JSON-RPC batch requests are not supported"), 400);
-    }
-
-    if (!env?.MCP_WORKER_TOKEN) {
-      return json(rpcError(null, -32603, "MCP origin credential is not configured"), 503);
     }
 
     const handled = await handleRpc(message, env);
