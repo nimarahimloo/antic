@@ -48,6 +48,8 @@ jobs:
         run: npm run test:order-pricing
       - name: Payment callback security tests
         run: npm run test:payment-security
+      - name: AI provider opt-in safety tests
+        run: npm run test:ai-provider-gating
 
   worker:
     name: Cloudflare MCP Worker tests
