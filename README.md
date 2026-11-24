@@ -83,7 +83,7 @@ PUBLIC_BASE_URL="https://your-domain.ir"   # یا آدرس API اگر جداست
 - برای ثبت BYOK هر Provider به کلید معتبر همان Provider نیاز است. کلیدها باید از طریق Secrets Store/Provider Keys ثبت شوند؛ هرگز در Git، فایل `.env.example` یا پیام گفتگو قرار نگیرند.
 - تولید و ویرایش تصویر با FLUX.2 و حداکثر چهار تصویر مرجع
 - فایل‌های ورودی و خروجی خصوصی در `AI_PRIVATE_DIR`؛ این فایل‌ها زیر `/uploads` عمومی قرار نمی‌گیرند
-- محدودیت روزانهٔ درخواست، توکن و بودجهٔ محافظه‌کارانهٔ Cloudflare
+- محدودیت روزانهٔ درخواست، توکن و بودجهٔ محافظه‌کارانهٔ Cloudflare؛ همهٔ Providerها به‌صورت پیش‌فرض خاموش‌اند و فقط با فعال‌سازی صریح اجرا می‌شوند
 
 ```env
 # backend/.env
@@ -92,14 +92,14 @@ AI_PRIVATE_DIR="./data/ai"
 CLOUDFLARE_ACCOUNT_ID="..."
 CLOUDFLARE_API_TOKEN="..."
 CLOUDFLARE_AI_GATEWAY_ID="nvidia-m"
-AI_ENABLE_CLOUDFLARE=true
+AI_ENABLE_CLOUDFLARE=false
 # Required for the external MCP Worker ↔ Backend bridge.
 # Configure the identical secret in the Cloudflare Worker dashboard.
 MCP_WORKER_TOKEN="replace-with-a-long-random-secret"
 
 # NVIDIA — کلید فقط در Secret Manager محیط اجرا
 NVIDIA_API_KEY=""
-AI_ENABLE_NVIDIA=true
+AI_ENABLE_NVIDIA=false
 
 # اختیاری و با فعال‌سازی صریح؛ فقط مدل‌های allowlist شده
 GOOGLE_GENERATIVE_AI_API_KEY=""
@@ -114,7 +114,7 @@ AI_DAILY_TOTAL_TOKENS=200000
 AI_CLOUDFLARE_DAILY_QUOTA_UNITS=9000
 ```
 
-Cloudflare Workers AI سهمیهٔ رایگان مشترک **۱۰٬۰۰۰ Neuron در روز** دارد که در `00:00 UTC` بازنشانی می‌شود. مقدار محلی `AI_CLOUDFLARE_DAILY_QUOTA_UNITS` یک محافظ تقریبی است؛ مصرف واقعی Neuron باید در داشبورد Cloudflare بررسی شود. در Workers Free پس از تمام‌شدن سهمیه درخواست‌ها شکست می‌خورند و overage ندارند. اگر حساب Workers Paid است، قبل از فعال‌سازی مصرف پولی، سقف سرویس و هزینه را بررسی کنید.
+در حساب Cloudflare متصل به این پروژه، تنظیم AI Gateway برابر `workers_ai_billing_mode=postpaid` است؛ طبق مستندات Cloudflare این حالت مصرف Workers AI را مستقیماً به حساب صورتحساب می‌کند. به همین دلیل `AI_ENABLE_CLOUDFLARE=false` پیش‌فرض است و تا بررسی پلن و سقف مصرف، آن را فعال نکنید. سهمیهٔ Workers Free برابر **۱۰٬۰۰۰ Neuron در روز** است؛ در Workers Paid مصرف بیش از این سهمیه با نرخ Cloudflare محاسبه می‌شود. سهمیه در `00:00 UTC` بازنشانی می‌شود. `AI_CLOUDFLARE_DAILY_QUOTA_UNITS` فقط یک محافظ محلی است و جایگزین سقف صورتحساب نیست. [قیمت‌گذاری رسمی Workers AI](https://developers.cloudflare.com/workers-ai/platform/pricing/) · [حالت‌های صورتحساب AI Gateway](https://developers.cloudflare.com/ai-gateway/features/unified-billing/)
 
 توکن Cloudflare، کلید Gemini/OpenRouter و فایل‌های خصوصی هرگز به bundle مرورگر یا پاسخ عمومی منتقل نمی‌شوند. همهٔ endpointهای `/api/ai/*` فقط برای ادمین معتبر فعال‌اند.
 
