@@ -8,6 +8,7 @@ import { useVariantOptions } from "@/hooks/useVariantOptions";
 import { productGallery, storeImage } from "@/lib/storeImage";
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductSpecs from "@/components/product/ProductSpecs";
+import RelatedProjects from "@/components/RelatedProjects";
 import { ArrowRight, Phone, Truck, ShieldCheck, Headphones, Store, BadgeCheck } from "lucide-react";
 
 export default function ProductDetailPage({ slug }: { slug: string }) {
@@ -80,11 +81,12 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
 
       <div className="mx-auto max-w-7xl px-5 py-8 lg:px-10 lg:py-12">
         <div className="grid gap-10 lg:grid-cols-5 lg:gap-14">
-          <div className="lg:col-span-2 lg:sticky lg:top-28 lg:self-start">
+          {/* RTL: Gallery on RIGHT (col-span-2), Details on LEFT (col-span-3) */}
+          <div className="lg:col-span-3 lg:sticky lg:top-28 lg:self-start order-2 lg:order-1">
             <ProductGallery images={images} focusUrl={focusUrl} productName={d.product?.name ?? ""} />
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-2 order-1 lg:order-2">
             <div className="rounded-3xl border border-secondary/60 bg-card p-6 lg:p-8">
               <div className="flex items-center gap-2">
                 <Store className="h-4 w-4 text-primary" />
@@ -216,6 +218,14 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
           </div>
         </div>
       </div>
+
+      {/* Related Projects Section */}
+      <RelatedProjects
+        productId={d.product?.id ?? ""}
+        productCategorySlug={d.product?.categoryId ? undefined : undefined}
+        limit={6}
+      />
+
     </div>
   );
 }

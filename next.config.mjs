@@ -29,9 +29,15 @@ const imageRemotePatterns = [
   },
 ];
 
+const isDev = process.env.NODE_ENV === 'development';
+
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Use webpack instead of Turbopack for next-pwa compatibility
+  // turbopack: {} allows Turbopack in dev (PWA disabled in dev anyway)
+  turbopack: {},
+  
   // خروجی مستقل برای داکر/سرور اختصاصی
   output: process.env.NEXT_OUTPUT_STANDALONE === 'true' ? 'standalone' : undefined,
   
@@ -77,6 +83,20 @@ const nextConfig = {
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
+      // Service Worker headers
+      {
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+      {
+        source: '/workbox-:hash.js',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
     ];
   },
   
@@ -112,4 +132,133 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// PWA Configuration with next-pwa
+const withPWA = (await import('next-pwa')).default({
+  dest: 'public',
+  // Disable registration and SW generation in development
+  register: !isDev,
+  skipWaiting: true,
+  disable: isDev, // Disable PWA in development mode
+  buildExcludes: [/middleware-manifest\.json$/],
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'google-fonts-stylesheets',
+        expiration: {
+          maxEntries: 10,
+          maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    {
+      urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'google-fonts-webfonts',
+        expiration: {
+          maxEntries: 30,
+          maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    {
+      urlPattern: /\.(?:jpg|jpeg|png|gif|webp|svg|avif|ico)$/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'static-images',
+        expiration: {
+          maxEntries: 100,
+          maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    {
+      urlPattern: /\/api\/entities\/CurtainCategory/i,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'curtain-categories-api',
+        expiration: {
+          maxEntries: 10,
+          maxAgeSeconds: 60 * 60 * 24, // 1 day
+        },
+        networkTimeoutSeconds: 10,
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    {
+      urlPattern: /\/api\/catalog\/categories/i,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'shop-categories-api',
+        expiration: {
+          maxEntries: 10,
+          maxAgeSeconds: 60 * 60 * 24, // 1 day
+        },
+        networkTimeoutSeconds: 10,
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    {
+      urlPattern: /\/api\/catalog\/products/i,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'shop-products-api',
+        expiration: {
+          maxEntries: 50,
+          maxAgeSeconds: 60 * 60 * 24, // 1 day
+        },
+        networkTimeoutSeconds: 10,
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    {
+      urlPattern: /\/api\/entities\/CurtainModel/i,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'curtain-models-api',
+        expiration: {
+          maxEntries: 50,
+          maxAgeSeconds: 60 * 60 * 24, // 1 day
+        },
+        networkTimeoutSeconds: 10,
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    {
+      urlPattern: /\/api\/app\/public-settings/i,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'public-settings-api',
+        expiration: {
+          maxEntries: 5,
+          maxAgeSeconds: 60 * 60 * 24, // 1 day
+        },
+        networkTimeoutSeconds: 10,
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+  ],
+});
+
+export default withPWA(nextConfig);

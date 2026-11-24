@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import InteractiveCatalog from "@/components/sections/InteractiveCatalog";
-import PageLoading from "@/components/PageLoading";
+import { InteractiveCatalogSkeleton } from "@/components/sections/InteractiveCatalogSkeletons";
 
 function CatalogContent() {
   const searchParams = useSearchParams();
@@ -13,7 +13,7 @@ function CatalogContent() {
 
 export default function CatalogPage() {
   return (
-    <Suspense fallback={<PageLoading />}>
+    <Suspense fallback={<InteractiveCatalogSkeleton />}>
       <CatalogContent />
     </Suspense>
   );

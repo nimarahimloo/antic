@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -10,8 +11,9 @@ import { mosaicGridClass, mosaicItemClass } from "@/lib/mosaicLayout";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { api } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
+import { ProjectsPageSkeleton } from "@/components/Skeletons";
 
-export default function PortfolioCategoryPage() {
+function PortfolioCategoryPageContent() {
   const params = useParams();
   const slug = params.slug as string;
   const { categories, loading: catsLoading } = useCurtainCategories();
@@ -153,5 +155,13 @@ export default function PortfolioCategoryPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function PortfolioCategoryPage() {
+  return (
+    <Suspense fallback={<ProjectsPageSkeleton />}>
+      <PortfolioCategoryPageContent />
+    </Suspense>
   );
 }

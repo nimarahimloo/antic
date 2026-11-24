@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { useSmoothScroll } from "@/hooks/useSmoothScroll";
+import { PWARegistration } from "@/components/PWARegistration";
 
 function QueryProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -53,6 +54,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <CartProvider>
           <SmoothScrollProvider>
             <AuthInitializer>{children}</AuthInitializer>
+            <PWARegistration />
             <Toaster />
           </SmoothScrollProvider>
         </CartProvider>

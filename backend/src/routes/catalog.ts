@@ -298,6 +298,74 @@ router.delete("/admin/products/:id", requireAdmin, async (req: AuthedRequest, re
   }
 });
 
+// Admin: Get related projects for a product
+router.get("/admin/products/:id/related-projects", requireAdmin, async (req: AuthedRequest, res) => {
+  try {
+    const productId = routeParam(req, "id");
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        relatedProjects: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            title: true,
+            coverImage: true,
+            categorySlug: true,
+            subcategory: true,
+          },
+        },
+      },
+    });
+    if (!product) throw new HttpError(404, "Product not found");
+    res.json({ projects: product.relatedProjects });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// Admin: Add related project to product
+router.post("/admin/products/:id/related-projects", requireAdmin, async (req: AuthedRequest, res) => {
+  try {
+    const productId = routeParam(req, "id");
+    const { projectId } = req.body;
+    if (!projectId) throw new HttpError(400, "projectId is required");
+
+    const product = await prisma.product.update({
+      where: { id: productId },
+      data: {
+        relatedProjects: {
+          connect: { id: projectId },
+        },
+      },
+      include: { relatedProjects: true },
+    });
+    res.json({ projects: product.relatedProjects });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// Admin: Remove related project from product
+router.delete("/admin/products/:id/related-projects/:projectId", requireAdmin, async (req: AuthedRequest, res) => {
+  try {
+    const productId = routeParam(req, "id");
+    const projectId = routeParam(req, "projectId");
+    const product = await prisma.product.update({
+      where: { id: productId },
+      data: {
+        relatedProjects: {
+          disconnect: { id: projectId },
+        },
+      },
+      include: { relatedProjects: true },
+    });
+    res.json({ projects: product.relatedProjects });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
 router.post("/admin/categories", requireAdmin, async (req: AuthedRequest, res) => {
   try {
     const b = req.body || {};
@@ -313,6 +381,46 @@ router.post("/admin/categories", requireAdmin, async (req: AuthedRequest, res) =
       },
     });
     res.status(201).json(toStoreCategory(row));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.get("/products/:id/related-projects", async (req, res) => {
+  try {
+    const productId = routeParam(req, "id");
+    const limit = Math.min(Number(req.query.limit) || 6, 20);
+
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        relatedProjects: {
+          take: limit,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            title: true,
+            coverImage: true,
+            categorySlug: true,
+            subcategory: true,
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    const projects = product.relatedProjects.map((p) => ({
+      id: p.id,
+      title: p.title,
+      cover_image: p.coverImage,
+      category_slug: p.categorySlug,
+      subcategory: p.subcategory,
+    }));
+
+    res.json({ projects });
   } catch (err) {
     sendError(res, err);
   }

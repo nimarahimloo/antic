@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import PageHero from "@/components/PageHero";
+import { AboutPageSkeleton } from "@/components/Skeletons";
 
-export default function AboutPage() {
+function AboutPageContent() {
   return (
     <div className="bg-background">
       <PageHero
@@ -90,38 +92,14 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
-
-      <section className="relative overflow-hidden border-t border-secondary/40 bg-background py-24 lg:py-32">
-        <div className="pointer-events-none absolute -top-32 right-1/4 h-96 w-96 rounded-full bg-primary/10 blur-[120px]" />
-        <div className="pointer-events-none absolute -bottom-32 left-1/4 h-96 w-96 rounded-full bg-royal-green/8 blur-[120px]" />
-
-        <div className="relative mx-auto max-w-5xl px-5 text-center lg:px-10">
-          <span className="eyebrow mb-5 block">تیم ما</span>
-          <h2 className="font-display text-3xl font-black leading-tight text-foreground lg:text-5xl">
-            افراد پشت <span className="text-gold-gradient">ساه</span>
-          </h2>
-          <p className="mx-auto mt-6 max-w-xl font-body text-base leading-8 text-muted-foreground">
-            تیم ما از متخصصان با تجربه در زمینه معماری، طراحی داخلی، مهندسی بافت و نصب متخصص تشکیل شده است.
-          </p>
-          <div className="mx-auto mt-12 grid gap-6 max-w-3xl sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { name: "سارا محمدی", role: "معماری ارشد", desc: "طراحی فضایی و نورپردازی" },
-              { name: "احمد رضایی", role: "مهندس بافت", desc: "انتخاب و کنترل کیفیت پارچه" },
-              { name: "مریم حسینی", role: "طراح داخلی", desc: "همگام‌سازی با دکوراسیون" },
-              { name: "رضا کریمی", role: "مدیر پروژه", desc: "نصب و اجرای تمیز" },
-            ].map((member) => (
-              <div key={member.name} className="text-right rounded-2xl border border-secondary/60 bg-card p-6 transition hover:border-primary/50">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
-                  <span className="font-display text-xl font-black">{member.name.charAt(0)}</span>
-                </div>
-                <h4 className="font-display text-base font-bold text-foreground">{member.name}</h4>
-                <p className="font-body text-xs text-primary mt-0.5">{member.role}</p>
-                <p className="font-body text-xs text-muted-foreground mt-2">{member.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
     </div>
+  );
+}
+
+export default function AboutPage() {
+  return (
+    <Suspense fallback={<AboutPageSkeleton />}>
+      <AboutPageContent />
+    </Suspense>
   );
 }

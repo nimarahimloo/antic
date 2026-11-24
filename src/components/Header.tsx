@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, LogIn, User, ChevronLeft } from "lucide-react";
+import { Menu, X, LayoutDashboard, LogIn, User, ChevronLeft, Phone } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import GlobalSearch from "@/components/GlobalSearch";
+import { PWAInstallButton } from "@/components/PWAInstallButton";
 import {
   Sheet,
   SheetContent,
@@ -130,11 +131,14 @@ export default function Header() {
 
           <a 
             href="/contact"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/50 bg-primary/10 text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+            className="flex h-10 items-center justify-center gap-2 rounded-full border border-primary/50 bg-primary/10 px-4 text-primary transition-colors hover:bg-primary hover:text-primary-foreground lg:px-5"
             aria-label="تماس با ما"
           >
-            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35-.03.74-.25 1.02l-2.2 2.2z"/></svg>
+            <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35-.03.74-.25 1.02l-2.2 2.2z"/></svg>
+            <span className="hidden font-body text-xs font-bold lg:inline">تماس با ما</span>
           </a>
+
+          <PWAInstallButton variant="ghost" showLabel={false} className="h-10 w-10 p-0 lg:w-auto lg:px-3" aria-label="نصب اپلیکیشن پرده آنتیک" />
 
           <button
             type="button"
@@ -228,6 +232,15 @@ export default function Header() {
             <div className="my-3 border-t border-secondary/40" />
 
             <ul className="flex flex-col gap-0.5">
+              <li>
+                <a
+                  href="/contact"
+                  className="flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-3 font-display text-[15px] font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                >
+                  <Phone className="h-4 w-4 shrink-0" />
+                  تماس با ما
+                </a>
+              </li>
               {isAdmin && (
                 <li>
                   <Link
@@ -267,8 +280,9 @@ export default function Header() {
             </ul>
           </nav>
 
-          <div className="border-t border-secondary/40 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center">
-            <p className="font-body text-[11px] text-muted-foreground">
+          <div className="border-t border-secondary/40 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <PWAInstallButton variant="outline" className="w-full" showLabel={true} />
+            <p className="mt-3 font-body text-[11px] text-muted-foreground text-center">
               طراحی و اجرای پرده لوکس
             </p>
           </div>

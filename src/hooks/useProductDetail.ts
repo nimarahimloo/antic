@@ -35,6 +35,7 @@ interface ProductVariant {
 
 interface DetailProduct {
   id: string;
+  categoryId?: string;
   options?: ProductOption[];
   modifiers?: ProductModifier[];
   variantsInfo?: { variants?: ProductVariant[] };

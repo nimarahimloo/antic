@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import PageHero from "@/components/PageHero";
-import PageLoading from "@/components/PageLoading";
+import { AuthPageSkeleton } from "@/components/Skeletons";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -111,7 +111,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<PageLoading />}>
+    <Suspense fallback={<AuthPageSkeleton title="ورود" />}>
       <LoginForm />
     </Suspense>
   );

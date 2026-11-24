@@ -77,6 +77,8 @@ model CurtainModel {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  relatedProjects Project[] @relation("CurtainModelRelatedProjects")
+
   @@index([categorySlug])
   @@index([code])
 }
@@ -118,6 +120,8 @@ model Project {
   images       String?
   categorySlug String   @default("")
   subcategory  String?
+  relatedProducts Product[] @relation("ProductRelatedProjects")
+  relatedCurtainModels CurtainModel[] @relation("CurtainModelRelatedProjects")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -214,6 +218,8 @@ model Product {
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  relatedProjects Project[] @relation("ProductRelatedProjects")
 
   @@index([categoryId])
   @@index([visible])

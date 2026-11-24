@@ -1,19 +1,48 @@
 {
   "name": "پرده آنتیک",
   "short_name": "آنتیک",
-  "description": "خانه لوکس پرده و پارچه — کاتالوگ تعاملی",
+  "description": "مرجع خرید پرده، رول، زبرا، رومن، پنل، شید، شناور و آکسسوری‌های پرده با کیفیت بالا و قیمت مناسب",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0B0B0B",
   "theme_color": "#0B0B0B",
   "lang": "fa",
   "dir": "rtl",
+  "orientation": "portrait-primary",
+  "scope": "/",
   "icons": [
     {
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "categories": ["shopping", "lifestyle", "home"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "کاتالوگ پرده",
+      "short_name": "کاتالوگ",
+      "description": "مشاهده کاتالوگ پرده‌ها",
+      "url": "/catalog",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "فروشگاه آکسسوری",
+      "short_name": "فروشگاه",
+      "description": "خرید آکسسوری پرده",
+      "url": "/shop",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "پروژه‌ها",
+      "short_name": "پروژه‌ها",
+      "description": "مشاهده پروژه‌های اجرایی",
+      "url": "/projects",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
 }

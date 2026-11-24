@@ -1,9 +1,3 @@
-/**
- * Seed ایمن — هرگز دادهٔ موجود ادمین را پاک یا بازنویسی نمی‌کند.
- * - بدون deleteMany روی محتوا
- * - فقط رکوردهای غایب ساخته می‌شوند
- * - update فقط فیلدهای خالی را پر می‌کند
- */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -37,7 +31,6 @@ const SLUG_MECHANISM: Record<string, string> = {
   office: "zebra",
 };
 
-/** فقط برای پر کردن دیتابیس خالی — مرجع بعدی همیشه جدول CurtainCategory است */
 const CURTAIN_ROOTS: CatDef[] = [
   { name: "شید", slug: "shade", order: 1 },
   { name: "رومن", slug: "roman", order: 2 },

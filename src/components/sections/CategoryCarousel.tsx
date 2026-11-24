@@ -185,7 +185,7 @@ export default function CategoryCarousel() {
         ref={scrollerRef}
         dir="ltr"
         className="flex cursor-grab gap-5 overflow-x-auto no-scrollbar px-5 active:cursor-grabbing lg:gap-6 lg:px-10"
-        style={{ scrollBehavior: isDragging ? "auto" : undefined, touchAction: "pan-y" }}
+        style={{ scrollBehavior: isDragging ? "auto" : undefined, touchAction: "pan-x" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}

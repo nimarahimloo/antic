@@ -1,11 +1,13 @@
 "use client";
 
+import { Suspense } from "react";
 import { useState } from "react";
 import { Phone, Mail, MapPin, Check } from "lucide-react";
 import { SITE_PHONE_HREF, SITE_PHONE_DISPLAY, SITE_EMAIL } from "@/lib/siteContact";
 import PageHero from "@/components/PageHero";
+import { ContactPageSkeleton } from "@/components/Skeletons";
 
-export default function ContactPage() {
+function ContactPageContent() {
   const [sent, setSent] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", message: "" });
 
@@ -134,5 +136,13 @@ export default function ContactPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function ContactPage() {
+  return (
+    <Suspense fallback={<ContactPageSkeleton />}>
+      <ContactPageContent />
+    </Suspense>
   );
 }

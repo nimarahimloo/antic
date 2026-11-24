@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Plug,
@@ -15,6 +15,39 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SkeletonBox, SkeletonText } from "@/components/Skeletons";
+
+function ConnectPageSkeleton() {
+  return (
+    <div className="bg-background">
+      <SkeletonBox className="border-b border-secondary/50 bg-card/40 h-64" />
+      <div className="mx-auto max-w-7xl px-5 py-14 lg:px-10 lg:py-20">
+        <SkeletonBox className="mb-12 h-20 rounded-2xl border border-secondary/50" />
+        <SkeletonText lines={3} className="mx-auto max-w-3xl" />
+        <SkeletonBox className="h-20 rounded-2xl border border-secondary/50" />
+        <div className="flex gap-3 mb-8">
+          <SkeletonBox className="flex-1 h-12 rounded-xl border border-secondary/50" />
+          <SkeletonBox className="h-12 w-32 rounded-xl border border-secondary/50" />
+        </div>
+        <SkeletonText lines={2} />
+        <div className="flex flex-wrap gap-2 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <SkeletonBox key={i} className="h-10 w-24 rounded-xl border border-secondary/50" />
+          ))}
+        </div>
+        <SkeletonBox className="h-40 rounded-2xl border border-secondary/50" />
+        <SkeletonText lines={2} />
+        <SkeletonBox className="h-40 rounded-2xl border border-secondary/50" />
+        <SkeletonText lines={2} />
+        <SkeletonBox className="h-40 rounded-2xl border border-secondary/50" />
+        <SkeletonText lines={2} />
+        <SkeletonBox className="h-40 rounded-2xl border border-secondary/50" />
+        <SkeletonText lines={2} />
+        <SkeletonBox className="mt-14 h-12 w-40 rounded-full border border-primary/50" />
+      </div>
+    </div>
+  );
+}
 
 function StepItem({ n, children }: { n: number; children: React.ReactNode }) {
   return (
@@ -47,7 +80,7 @@ function ClientPanel({ steps, note }: { steps: React.ReactNode[]; note?: string 
   );
 }
 
-export default function ConnectPage() {
+function ConnectPageContent() {
   const [copied, setCopied] = useState(false);
 
   const serverUrl = useMemo(() => {
@@ -210,5 +243,13 @@ export default function ConnectPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function ConnectPage() {
+  return (
+    <Suspense fallback={<ConnectPageSkeleton />}>
+      <ConnectPageContent />
+    </Suspense>
   );
 }

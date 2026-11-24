@@ -1,5 +1,4 @@
 import { cache } from "react";
-import { api } from "@/api/client";
 
 /**
  * Server-side data fetching utilities
@@ -7,12 +6,34 @@ import { api } from "@/api/client";
  * Cache can be invalidated with revalidateTag/revalidatePath
  */
 
+// Backend URL for server-side fetches
+const BACKEND_URL = (process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001').replace(/\/$/, '');
+
+async function fetchEntities(entity: string, params: URLSearchParams) {
+  const res = await fetch(`${BACKEND_URL}/api/entities/${entity}?${params}`, {
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+async function fetchEntity(entity: string, id: string) {
+  const res = await fetch(`${BACKEND_URL}/api/entities/${entity}/${encodeURIComponent(id)}`, {
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 // ============================================
 // Categories
 // ============================================
 
 export const getCurtainCategories = cache(async (catalogOnly = false) => {
-  const categories = await api.entities.CurtainCategory.list("order", 500);
+  const params = new URLSearchParams({ sort_by: "order", limit: "500" });
+  const categories = await fetchEntities("CurtainCategory", params);
   const normalized = (categories || []).map((row: unknown) => {
     const r = row as Record<string, unknown>;
     return {
@@ -28,16 +49,16 @@ export const getCurtainCategories = cache(async (catalogOnly = false) => {
       backgroundImage: r.backgroundImage ? String(r.backgroundImage) : null,
       backgroundGradient: r.backgroundGradient ? String(r.backgroundGradient) : null,
     };
-  }).filter((c) => c.slug);
+  }).filter((c: { slug?: string }) => c.slug);
 
-  const sorted = normalized.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "fa"));
+  const sorted = normalized.sort((a: { order: number; name: string }, b: { order: number; name: string }) => a.order - b.order || a.name.localeCompare(b.name, "fa"));
 
-  return catalogOnly ? sorted.filter((c) => c.inCatalog) : sorted;
+  return catalogOnly ? sorted.filter((c: { inCatalog: boolean }) => c.inCatalog) : sorted;
 });
 
 export const getCurtainCategory = cache(async (slug: string) => {
   const categories = await getCurtainCategories(false);
-  return categories.find((c) => c.slug === slug) || null;
+  return categories.find((c: { slug?: string }) => c.slug === slug) || null;
 });
 
 function parseSubcategories(raw: unknown): Array<{ name: string; slug: string }> {
@@ -66,12 +87,23 @@ function parseSubcategories(raw: unknown): Array<{ name: string; slug: string }>
 // ============================================
 
 export const getCurtainModels = cache(async (filters: Record<string, string> = {}, limit = 80) => {
-  const models = await api.entities.CurtainModel.filter(filters, { sort: "-created_date", limit });
-  return (models || []) as Record<string, unknown>[];
+  const clean: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(filters || {})) {
+    if (k.startsWith("$")) continue;
+    if (v !== null && typeof v === "object") continue;
+    if (v === undefined || v === "") continue;
+    clean[k] = v;
+  }
+  const params = new URLSearchParams({
+    sort_by: "-created_date",
+    limit: String(limit),
+    filter: JSON.stringify(clean),
+  });
+  return fetchEntities("CurtainModel", params) as Promise<Record<string, unknown>[]>;
 });
 
 export const getCurtainModel = cache(async (id: string) => {
-  return api.entities.CurtainModel.get(id) as Promise<Record<string, unknown> | null>;
+  return fetchEntity("CurtainModel", id) as Promise<Record<string, unknown> | null>;
 });
 
 export const getModelsByCategory = cache(async (categorySlug: string, subcategory?: string) => {
@@ -85,12 +117,23 @@ export const getModelsByCategory = cache(async (categorySlug: string, subcategor
 // ============================================
 
 export const getProjects = cache(async (filters: Record<string, string> = {}, limit = 24) => {
-  const projects = await api.entities.Project.filter(filters, { sort: "-created_date", limit });
-  return (projects || []) as Record<string, unknown>[];
+  const clean: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(filters || {})) {
+    if (k.startsWith("$")) continue;
+    if (v !== null && typeof v === "object") continue;
+    if (v === undefined || v === "") continue;
+    clean[k] = v;
+  }
+  const params = new URLSearchParams({
+    sort_by: "-created_date",
+    limit: String(limit),
+    filter: JSON.stringify(clean),
+  });
+  return fetchEntities("Project", params) as Promise<Record<string, unknown>[]>;
 });
 
 export const getProject = cache(async (id: string) => {
-  return api.entities.Project.get(id) as Promise<Record<string, unknown> | null>;
+  return fetchEntity("Project", id) as Promise<Record<string, unknown> | null>;
 });
 
 export const getProjectsByCategory = cache(async (categorySlug: string) => {

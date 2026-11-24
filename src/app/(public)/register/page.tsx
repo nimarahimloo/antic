@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import PageHero from "@/components/PageHero";
-import PageLoading from "@/components/PageLoading";
+import { AuthPageSkeleton } from "@/components/Skeletons";
 
 function RegisterForm() {
   const [email, setEmail] = useState("");
@@ -112,7 +112,7 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <Suspense fallback={<PageLoading />}>
+    <Suspense fallback={<AuthPageSkeleton title="ثبت‌نام" />}>
       <RegisterForm />
     </Suspense>
   );

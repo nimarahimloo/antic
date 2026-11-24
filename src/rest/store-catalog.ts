@@ -129,3 +129,90 @@ export async function getCategoryBySlug(slug: string): Promise<Category | undefi
   const { categories } = await queryCategories();
   return categories.find((c) => c.slug === slug);
 }
+
+export interface RelatedProject {
+  id: string;
+  title: string;
+  cover_image?: string;
+  category_slug?: string;
+  subcategory?: string;
+}
+
+export interface RelatedProjectsResponse {
+  projects: RelatedProject[];
+}
+
+export async function getRelatedProjects(productId: string, limit = 6): Promise<RelatedProject[]> {
+  const res = await get<RelatedProjectsResponse>(`/catalog/products/${encodeURIComponent(productId)}/related-projects?limit=${limit}`);
+  return res?.projects ?? [];
+}
+
+// Admin functions
+export async function getAdminRelatedProjects(productId: string): Promise<RelatedProject[]> {
+  const res = await get<RelatedProjectsResponse>(`/catalog/admin/products/${encodeURIComponent(productId)}/related-projects`);
+  return res?.projects ?? [];
+}
+
+export async function addRelatedProject(productId: string, projectId: string): Promise<RelatedProject[]> {
+  const res = await fetch(`${API}/catalog/admin/products/${encodeURIComponent(productId)}/related-projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ projectId }),
+  });
+  if (!res.ok) throw new Error("Failed to add related project");
+  const data = await res.json();
+  return data?.projects ?? [];
+}
+
+export async function removeRelatedProject(productId: string, projectId: string): Promise<RelatedProject[]> {
+  const res = await fetch(`${API}/catalog/admin/products/${encodeURIComponent(productId)}/related-projects/${encodeURIComponent(projectId)}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Failed to remove related project");
+  const data = await res.json();
+  return data?.projects ?? [];
+}
+
+// CurtainModel related projects
+export async function getCurtainModelRelatedProjects(modelId: string, limit = 6): Promise<RelatedProject[]> {
+  const res = await get<RelatedProjectsResponse>(`/entities/CurtainModel/${encodeURIComponent(modelId)}/related-projects?limit=${limit}`);
+  return res?.projects ?? [];
+}
+
+export async function getAdminCurtainModelRelatedProjects(modelId: string): Promise<RelatedProject[]> {
+  const res = await get<RelatedProjectsResponse>(`/entities/admin/CurtainModel/${encodeURIComponent(modelId)}/related-projects`);
+  return res?.projects ?? [];
+}
+
+export async function addCurtainModelRelatedProject(modelId: string, projectId: string): Promise<RelatedProject[]> {
+  const res = await fetch(`${API}/entities/admin/CurtainModel/${encodeURIComponent(modelId)}/related-projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ projectId }),
+  });
+  if (!res.ok) throw new Error("Failed to add related project");
+  const data = await res.json();
+  return data?.projects ?? [];
+}
+
+export async function removeCurtainModelRelatedProject(modelId: string, projectId: string): Promise<RelatedProject[]> {
+  const res = await fetch(`${API}/entities/admin/CurtainModel/${encodeURIComponent(modelId)}/related-projects/${encodeURIComponent(projectId)}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Failed to remove related project");
+  const data = await res.json();
+  return data?.projects ?? [];
+}
+
+// Get projects for a category
+export async function getCategoryProjects(categorySlug: string, subcategory?: string, limit = 20): Promise<RelatedProject[]> {
+  const q = new URLSearchParams();
+  q.set("limit", String(limit));
+  if (subcategory) q.set("subcategory", subcategory);
+  const res = await get<RelatedProjectsResponse>(`/entities/CurtainCategory/${encodeURIComponent(categorySlug)}/projects?${q}`);
+  return res?.projects ?? [];
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import Link from "next/link";
 import { api } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, ArrowLeft, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
+import { AuthPageSkeleton } from "@/components/Skeletons";
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordPageContent() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -76,5 +77,13 @@ export default function ForgotPasswordPage() {
         </form>
       )}
     </AuthLayout>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={<AuthPageSkeleton title="بازیابی رمز عبور" />}>
+      <ForgotPasswordPageContent />
+    </Suspense>
   );
 }

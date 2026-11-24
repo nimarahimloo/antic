@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { formatToman } from "@/components/CartDrawer";
 import PageHero from "@/components/PageHero";
+import { ContactPageSkeleton } from "@/components/Skeletons";
 
-export default function CheckoutPage() {
+function CheckoutPageContent() {
   const [form, setForm] = useState({
     customerName: "",
     customerPhone: "",
@@ -212,5 +213,13 @@ export default function CheckoutPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<ContactPageSkeleton />}>
+      <CheckoutPageContent />
+    </Suspense>
   );
 }

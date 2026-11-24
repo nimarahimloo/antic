@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { prisma } from "../lib/prisma.js";
 import {
   ENTITY_MAP,
   isEntityName,
@@ -191,6 +192,162 @@ router.delete("/:Entity/:id", requireAdmin, async (req: AuthedRequest, res) => {
     // @ts-expect-error dynamic
     await meta.model.delete({ where: { id: req.params.id } });
     res.json({ id: req.params.id });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// CurtainModel related projects endpoints
+router.get("/CurtainModel/:id/related-projects", async (req, res) => {
+  try {
+    const modelId = req.params.id;
+    const limit = Math.min(Number(req.query.limit) || 6, 20);
+
+    const model = await prisma.curtainModel.findUnique({
+      where: { id: modelId },
+      include: {
+        relatedProjects: {
+          take: limit,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            title: true,
+            coverImage: true,
+            categorySlug: true,
+            subcategory: true,
+          },
+        },
+      },
+    });
+
+    if (!model) {
+      return res.status(404).json({ error: "Curtain model not found" });
+    }
+
+    const projects = model.relatedProjects.map((p: { id: string; title: string; coverImage: string | null; categorySlug: string | null; subcategory: string | null }) => ({
+      id: p.id,
+      title: p.title,
+      cover_image: p.coverImage,
+      category_slug: p.categorySlug,
+      subcategory: p.subcategory,
+    }));
+
+    res.json({ projects });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.get("/admin/CurtainModel/:id/related-projects", requireAdmin, async (req: AuthedRequest, res) => {
+  try {
+    const modelId = req.params.id;
+    // Use raw query for implicit relation table
+    const relations = await prisma.$queryRaw<Array<{ B: string }>>`
+      SELECT "B" FROM "_CurtainModelRelatedProjects" WHERE "A" = ${modelId} LIMIT 50
+    `;
+    const projectIds = relations.map((r) => r.B);
+    const projects = await prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, title: true, coverImage: true, categorySlug: true, subcategory: true },
+    });
+    res.json({ projects });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.post("/admin/CurtainModel/:id/related-projects", requireAdmin, async (req: AuthedRequest, res) => {
+  try {
+    const modelId = req.params.id;
+    const { projectId } = req.body;
+    if (!projectId) throw new HttpError(400, "projectId is required");
+
+    // Use raw query for implicit relation table
+    await prisma.$executeRaw`
+      INSERT INTO "_CurtainModelRelatedProjects" ("A", "B") VALUES (${modelId}, ${projectId})
+      ON CONFLICT DO NOTHING
+    `;
+    const projects = await prisma.project.findMany({
+      where: { id: { in: [projectId] } },
+      select: { id: true, title: true, coverImage: true, categorySlug: true, subcategory: true },
+    });
+    res.json({ projects });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.delete("/admin/CurtainModel/:id/related-projects/:projectId", requireAdmin, async (req: AuthedRequest, res) => {
+  try {
+    const modelId = req.params.id;
+    const projectId = req.params.projectId;
+
+    await prisma.$executeRaw`
+      DELETE FROM "_CurtainModelRelatedProjects" WHERE "A" = ${modelId} AND "B" = ${projectId}
+    `;
+    const relations = await prisma.$queryRaw<Array<{ B: string }>>`
+      SELECT "B" FROM "_CurtainModelRelatedProjects" WHERE "A" = ${modelId}
+    `;
+    const projectIds = relations.map((r) => r.B);
+    const projects = await prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, title: true, coverImage: true, categorySlug: true, subcategory: true },
+    });
+    res.json({ projects });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// Get projects for a category (used in catalog page)
+router.get("/CurtainCategory/:slug/projects", async (req, res) => {
+  try {
+    const slug = req.params.slug;
+    const subcategory = req.query.subcategory as string | undefined;
+    const limit = Math.min(Number(req.query.limit) || 20, 50);
+
+    const where: Record<string, unknown> = { categorySlug: slug };
+    if (subcategory) where.subcategory = subcategory;
+
+    const projects = await prisma.project.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        coverImage: true,
+        categorySlug: true,
+        subcategory: true,
+      },
+    });
+
+    res.json({ projects });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// Get related projects for a CurtainModel (using the implicit relation table)
+router.get("/CurtainModel/:id/related-projects", async (req, res) => {
+  try {
+    const modelId = req.params.id;
+    const limit = Math.min(Number(req.query.limit) || 6, 20);
+
+    const relations = await prisma.$queryRaw<Array<{ B: string }>>`
+      SELECT "B" FROM "_CurtainModelRelatedProjects" WHERE "A" = ${modelId} LIMIT ${limit}
+    `;
+    const projectIds = relations.map((r) => r.B);
+    const projects = await prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: { id: true, title: true, coverImage: true, categorySlug: true, subcategory: true },
+    });
+
+    res.json({ projects });
   } catch (err) {
     sendError(res, err);
   }

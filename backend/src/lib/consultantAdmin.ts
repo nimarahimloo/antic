@@ -1,7 +1,3 @@
-/**
- * دستیار ادمین — آزاد، هر لحن و هر جمله.
- * CRUD همچنان فقط بعد از پیش‌نمایش + تایید.
- */
 import { prisma } from "./prisma.js";
 import { executeAdminCommand } from "./adminActions.js";
 import type { AssistantContext, AssistantResult, ChatMessage, RichBlock } from "./consultant.js";
@@ -59,10 +55,6 @@ function listPhraseForPath(path: string): string {
   return "لیست مدل‌ها";
 }
 
-/**
- * جملات آزاد ادمین را به چند واریانت قابل‌اجرا تبدیل می‌کند
- * (خودمونی، رسمی، کوتاه، با غلط املایی رایج)
- */
 function expandVariants(userText: string, history: ChatMessage[], path: string): string[] {
   const t = userText.trim();
   const n = normalize(t);
@@ -116,13 +108,11 @@ function expandVariants(userText: string, history: ChatMessage[], path: string):
     else variants.add("تعداد");
   }
 
-  // ساخت آزاد
   if (/بساز|اضافه|افزودن|ثبت\s*کن|ایجاد|بذار\s*تو/.test(n)) {
     if (/مدل/.test(n) || path.includes("/models")) variants.add(t);
     if (/دسته/.test(n)) variants.add(t);
   }
 
-  // حذف آزاد
   if (/حذف|پاک/.test(n)) {
     variants.add(t);
     const code = t.match(/\b([A-Za-z]{1,10}-?\d{1,8})\b/);

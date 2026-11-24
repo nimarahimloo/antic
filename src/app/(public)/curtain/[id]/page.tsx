@@ -7,7 +7,7 @@ import CurtainPreview from "@/components/catalog/CurtainPreview";
 import ProjectCard from "@/components/ProjectCard";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 import CurtainDetailClient from "./CurtainDetailClient";
-import PageLoading from "@/components/PageLoading";
+import { CurtainDetailPageSkeleton } from "@/components/Skeletons";
 
 interface CurtainDetailPageProps {
   params: Promise<{ id: string }>;
@@ -205,7 +205,7 @@ function Spec({ label, value }: { label: string; value: string }) {
 
 export default async function CurtainDetailPage({ params }: CurtainDetailPageProps) {
   return (
-    <Suspense fallback={<PageLoading />}>
+    <Suspense fallback={<CurtainDetailPageSkeleton />}>
       <CurtainDetailServer params={params} />
     </Suspense>
   );

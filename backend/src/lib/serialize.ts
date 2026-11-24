@@ -68,6 +68,8 @@ const ALLOWED: Record<string, Set<string>> = {
     "subcategories",
     "inCatalog",
     "mechanism",
+    "backgroundImage",
+    "backgroundGradient",
   ]),
   PortfolioCategory: new Set([
     "name",

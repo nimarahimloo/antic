@@ -161,7 +161,7 @@ export default function GlobalSearch({ compact = false, className = "" }: { comp
       </div>
 
       {showPanel && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-secondary/60 bg-card shadow-xl md:left-auto md:w-[min(100vw-2rem,22rem)]">
+        <div className="absolute right-0 left-0 top-[calc(100%+8px)] z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-secondary/60 bg-card shadow-xl md:right-0 md:w-[min(100vw-2rem,22rem)]">
           {!loading && results.length === 0 && (
             <p className="px-4 py-6 text-center font-body text-xs text-muted-foreground">
               نتیجه‌ای برای «{q.trim()}» پیدا نشد

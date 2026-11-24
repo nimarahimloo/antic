@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getCurtainCategories } from "@/lib/server-data";
 import ProjectsList from "@/components/ProjectsList";
-import PageLoading from "@/components/PageLoading";
+import { ProjectsPageSkeleton } from "@/components/Skeletons";
 import ProjectsListClientWrapper from "./ProjectsListClientWrapper";
 
 export default async function ProjectsPage() {
@@ -15,7 +15,7 @@ export default async function ProjectsPage() {
   }
 
   return (
-    <Suspense fallback={<PageLoading />}>
+    <Suspense fallback={<ProjectsPageSkeleton />}>
       <ProjectsListClientWrapper categories={categories} />
     </Suspense>
   );

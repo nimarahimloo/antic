@@ -34,8 +34,9 @@ export default function ProductGallery({ images, focusUrl, productName }: Produc
     if (!lightbox) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setLightbox(false);
-      if (e.key === "ArrowLeft") setActiveIndex((i) => (i + 1) % images.length);
-      if (e.key === "ArrowRight") setActiveIndex((i) => (i - 1 + images.length) % images.length);
+      // RTL: ArrowRight goes next (right), ArrowLeft goes previous (left)
+      if (e.key === "ArrowRight") setActiveIndex((i) => (i + 1) % images.length);
+      if (e.key === "ArrowLeft") setActiveIndex((i) => (i - 1 + images.length) % images.length);
     };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
