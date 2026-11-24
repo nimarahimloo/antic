@@ -56,9 +56,9 @@ async function main() {
     }
   });
 
-  // 2. NVIDIA is priority #1 when configured
-  check("NVIDIA is priority #1 in CHAT_PROVIDER_PRIORITY", () => {
-    assert.strictEqual(CHAT_PROVIDER_PRIORITY[0], "nvidia");
+  // 2. Cloudflare Workers AI is the primary chat provider
+  check("Cloudflare is priority #1 in CHAT_PROVIDER_PRIORITY", () => {
+    assert.strictEqual(CHAT_PROVIDER_PRIORITY[0], "cloudflare");
   });
 
   // 3. Cloudflare is in the priority list
