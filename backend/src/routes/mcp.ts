@@ -2,12 +2,6 @@ import { Router } from "express";
 import { timingSafeEqual } from "node:crypto";
 import { HttpError, sendError } from "../lib/errors.js";
 import { catalogToolSchemas, executeCatalogTool } from "../services/catalogToolRegistry.js";
-import {
-  getCurtainModel,
-  listCurtainCategories,
-  listCurtainProjects,
-  searchCurtainModels,
-} from "../services/aiCatalog.js";
 
 /**
  * Internal read-only catalog tool bridge consumed by the edge MCP Worker.
@@ -82,7 +76,6 @@ router.post("/tools/:name", async (req, res) => {
     return res.json(
       await executeCatalogTool(name as keyof typeof catalogToolSchemas, args),
     );
-;
   } catch (err) {
     sendError(res, err);
   }
