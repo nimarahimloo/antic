@@ -87,7 +87,7 @@ jobs:
       FRONTEND_URL: http://localhost:3000
       PUBLIC_BASE_URL: http://localhost:3001
       ZARINPAL_SANDBOX: "true"
-      MCP_WORKER_TOKEN: ci-only-mcp-worker-token
+      MCP_WORKER_TOKEN: ci-only-mcp-worker-token-0123456789-abcdef
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
