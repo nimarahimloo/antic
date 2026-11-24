@@ -12,8 +12,11 @@ function merchantId() {
 }
 
 function isSandbox() {
-  const m = merchantId();
-  return process.env.ZARINPAL_SANDBOX === "true" || !m;
+  return process.env.ZARINPAL_SANDBOX === "true";
+}
+
+function demoPaymentsEnabled() {
+  return process.env.NODE_ENV !== "production" && process.env.ZARINPAL_DEMO_MODE === "true";
 }
 
 function publicBase() {
@@ -68,6 +71,9 @@ router.post("/checkout", optionalAuth, async (req: AuthedRequest, res) => {
 
     const amountRial = amountToman * 10;
     const MERCHANT = merchantId();
+    if (!MERCHANT && !demoPaymentsEnabled()) {
+      throw new HttpError(503, "درگاه پرداخت پیکربندی نشده است.");
+    }
 
     const order = await prisma.order.create({
       data: {
@@ -173,7 +179,12 @@ router.get("/zarinpal/callback", async (req, res) => {
       );
     }
 
-    if (!MERCHANT) {
+    if (!MERCHANT && !demoPaymentsEnabled()) {
+      await prisma.order.update({ where: { id: orderId }, data: { status: "failed" } });
+      return res.redirect(`${FRONT}/checkout/result?Status=NOK&orderId=${orderId}`);
+    }
+
+    if (!MERCHANT && demoPaymentsEnabled()) {
       const demoAuth = authority || `DEMO-${orderId}`;
       await prisma.order.update({
         where: { id: orderId },

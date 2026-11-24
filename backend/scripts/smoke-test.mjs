@@ -144,8 +144,8 @@ async function main() {
       : fail("catalog categories", `${r.status}`);
   }
 
-  // 10. Checkout demo (twice — tests unique authority)
-  for (let i = 1; i <= 2; i++) {
+  // 10. Payment must fail closed when no real merchant is configured.
+  if (!process.env.ZARINPAL_MERCHANT_ID) {
     const r = await req("/api/orders/checkout", {
       method: "POST",
       body: {
@@ -154,13 +154,9 @@ async function main() {
         items: [{ productId: "p1", name: "Test", quantity: 1, unitPrice: 50000 }],
       },
     });
-    if (r.status === 200 && r.data?.orderId && r.data?.paymentUrl) {
-      ok(`checkout demo #${i}`, r.data.orderId.slice(-6));
-      const o = await req(`/api/orders/${r.data.orderId}`);
-      o.data?.status === "paid" ? ok(`order #${i} paid`) : fail(`order #${i} paid`, o.data?.status);
-    } else {
-      fail(`checkout demo #${i}`, `${r.status} ${JSON.stringify(r.data)}`);
-    }
+    r.status === 503
+      ? ok("checkout rejects missing payment gateway")
+      : fail("checkout rejects missing payment gateway", `${r.status} ${JSON.stringify(r.data)}`);
   }
 
   // 11. Admin orders list
