@@ -19,7 +19,7 @@
 - **پرداخت زرین‌پال** (یا حالت دمو بدون Merchant ID)
 - صفحات `/checkout` و `/checkout/result`
 - **بازیابی رمز عبور** با توکن یک‌بارمصرف (`/forgot-password` → `/reset-password`)
-- **سرور MCP** برای کلاینت‌های هوش مصنوعی (`/connect` → `/api/mcp`)
+- **سرور MCP** برای کلاینت‌های هوش مصنوعی (`/connect` → `https://mcp.pardehantic.ir/mcp`)
 
 ## راه‌اندازی
 
@@ -76,7 +76,7 @@ PUBLIC_BASE_URL="https://your-domain.ir"   # یا آدرس API اگر جداست
 - انتخاب خودکار مدل با failover سلامت‌محور یا انتخاب دستی Provider/Model از فهرست مدل‌های فعال و سازگار با ابزارها
 - ابزارهای داخلی Workspace از طریق AI SDK مستقیماً همان توابع دامنهٔ `aiCatalog` را اجرا می‌کنند؛ Workspace برای فراخوانی ابزارهای داخلی به Worker خودش HTTP نمی‌زند و هیچ network hop اضافه‌ای به سایت تحمیل نمی‌کند.
 - Worker موجود `mcp.pardehantic.ir/mcp` فقط درگاه MCP عمومی برای کلاینت‌های خارجی است: Streamable HTTP را مدیریت می‌کند و ابزارهای فقط‌خواندنی کاتالوگ/پروژه را به Backend bridge می‌کند؛ Worker مسئول inference، انتخاب مدل، فایل‌های خصوصی یا مدیریت Gateway نیست.
-- مسیر `POST /api/mcp/tools/:name` فقط از Worker معتبر با `MCP_WORKER_TOKEN` درخواست می‌پذیرد؛ همان secret باید در محیط Backend و در تنظیمات Secretهای Worker با نام یکسان تنظیم شود. مقدار واقعی هرگز در Git ذخیره نشود.
+- مسیر داخلی `POST /api/mcp/tools/:name` فقط از Worker معتبر با `MCP_WORKER_TOKEN` درخواست می‌پذیرد؛ کلاینت‌های خارجی باید به آدرس عمومی `https://mcp.pardehantic.ir/mcp` وصل شوند، نه مسیر داخلی Backend. همان secret باید در `backend/.env` و تنظیمات Secretهای Worker با نام یکسان تنظیم شود. مقدار واقعی هرگز در Git ذخیره نشود.
 - Gateway موجود Cloudflare با شناسهٔ `nvidia-m` دارای `multiprovider_enabled=true` است و Secrets Store اختصاصی `ai-gateway-provider-keys` نیز ساخته و به Gateway متصل شده است.
 - در آخرین بررسی، Provider Configurations هنوز خالی بود؛ فعال‌سازی multiprovider و اتصال Secrets Store به‌تنهایی به معنی اتصال Providerها نیست.
 - Adapterهای Google/NVIDIA/OpenRouter در Backend مستقل باقی می‌مانند. در وضعیت فعلی، مسیر آن‌ها هنوز مستقیم است و تا زمان تکمیل و تست انتقال هر Adapter به Gateway نباید ترافیکشان را Gateway-routed معرفی کرد.
@@ -150,6 +150,9 @@ SMTP_FROM="no-reply@example.com"
 ## استقرار (Docker)
 
 ```bash
+# فایل محیطی Backend را بسازید و مقدار MCP_WORKER_TOKEN را در آن تنظیم کنید.
+cp backend/.env.example backend/.env
+
 # متغیرهای محیطی (اختیاری — پیش‌فرض‌ها در docker-compose.yml هستند)
 export JWT_SECRET="یک-رشته-تصادفی-بلند"
 export ADMIN_PASSWORD="رمز-قوی"
