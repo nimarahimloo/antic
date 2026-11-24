@@ -375,6 +375,15 @@ export default function AIWorkspacePage() {
     }
     return null;
   }, [configuredProviders, selectedModelKey]);
+  const availableImageModels = useMemo(
+    () => configuredProviders.flatMap((provider) =>
+      provider.imageModels.map((model) => ({
+        provider: provider.id,
+        ...model,
+      })),
+    ),
+    [configuredProviders],
+  );
   const isStreaming = status === "submitted" || status === "streaming";
 
   async function refreshConversations() {
@@ -440,11 +449,9 @@ export default function AIWorkspacePage() {
     try {
       const result = await api.ai.conversation(id);
       setConversationId(result.conversation.id);
-      setSelectedModelKey(
-        result.conversation.provider && result.conversation.model
-          ? result.conversation.provider + "::" + result.conversation.model
-          : "auto",
-      );
+      // Conversation.provider/model records the model that actually answered;
+      // it does not imply that the user had selected a manual/pinned mode.
+      setSelectedModelKey("auto");
       setMessages(result.messages as UIMessage[]);
       await refreshImages(result.conversation.id);
     } catch (err) {
@@ -928,13 +935,11 @@ export default function AIWorkspacePage() {
                   className="mt-1 h-10 w-full rounded-xl border border-secondary/60 bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
                 >
                   <option value="auto">انتخاب خودکار با جایگزینی مدل</option>
-                  {configuredProviders.flatMap((provider) =>
-                    provider.imageModels.map((model) => (
-                      <option key={provider.id + "::" + model.id} value={model.id}>
-                        {provider.label} · {model.label}
-                      </option>
-                    )),
-                  )}
+                  {availableImageModels.map((model) => (
+                    <option key={model.provider + "::" + model.id} value={model.id}>
+                      {model.provider} · {model.label}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="block text-xs text-muted-foreground">
@@ -1023,7 +1028,7 @@ export default function AIWorkspacePage() {
               disabled={
                 generatingImage ||
                 !imagePrompt.trim() ||
-                !configuredProviders.length
+                !availableImageModels.length
               }
             >
               {generatingImage ? (
