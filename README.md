@@ -64,7 +64,7 @@ FRONTEND_URL="https://your-domain.ir"
 PUBLIC_BASE_URL="https://your-domain.ir"   # یا آدرس API اگر جداست
 ```
 
-اگر `ZARINPAL_MERCHANT_ID` خالی باشد، checkout در **حالت دمو** مستقیم به صفحه نتیجه موفق می‌رود (بدون درگاه واقعی).
+در محیط توسعه، برای تست بدون تراکنش واقعی می‌توانید `ZARINPAL_DEMO_MODE=true` را صریحاً تنظیم کنید؛ این حالت فقط وقتی `NODE_ENV` برابر `production` نباشد فعال است. در Production اگر `ZARINPAL_MERCHANT_ID` تنظیم نشده باشد، checkout با خطای 503 متوقف می‌شود و هیچ سفارشی paid نمی‌شود. برای انتشار واقعی، Merchant ID معتبر و `ZARINPAL_SANDBOX=false` را از Secret Manager محیط اجرا تنظیم کنید.
 
 مبالغ فروشگاه به **تومان** است؛ برای زرین‌پال به ریال (`×۱۰`) تبدیل می‌شود.
 
