@@ -150,16 +150,19 @@ SMTP_FROM="no-reply@example.com"
 ## استقرار (Docker)
 
 ```bash
-# فایل محیطی Backend را بسازید و مقدار MCP_WORKER_TOKEN را در آن تنظیم کنید.
+# فایل محیطی Backend را بسازید و همهٔ Placeholderها را جایگزین کنید.
 cp backend/.env.example backend/.env
+$EDITOR backend/.env
 
-# متغیرهای محیطی (اختیاری — پیش‌فرض‌ها در docker-compose.yml هستند)
-export JWT_SECRET="یک-رشته-تصادفی-بلند"
-export ADMIN_PASSWORD="رمز-قوی"
-export CORS_ORIGIN="https://your-domain.ir"
-export FRONTEND_URL="https://your-domain.ir"
-export PUBLIC_BASE_URL="https://your-domain.ir"
+# مقادیر اجباری:
+# - JWT_SECRET تصادفی با حداقل ۳۲ نویسه
+# - ADMIN_EMAIL و ADMIN_PASSWORD اختصاصی (رمز حداقل ۱۲ نویسه)
+# - MCP_WORKER_TOKEN تصادفی با حداقل ۳۲ نویسه و برابر Secret در Cloudflare Worker
+# - دامنه‌های واقعی CORS_ORIGIN / FRONTEND_URL / PUBLIC_BASE_URL
+# - ZARINPAL_MERCHANT_ID معتبر و ZARINPAL_SANDBOX=false برای پرداخت واقعی
+# - کلیدهای Provider فقط در backend/.env یا Cloudflare Secrets Store؛ نه در Git یا گفتگو
 
+docker compose config --quiet
 docker compose up -d --build
 ```
 
