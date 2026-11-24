@@ -53,7 +53,7 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@antic.local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD to a strong initial admin password before starting Compose}
       ZARINPAL_MERCHANT_ID: ${ZARINPAL_MERCHANT_ID:-}
-      ZARINPAL_SANDBOX: ${ZARINPAL_SANDBOX:-true}
+      ZARINPAL_SANDBOX: ${ZARINPAL_SANDBOX:-false}
       ZARINPAL_DEMO_MODE: "false"
       MCP_WORKER_TOKEN: ${MCP_WORKER_TOKEN:-}
       SMTP_HOST: ${SMTP_HOST:-}
