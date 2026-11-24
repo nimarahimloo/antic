@@ -93,6 +93,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Create isolated backend runtime environment
+        shell: bash
+        run: |
+          umask 077
+          cat > backend/.env <<EOF
+          NODE_ENV=production
+          PORT=3001
+          JWT_SECRET=${JWT_SECRET}
+          ADMIN_EMAIL=${ADMIN_EMAIL}
+          ADMIN_PASSWORD=${ADMIN_PASSWORD}
+          CORS_ORIGIN=${CORS_ORIGIN}
+          FRONTEND_URL=${FRONTEND_URL}
+          PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
+          ZARINPAL_MERCHANT_ID=
+          ZARINPAL_SANDBOX=true
+          ZARINPAL_DEMO_MODE=false
+          MCP_WORKER_TOKEN=${MCP_WORKER_TOKEN}
+          AI_ENABLE_CLOUDFLARE=false
+          AI_ENABLE_NVIDIA=false
+          AI_ENABLE_GOOGLE=false
+          AI_ENABLE_OPENROUTER=false
+          EOF
       - name: Validate Compose configuration
         run: docker compose config --quiet
       - name: Build and start production containers
