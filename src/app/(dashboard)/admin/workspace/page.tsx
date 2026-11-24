@@ -176,14 +176,14 @@ function ToolPart({ part }: { part: WorkspaceToolPart }) {
     part.toolName || part.type.replace(/^tool-/, "").replace(/^dynamic-tool$/, "tool");
 
   return (
-    <details className="my-2 overflow-hidden rounded-xl border border-primary/20 bg-primary/5">
+    <details dir="rtl" className="my-2 overflow-hidden rounded-xl border border-primary/20 bg-primary/5">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs text-primary">
         <Wrench className="h-3.5 w-3.5" />
         <span className="font-semibold">{toolName}</span>
         <span className="text-muted-foreground">· {status}</span>
       </summary>
       {details !== undefined ? (
-        <pre className="max-h-64 overflow-auto border-t border-primary/15 px-3 py-2 text-left text-[11px] leading-5 text-muted-foreground">
+        <pre className="max-h-64 overflow-auto border-t border-primary/15 bg-background px-3 py-2 text-sm font-mono text-right text-muted-foreground">
           {JSON.stringify(details, null, 2)}
         </pre>
       ) : null}
@@ -195,6 +195,7 @@ function WorkspaceMessage({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
   return (
     <article
+      dir="rtl"
       className={cn(
         "flex gap-3 py-4",
         isUser ? "justify-end" : "justify-start",
@@ -212,7 +213,7 @@ function WorkspaceMessage({ message }: { message: UIMessage }) {
       </div>
       <div
         className={cn(
-          "max-w-[86%] space-y-2 rounded-2xl px-4 py-3",
+          "max-w-[86%] space-y-2 rounded-2xl px-4 py-3 text-right",
           isUser
             ? "bg-secondary/70 text-foreground"
             : "border border-secondary/50 bg-card text-card-foreground",
@@ -672,7 +673,7 @@ export default function AIWorkspacePage() {
           <span>{workspaceError}</span>
           <button
             type="button"
-            className="mr-auto"
+            className="ml-auto"
             onClick={() => setWorkspaceError(null)}
             aria-label="بستن خطا"
           >
@@ -872,7 +873,8 @@ export default function AIWorkspacePage() {
                 }}
                 rows={2}
                 placeholder="پیام خود را بنویسید؛ Enter برای ارسال و Shift+Enter برای خط جدید"
-                className="max-h-40 min-h-12 flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground"
+                className="max-h-40 min-h-12 flex-1 resize-none rounded-xl border border-secondary bg-card px-3 py-2 text-sm text-right text-foreground outline-none placeholder:text-muted-foreground"
+                style={{ direction: "rtl", textAlign: "right" }}
               />
               {isStreaming ? (
                 <Button type="button" variant="outline" onClick={() => stop()}>
@@ -922,6 +924,7 @@ export default function AIWorkspacePage() {
                 rows={5}
                 placeholder="مثلاً: پردهٔ شید مشکی مینیمال در پذیرایی روشن با نور عصر"
                 className="w-full resize-none rounded-xl border border-secondary/60 bg-background px-3 py-2 text-sm leading-6 text-foreground outline-none focus:border-primary"
+                style={{ direction: "rtl", textAlign: "right" }}
               />
             </div>
 
@@ -995,7 +998,7 @@ export default function AIWorkspacePage() {
                           current.filter((reference) => reference.id !== file.id),
                         )
                       }
-                      className="absolute left-1 top-1 rounded-full bg-black/70 p-1 text-white opacity-0 transition group-hover:opacity-100"
+                      className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white opacity-0 transition group-hover:opacity-100"
                       aria-label="حذف تصویر مرجع"
                     >
                       <X className="h-3 w-3" />
