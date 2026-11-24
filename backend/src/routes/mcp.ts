@@ -1,5 +1,7 @@
 import { Router } from "express";
-import { sendError } from "../lib/errors.js";
+import { timingSafeEqual } from "node:crypto";
+import { z } from "zod";
+import { HttpError, sendError } from "../lib/errors.js";
 import {
   getCurtainModel,
   listCurtainCategories,
@@ -13,6 +15,38 @@ import {
  * Tools: list_categories, search_models, list_projects, get_model.
  */
 const router = Router();
+
+const toolSchemas = {
+  list_categories: z.object({}).strict(),
+  search_models: z.object({
+    query: z.string().max(160).optional(),
+    category_slug: z.string().max(100).optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+  }).strict(),
+  get_model: z.object({
+    id: z.string().trim().min(1).max(128),
+  }).strict(),
+  list_projects: z.object({
+    limit: z.number().int().min(1).max(50).optional(),
+  }).strict(),
+};
+
+function requireMcpWorker(req: import("express").Request) {
+  const expected = process.env.MCP_WORKER_TOKEN?.trim();
+  if (!expected) {
+    throw new HttpError(503, "MCP Worker authentication is not configured.");
+  }
+
+  const supplied = req.get("x-mcp-worker-token") || "";
+  const expectedBytes = Buffer.from(expected);
+  const suppliedBytes = Buffer.from(supplied);
+  if (
+    suppliedBytes.length !== expectedBytes.length ||
+    !timingSafeEqual(suppliedBytes, expectedBytes)
+  ) {
+    throw new HttpError(401, "Invalid MCP Worker credential.");
+  }
+}
 
 router.get("/", (_req, res) => {
   res.json({
@@ -77,7 +111,7 @@ router.post("/tools/:name", async (req, res) => {
       );
     }
 
-    res.status(404).json({ error: `Unknown tool: ${name}` });
+    res.status(404).json({ error: "Unknown tool" });
   } catch (err) {
     sendError(res, err);
   }
