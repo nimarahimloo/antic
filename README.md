@@ -24,7 +24,7 @@
 ## راه‌اندازی
 
 ```bash
-git pull origin dev
+git pull origin main
 
 # ترمینال ۱ — بک‌اند
 cd backend
