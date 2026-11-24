@@ -109,7 +109,7 @@ async function readLimitedBody(request) {
 }
 
 async function callCatalogTool(name, args, env) {
-  const backendEndpoint = (currentEnv.MCP_BACKEND_URL || UPSTREAM).replace(/\/+$/, "");
+  const backendEndpoint = (env.MCP_BACKEND_URL || UPSTREAM).replace(/\/+$/, "");
   const response = await fetch(`${backendEndpoint}/${encodeURIComponent(name)}`, {
     method: "POST",
     headers: {
