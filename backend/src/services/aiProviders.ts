@@ -190,7 +190,7 @@ function nvidiaApiKey() {
 
 export function isCloudflareConfigured() {
   const { accountId, apiToken } = cloudflareCredentials();
-  return enabled("AI_ENABLE_CLOUDFLARE", true) && Boolean(accountId && apiToken);
+  return enabled("AI_ENABLE_CLOUDFLARE") && Boolean(accountId && apiToken);
 }
 
 export function isGoogleConfigured() {
@@ -198,7 +198,7 @@ export function isGoogleConfigured() {
 }
 
 export function isNVIDIAConfigured() {
-  return enabled("AI_ENABLE_NVIDIA", true) && Boolean(nvidiaApiKey());
+  return enabled("AI_ENABLE_NVIDIA") && Boolean(nvidiaApiKey());
 }
 
 export function isOpenRouterConfigured() {

@@ -1,8 +1,10 @@
 # AI Workspace Provider Setup Guide
 
-This document describes how to configure each free AI provider for the
-Pardeh Antic AI Workspace. All providers are free-tier only — no credit
-card, billing upgrade, or paid infrastructure is required or authorized.
+This document describes explicit, fail-closed setup for AI providers in the
+Pardeh Antic AI Workspace. Provider credentials and free-tier eligibility are
+account-specific and can change. No paid inference is authorized. All providers
+default to disabled and must be explicitly enabled only after current quotas
+and billing terms have been checked.
 
 ## Provider Priority Order
 
@@ -15,10 +17,14 @@ configured providers in this code-defined order for automatic mode:
 4. **OpenRouter** (free-model allowlist, explicit opt-in)
 
 The live Cloudflare Gateway `nvidia-m` has multiprovider enabled and its
-dedicated Secrets Store attached. Provider-key configurations are still empty.
-Until each adapter is migrated to the Gateway transport and its BYOK key is
-configured, Google/NVIDIA/OpenRouter requests continue to use their existing
-direct backend adapters; do not describe those requests as Gateway-routed.
+dedicated Secrets Store attached. Provider-key configurations are still empty. The live Gateway reports
+`workers_ai_billing_mode=postpaid`, which bills Workers AI directly to the
+Cloudflare account. Keep Cloudflare inference disabled unless the account's
+plan and spend exposure have been explicitly reviewed. BYOK-only does not
+change Workers AI billing. Until each adapter is migrated to Gateway transport
+and its BYOK key is configured, Google/NVIDIA/OpenRouter requests continue to
+use their existing direct backend adapters; do not describe those requests as
+Gateway-routed.
 
 When the primary provider reaches quota, is unhealthy, or times out, the
 system automatically fails over to the next configured provider without
@@ -72,9 +78,13 @@ AI_ENABLE_CLOUDFLARE=true
 AI_CLOUDFLARE_DAILY_QUOTA_UNITS=10000
 ```
 
-**Free tier:** 10,000 neurons/day (shared across all Cloudflare users on
-the free tier). The local guard is set to 10,000 to prevent exceeding
-the actual free-tier budget.
+**Billing safety:** the connected Gateway is configured as `postpaid`.
+Cloudflare documents 10,000 neurons/day in the Workers AI Free allocation;
+Workers Paid charges for usage above that allocation. Because the connected
+account's Workers plan and effective postpaid exposure have not been confirmed
+here, leave `AI_ENABLE_CLOUDFLARE=false` until reviewed. The local quota
+guard is approximate and is not a billing cap. See the
+[official pricing page](https://developers.cloudflare.com/workers-ai/platform/pricing/).
 
 **API endpoint:** `https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/v1`.
 
@@ -133,11 +143,17 @@ AI_ENABLE_OPENROUTER=true
 
 ## No Paid Fallback
 
+Cloudflare Workers AI is not treated as cost-free merely because it has a
+daily free allocation: the connected Gateway is set to `postpaid`. Keep it
+disabled until its billing mode and account plan are verified. NVIDIA, Gemini,
+and OpenRouter also remain disabled by default; an allowlisted model name does
+not guarantee that a particular account has free quota.
+
 The routing configuration (`CHAT_PROVIDER_PRIORITY` in
 `backend/src/services/aiRouting.ts`) explicitly lists only free-tier
 providers: `["nvidia", "cloudflare", "google", "openrouter"]`. No paid
-providers (Anthropic, Cohere, etc.) are registered. When no free
-provider is available, the system returns HTTP 503 and fails safely —
+providers (Anthropic, Cohere, etc.) are registered. When no explicitly enabled and configured provider is available, the system
+returns HTTP 503 and fails safely —
 it never silently activates a paid service.
 
 ---
@@ -151,7 +167,8 @@ Before enabling a provider:
    `default` alias; do not send provider authorization headers from the app.
 4. Complete the provider-specific Gateway transport and verify an actual request
    before claiming that provider is Gateway-routed.
-5. Set `AI_ENABLE_<PROVIDER>=true` only after the runtime secret is present.
+5. Set `AI_ENABLE_<PROVIDER>=true` only after the runtime secret is present,
+   the current free quota is confirmed, and billing exposure is acceptable.
 6. Verify `/api/ai/providers` and run a real, low-risk smoke test.
 
 ---
