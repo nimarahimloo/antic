@@ -19,7 +19,7 @@
 - **پرداخت زرین‌پال** (یا حالت دمو بدون Merchant ID)
 - صفحات `/checkout` و `/checkout/result`
 - **بازیابی رمز عبور** با توکن یک‌بارمصرف (`/forgot-password` → `/reset-password`)
-- **سرور MCP** برای کلاینت‌های هوش مصنوعی (`/connect` → `/api/mcp`)
+- **سرور MCP** برای کلاینت‌های هوش مصنوعی (`/connect` → `https://mcp.pardehantic.ir/mcp`)
 
 ## راه‌اندازی
 
@@ -73,7 +73,14 @@ PUBLIC_BASE_URL="https://your-domain.ir"   # یا آدرس API اگر جداست
 فضای کاری داخل پنل ادمین و مسیر `/admin/workspace` قرار دارد. inference فقط روی backend و با ارائه‌دهندهٔ خارجی واقعی انجام می‌شود؛ هیچ پاسخ mock یا fallback محلی وجود ندارد.
 
 - گفتگوی streaming با AI SDK 7 و ذخیرهٔ دائمی پیام‌ها در Prisma/SQLite
-- ابزارهای واقعی `list_categories`، `search_models`، `get_model` و `list_projects` (همان منبع دادهٔ MCP)
+- انتخاب خودکار مدل با failover سلامت‌محور یا انتخاب دستی Provider/Model از فهرست مدل‌های فعال و سازگار با ابزارها
+- ابزارهای داخلی Workspace از طریق AI SDK مستقیماً همان توابع دامنهٔ `aiCatalog` را اجرا می‌کنند؛ Workspace برای فراخوانی ابزارهای داخلی به Worker خودش HTTP نمی‌زند و هیچ network hop اضافه‌ای به سایت تحمیل نمی‌کند.
+- Worker موجود `mcp.pardehantic.ir/mcp` فقط درگاه MCP عمومی برای کلاینت‌های خارجی است: Streamable HTTP را مدیریت می‌کند و ابزارهای فقط‌خواندنی کاتالوگ/پروژه را به Backend bridge می‌کند؛ Worker مسئول inference، انتخاب مدل، فایل‌های خصوصی یا مدیریت Gateway نیست.
+- مسیر داخلی `POST /api/mcp/tools/:name` فقط از Worker معتبر با `MCP_WORKER_TOKEN` درخواست می‌پذیرد؛ کلاینت‌های خارجی باید به آدرس عمومی `https://mcp.pardehantic.ir/mcp` وصل شوند، نه مسیر داخلی Backend. همان secret باید در `backend/.env` و تنظیمات Secretهای Worker با نام یکسان تنظیم شود. مقدار واقعی هرگز در Git ذخیره نشود.
+- Gateway موجود Cloudflare با شناسهٔ `nvidia-m` دارای `multiprovider_enabled=true` است و Secrets Store اختصاصی `ai-gateway-provider-keys` نیز ساخته و به Gateway متصل شده است.
+- در آخرین بررسی، Provider Configurations هنوز خالی بود؛ فعال‌سازی multiprovider و اتصال Secrets Store به‌تنهایی به معنی اتصال Providerها نیست.
+- Adapterهای Google/NVIDIA/OpenRouter در Backend مستقل باقی می‌مانند. در وضعیت فعلی، مسیر آن‌ها هنوز مستقیم است و تا زمان تکمیل و تست انتقال هر Adapter به Gateway نباید ترافیکشان را Gateway-routed معرفی کرد.
+- برای ثبت BYOK هر Provider به کلید معتبر همان Provider نیاز است. کلیدها باید از طریق Secrets Store/Provider Keys ثبت شوند؛ هرگز در Git، فایل `.env.example` یا پیام گفتگو قرار نگیرند.
 - تولید و ویرایش تصویر با FLUX.2 و حداکثر چهار تصویر مرجع
 - فایل‌های ورودی و خروجی خصوصی در `AI_PRIVATE_DIR`؛ این فایل‌ها زیر `/uploads` عمومی قرار نمی‌گیرند
 - محدودیت روزانهٔ درخواست، توکن و بودجهٔ محافظه‌کارانهٔ Cloudflare
@@ -84,12 +91,20 @@ AI_PRIVATE_DIR="./data/ai"
 
 CLOUDFLARE_ACCOUNT_ID="..."
 CLOUDFLARE_API_TOKEN="..."
+CLOUDFLARE_AI_GATEWAY_ID="nvidia-m"
 AI_ENABLE_CLOUDFLARE=true
+# Required for the external MCP Worker ↔ Backend bridge.
+# Configure the identical secret in the Cloudflare Worker dashboard.
+MCP_WORKER_TOKEN="replace-with-a-long-random-secret"
 
-# اختیاری و با فعال‌سازی صریح؛ فقط مدل‌های Free
-GOOGLE_GENERATIVE_AI_API_KEY="..."
+# NVIDIA — کلید فقط در Secret Manager محیط اجرا
+NVIDIA_API_KEY=""
+AI_ENABLE_NVIDIA=true
+
+# اختیاری و با فعال‌سازی صریح؛ فقط مدل‌های allowlist شده
+GOOGLE_GENERATIVE_AI_API_KEY=""
 AI_ENABLE_GOOGLE=false
-OPENROUTER_API_KEY="..."
+OPENROUTER_API_KEY=""
 AI_ENABLE_OPENROUTER=false
 
 AI_MAX_OUTPUT_TOKENS=2500
@@ -135,6 +150,9 @@ SMTP_FROM="no-reply@example.com"
 ## استقرار (Docker)
 
 ```bash
+# فایل محیطی Backend را بسازید و مقدار MCP_WORKER_TOKEN را در آن تنظیم کنید.
+cp backend/.env.example backend/.env
+
 # متغیرهای محیطی (اختیاری — پیش‌فرض‌ها در docker-compose.yml هستند)
 export JWT_SECRET="یک-رشته-تصادفی-بلند"
 export ADMIN_PASSWORD="رمز-قوی"

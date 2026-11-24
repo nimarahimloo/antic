@@ -1,18 +1,31 @@
 import { Router } from "express";
-import { sendError } from "../lib/errors.js";
-import {
-  getCurtainModel,
-  listCurtainCategories,
-  listCurtainProjects,
-  searchCurtainModels,
-} from "../services/aiCatalog.js";
+import { timingSafeEqual } from "node:crypto";
+import { HttpError, sendError } from "../lib/errors.js";
+import { catalogToolSchemas, executeCatalogTool } from "../services/catalogToolRegistry.js";
 
 /**
- * Minimal MCP-over-HTTP surface for catalog (read-only).
- * Not a full MCP transport — enough for Connect page demos and simple clients.
- * Tools: list_categories, search_models, list_projects, get_model
+ * Internal read-only catalog tool bridge consumed by the edge MCP Worker.
+ * The Worker implements the public Streamable HTTP MCP transport.
+ * Tools: list_categories, search_models, list_projects, get_model.
  */
 const router = Router();
+
+function requireMcpWorker(req: import("express").Request) {
+  const expected = process.env.MCP_WORKER_TOKEN?.trim();
+  if (!expected) {
+    throw new HttpError(503, "MCP Worker authentication is not configured.");
+  }
+
+  const supplied = req.get("x-mcp-worker-token") || "";
+  const expectedBytes = Buffer.from(expected);
+  const suppliedBytes = Buffer.from(supplied);
+  if (
+    suppliedBytes.length !== expectedBytes.length ||
+    !timingSafeEqual(suppliedBytes, expectedBytes)
+  ) {
+    throw new HttpError(401, "Invalid MCP Worker credential.");
+  }
+}
 
 router.get("/", (_req, res) => {
   res.json({
@@ -45,39 +58,32 @@ router.get("/", (_req, res) => {
 
 router.post("/tools/:name", async (req, res) => {
   try {
+    requireMcpWorker(req);
     const name = req.params.name;
-    const args = (req.body || {}) as Record<string, unknown>;
-
-    if (name === "list_categories") {
-      return res.json(await listCurtainCategories());
+    const schema = catalogToolSchemas[name as keyof typeof catalogToolSchemas];
+    if (!schema) {
+      return res.status(404).json({ error: "Unknown tool" });
     }
-
-    if (name === "search_models") {
-      return res.json(
-        await searchCurtainModels({
-          query: String(args.query || ""),
-          category_slug: String(args.category_slug || ""),
-          limit: Number(args.limit) || 20,
-        }),
-      );
+    const parsed = schema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Invalid tool arguments",
+        details: parsed.error.flatten(),
+      });
     }
+    const args = parsed.data as Record<string, unknown>;
 
-    if (name === "get_model") {
-      const result = await getCurtainModel({ id: String(args.id || "") });
-      const found = result.content as { found?: boolean; message?: string };
-      if (found?.found === false) {
+    const result = await executeCatalogTool(
+      name as keyof typeof catalogToolSchemas,
+      args,
+    );
+    if (name === "get_model" && result && typeof result === "object" && "content" in result) {
+      const content = (result as { content?: unknown }).content;
+      if (content && typeof content === "object" && "found" in content && content.found === false) {
         return res.status(404).json(result);
       }
-      return res.json(result);
     }
-
-    if (name === "list_projects") {
-      return res.json(
-        await listCurtainProjects({ limit: Number(args.limit) || 20 }),
-      );
-    }
-
-    res.status(404).json({ error: `Unknown tool: ${name}` });
+    return res.json(result);
   } catch (err) {
     sendError(res, err);
   }

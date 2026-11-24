@@ -24,6 +24,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     working_dir: /app
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       NODE_ENV: production
       PORT: "3001"

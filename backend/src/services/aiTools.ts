@@ -1,11 +1,9 @@
 import { tool, type ToolSet } from "ai";
-import { z } from "zod";
 import {
-  getCurtainModel,
-  listCurtainCategories,
-  listCurtainProjects,
-  searchCurtainModels,
-} from "./aiCatalog.js";
+  catalogToolDescriptions,
+  catalogToolSchemas,
+  executeCatalogTool,
+} from "./catalogToolRegistry.js";
 
 export const AI_SYSTEM_PROMPT = `شما «دستیار فضای کاری هوش مصنوعی پرده آنتیک» هستید و فقط برای مدیران احراز هویت‌شدهٔ آنتیک کار می‌کنید.
 
@@ -21,34 +19,24 @@ export const AI_SYSTEM_PROMPT = `شما «دستیار فضای کاری هوش 
 export function createAITools(): ToolSet {
   return {
     list_categories: tool({
-      description:
-        "لیست دسته‌بندی‌های واقعی کاتالوگ پرده همراه با slug، مکانیزم و زیردسته‌ها را برمی‌گرداند.",
-      inputSchema: z.object({}).strict(),
-      execute: async () => listCurtainCategories(),
+      description: catalogToolDescriptions.list_categories,
+      inputSchema: catalogToolSchemas.list_categories,
+      execute: async (input) => executeCatalogTool("list_categories", input),
     }),
     search_models: tool({
-      description:
-        "مدل‌های پرده را بر اساس متن، کد، پارچه، رنگ یا slug دسته جست‌وجو می‌کند.",
-      inputSchema: z.object({
-        query: z.string().optional().describe("عبارت جست‌وجو؛ اختیاری"),
-        category_slug: z.string().optional().describe("slug دقیق دستهٔ پرده؛ اختیاری"),
-        limit: z.number().int().min(1).max(50).optional().describe("حداکثر تعداد نتیجه"),
-      }),
-      execute: async (input) => searchCurtainModels(input),
+      description: catalogToolDescriptions.search_models,
+      inputSchema: catalogToolSchemas.search_models,
+      execute: async (input) => executeCatalogTool("search_models", input),
     }),
     get_model: tool({
-      description: "جزئیات کامل یک مدل پرده را با شناسهٔ id برمی‌گرداند.",
-      inputSchema: z.object({
-        id: z.string().min(1).describe("شناسهٔ مدل پرده"),
-      }),
-      execute: async (input) => getCurtainModel(input),
+      description: catalogToolDescriptions.get_model,
+      inputSchema: catalogToolSchemas.get_model,
+      execute: async (input) => executeCatalogTool("get_model", input),
     }),
     list_projects: tool({
-      description: "نمونه‌کارهای واقعی و پروژه‌های اجراشدهٔ پرده آنتیک را برمی‌گرداند.",
-      inputSchema: z.object({
-        limit: z.number().int().min(1).max(50).optional(),
-      }),
-      execute: async (input) => listCurtainProjects(input),
+      description: catalogToolDescriptions.list_projects,
+      inputSchema: catalogToolSchemas.list_projects,
+      execute: async (input) => executeCatalogTool("list_projects", input),
     }),
   };
 }

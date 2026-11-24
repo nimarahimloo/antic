@@ -43,6 +43,7 @@ import { generateWorkspaceImage } from "../services/aiImages.js";
 import {
   classifyProviderError,
   getBreakerStatus,
+  getChatCandidates,
   recordProviderFailure,
   recordProviderSuccess,
   selectChatRoute,
@@ -373,6 +374,9 @@ router.post("/images/generate", async (req: AuthedRequest, res) => {
       .object({
         conversationId: z.string().trim().min(1).optional(),
         prompt: z.string().trim().min(1).max(4_000),
+        // Optional explicit FLUX model. When omitted, use the automatic
+        // Cloudflare image-model fallback chain.
+        model: z.string().trim().min(1).max(200).optional(),
         referenceFileIds: z.array(z.string().trim().min(1)).max(4).default([]),
         width: z.number().int().min(256).max(1_920).optional(),
         height: z.number().int().min(256).max(1_920).optional(),
@@ -384,12 +388,18 @@ router.post("/images/generate", async (req: AuthedRequest, res) => {
     const conversationId = body.conversationId || null;
     if (conversationId) await ownedConversation(conversationId, ownerId);
 
-    // Image generation fallback chain: try candidates in order until one succeeds.
+    // Automatic image routing can fail over between FLUX variants. A manual
+    // model selection is validated against the configured image-model catalog.
     const route = selectImageRoute();
-    if (!route.primary) {
+    const candidates = body.model
+      ? route.candidates.filter((candidate) => candidate.modelId === body.model)
+      : route.candidates;
+    if (!candidates.length) {
       throw new HttpError(
-        503,
-        "هیچ مدل تولید تصویر رایگان در حال حاضر در دسترس نیست.",
+        body.model ? 400 : 503,
+        body.model
+          ? "مدل تصویر انتخاب‌شده در فهرست مدل‌های فعال وجود ندارد."
+          : "هیچ مدل تولید تصویر در حال حاضر در دسترس نیست.",
       );
     }
 
@@ -397,7 +407,7 @@ router.post("/images/generate", async (req: AuthedRequest, res) => {
       userId: ownerId,
       conversationId,
       prompt: body.prompt,
-      modelCandidates: route.candidates.map((c) => c.modelId),
+      modelCandidates: candidates.map((c) => c.modelId),
       referenceFileIds: body.referenceFileIds,
       width: body.width || 1024,
       height: body.height || 1024,
@@ -411,7 +421,8 @@ router.post("/images/generate", async (req: AuthedRequest, res) => {
     res.status(result.reused ? 200 : 201).json({
       ...result,
       routing: {
-        candidates: route.candidates.map((c) => ({
+        mode: body.model ? "manual" : "automatic",
+        candidates: candidates.map((c) => ({
           provider: c.providerId,
           model: c.modelId,
         })),
@@ -431,8 +442,10 @@ router.post("/chat", async (req: AuthedRequest, res) => {
     const body = z
       .object({
         conversationId: z.string().trim().min(1),
-        // provider/model are NOT accepted here: routing is always automatic
-        // backend-driven. Clients must not send them.
+        // Both fields must be supplied together and are checked against the
+        // configured provider/model allowlist below.
+        provider: z.enum(["cloudflare", "google", "nvidia", "openrouter"]).optional(),
+        model: z.string().trim().min(1).max(200).optional(),
         messages: z.array(z.unknown()).min(1),
         trigger: z.string().optional(),
         messageId: z.string().optional(),
@@ -530,17 +543,35 @@ router.post("/chat", async (req: AuthedRequest, res) => {
 
     let lastError: unknown = null;
 
-    // ─── Automatic routing with failover (backend-driven only) ───
-    // No manual provider/model override is accepted. Always route across all
-    // healthy, configured free providers.
-    const route = selectChatRoute();
-    if (!route.primary) {
-      throw new HttpError(
-        503,
-        "هیچ ارائه‌دهندهٔ هوش مصنوعی رایگان در حال حاضر در دسترس نیست.",
-      );
+    // ─── Automatic routing or explicit model selection ───
+    // Manual selections are allow-listed and pinned to the requested model.
+    // Automatic mode keeps the health-aware failover chain.
+    if (Boolean(body.provider) !== Boolean(body.model)) {
+      throw new HttpError(400, "برای انتخاب دستی، Provider و Model باید هم‌زمان ارسال شوند.");
     }
-    const candidates = route.candidates;
+    let candidates;
+    if (body.provider && body.model) {
+      const selected = getChatCandidates({ requireTools: true }).find(
+        (candidate) =>
+          candidate.providerId === body.provider && candidate.modelId === body.model,
+      );
+      if (!selected) {
+        throw new HttpError(
+          400,
+          "مدل انتخاب‌شده در فهرست مدل‌های فعال و سازگار با ابزارها وجود ندارد.",
+        );
+      }
+      candidates = [selected];
+    } else {
+      const route = selectChatRoute({ requireTools: true });
+      if (!route.primary) {
+        throw new HttpError(
+          503,
+          "هیچ ارائه‌دهندهٔ هوش مصنوعی پیکربندی‌شده و در دسترس نیست.",
+        );
+      }
+      candidates = route.candidates;
+    }
 
     for (const candidate of candidates) {
       const { providerId, modelId, model } = candidate;
