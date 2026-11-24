@@ -26,7 +26,7 @@
 |------|----------|-------------|
 | فرانت | Next.js 16 (App Router) + React 19 + Tailwind + TanStack Query | `:3000` |
 | بک‌اند | Express + Prisma + SQLite + JWT | `:3001` |
-| پرداخت | زرین‌پال (خالی بودن `ZARINPAL_MERCHANT_ID` = حالت دمو) | `/api/orders` |
+| پرداخت | زرین‌پال (حالت دمو فقط با `ZARINPAL_DEMO_MODE=true` در توسعه؛ Production بدون Merchant ID رد می‌شود) | `/api/orders` |
 | ادمین | صفحات `/admin/*` | لاگین لازم |
 
 ## راه‌اندازی لوکال (اجباری قبل از تست)
@@ -224,7 +224,7 @@ BASE=http://localhost:3001 node backend/scripts/functional-test.mjs
 
 ## پرداخت زرین‌پال
 
-- `ZARINPAL_MERCHANT_ID` خالی = **حالت دمو** (مستقیم به `/checkout/result?Status=OK` ریدایرکت)
+- `ZARINPAL_MERCHANT_ID` خالی در Production = **HTTP 503**؛ پرداخت نمایشی فقط با `ZARINPAL_DEMO_MODE=true` و خارج از Production فعال می‌شود.
 - مبالغ فروشگاه به **تومان**؛ برای زرین‌پال به ریال (`×۱۰`) تبدیل می‌شود
 - sandbox: `ZARINPAL_SANDBOX="true"`
 
@@ -268,13 +268,17 @@ SMTP_FROM="no-reply@example.com"
 ## استقرار (Docker)
 
 ```bash
-# متغیرهای محیطی
-export JWT_SECRET="یک-رشته-تصادفی-بلند"
-export ADMIN_PASSWORD="رمز-قوی"
-export CORS_ORIGIN="https://your-domain.ir"
-export FRONTEND_URL="https://your-domain.ir"
-export PUBLIC_BASE_URL="https://your-domain.ir"
+# همهٔ Secretهای Production فقط از backend/.env خوانده می‌شوند.
+cp backend/.env.example backend/.env
+$EDITOR backend/.env
 
+# Placeholderها را با مقادیر یکتا و قوی جایگزین کنید:
+# JWT_SECRET (حداقل ۳۲ نویسه)، ADMIN_EMAIL، ADMIN_PASSWORD (حداقل ۱۲ نویسه)
+# MCP_WORKER_TOKEN (حداقل ۳۲ نویسه و برابر Secret در Cloudflare Worker)
+# دامنه‌های واقعی CORS_ORIGIN / FRONTEND_URL / PUBLIC_BASE_URL
+# ZARINPAL_MERCHANT_ID معتبر و ZARINPAL_SANDBOX=false برای پرداخت واقعی
+
+docker compose config --quiet
 docker compose up -d --build
 ```
 
