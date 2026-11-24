@@ -77,8 +77,10 @@ PUBLIC_BASE_URL="https://your-domain.ir"   # یا آدرس API اگر جداست
 - ابزارهای داخلی Workspace از طریق AI SDK مستقیماً همان توابع دامنهٔ `aiCatalog` را اجرا می‌کنند؛ Workspace برای فراخوانی ابزارهای داخلی به Worker خودش HTTP نمی‌زند و هیچ network hop اضافه‌ای به سایت تحمیل نمی‌کند.
 - Worker موجود `mcp.pardehantic.ir/mcp` فقط درگاه MCP عمومی برای کلاینت‌های خارجی است: Streamable HTTP را مدیریت می‌کند و ابزارهای فقط‌خواندنی کاتالوگ/پروژه را به Backend bridge می‌کند؛ Worker مسئول inference، انتخاب مدل، فایل‌های خصوصی یا مدیریت Gateway نیست.
 - مسیر `POST /api/mcp/tools/:name` فقط از Worker معتبر با `MCP_WORKER_TOKEN` درخواست می‌پذیرد؛ همان secret باید در محیط Backend و در تنظیمات Secretهای Worker با نام یکسان تنظیم شود. مقدار واقعی هرگز در Git ذخیره نشود.
-- Gateway موجود Cloudflare با شناسهٔ `nvidia-m` دارای `multiprovider_enabled=true` است. این گزینه به‌تنهایی Provider یا کلید API اضافه نمی‌کند؛ Providerهای Cloudflare باید جداگانه پیکربندی شوند.
-- Adapterهای Google/NVIDIA/OpenRouter در Backend مستقل می‌مانند. تا وقتی مسیر Gateway و credential مربوط به هر Provider پیکربندی و تأیید نشده، ترافیک آن Provider نباید به‌عنوان ترافیک عبوری از Cloudflare Gateway گزارش شود.
+- Gateway موجود Cloudflare با شناسهٔ `nvidia-m` دارای `multiprovider_enabled=true` است و Secrets Store اختصاصی `ai-gateway-provider-keys` نیز ساخته و به Gateway متصل شده است.
+- در آخرین بررسی، Provider Configurations هنوز خالی بود؛ فعال‌سازی multiprovider و اتصال Secrets Store به‌تنهایی به معنی اتصال Providerها نیست.
+- Adapterهای Google/NVIDIA/OpenRouter در Backend مستقل باقی می‌مانند. در وضعیت فعلی، مسیر آن‌ها هنوز مستقیم است و تا زمان تکمیل و تست انتقال هر Adapter به Gateway نباید ترافیکشان را Gateway-routed معرفی کرد.
+- برای ثبت BYOK هر Provider به کلید معتبر همان Provider نیاز است. کلیدها باید از طریق Secrets Store/Provider Keys ثبت شوند؛ هرگز در Git، فایل `.env.example` یا پیام گفتگو قرار نگیرند.
 - تولید و ویرایش تصویر با FLUX.2 و حداکثر چهار تصویر مرجع
 - فایل‌های ورودی و خروجی خصوصی در `AI_PRIVATE_DIR`؛ این فایل‌ها زیر `/uploads` عمومی قرار نمی‌گیرند
 - محدودیت روزانهٔ درخواست، توکن و بودجهٔ محافظه‌کارانهٔ Cloudflare
@@ -95,10 +97,14 @@ AI_ENABLE_CLOUDFLARE=true
 # Configure the identical secret in the Cloudflare Worker dashboard.
 MCP_WORKER_TOKEN="replace-with-a-long-random-secret"
 
-# اختیاری و با فعال‌سازی صریح؛ فقط مدل‌های Free
-GOOGLE_GENERATIVE_AI_API_KEY="..."
+# NVIDIA — کلید فقط در Secret Manager محیط اجرا
+NVIDIA_API_KEY=""
+AI_ENABLE_NVIDIA=true
+
+# اختیاری و با فعال‌سازی صریح؛ فقط مدل‌های allowlist شده
+GOOGLE_GENERATIVE_AI_API_KEY=""
 AI_ENABLE_GOOGLE=false
-OPENROUTER_API_KEY="..."
+OPENROUTER_API_KEY=""
 AI_ENABLE_OPENROUTER=false
 
 AI_MAX_OUTPUT_TOKENS=2500

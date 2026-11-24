@@ -6,13 +6,19 @@ card, billing upgrade, or paid infrastructure is required or authorized.
 
 ## Provider Priority Order
 
-The routing layer (`backend/src/services/aiRouting.ts`) selects providers
-in this priority order for automatic mode:
+The routing layer (`backend/src/services/aiRouting.ts`) currently selects
+configured providers in this code-defined order for automatic mode:
 
-1. **NVIDIA NIM** (priority #1 — first-class provider)
-2. **Cloudflare Workers AI** (operational primary)
-3. **Google Gemini** (free tier, explicit opt-in)
-4. **OpenRouter** (free models only, explicit opt-in)
+1. **Cloudflare Workers AI**
+2. **NVIDIA NIM**
+3. **Google Gemini** (explicit opt-in)
+4. **OpenRouter** (free-model allowlist, explicit opt-in)
+
+The live Cloudflare Gateway `nvidia-m` has multiprovider enabled and its
+dedicated Secrets Store attached. Provider-key configurations are still empty.
+Until each adapter is migrated to the Gateway transport and its BYOK key is
+configured, Google/NVIDIA/OpenRouter requests continue to use their existing
+direct backend adapters; do not describe those requests as Gateway-routed.
 
 When the primary provider reaches quota, is unhealthy, or times out, the
 system automatically fails over to the next configured provider without
@@ -33,17 +39,18 @@ auto-recover after a 5-minute cooldown.
 
 **Environment variables** (`backend/.env`):
 ```env
-NVIDIA_API_KEY=nvapi-your-key-here
+NVIDIA_API_KEY=your-nvidia-api-key
 AI_ENABLE_NVIDIA=true
-AI_NVIDIA_DAILY_CREDITS=1000
 ```
 
-**Free tier:** ~1,000 credits/month, ~40 RPM rate limit. No credit card
-required. Models include `nemotron-3-super-120b-a12b` (tool-calling),
-`nemotron-3.5-lightning-30b-a3b`, `mistral-nemotron` (function calling),
-`llama-3.1-8b-instruct`.
+**Free tier and model availability:** quotas and available models can change
+by account and date. The Workspace exposes only the NVIDIA model IDs currently
+listed in `backend/src/services/aiProviders.ts`; verify the live NVIDIA
+dashboard and current quota before relying on a model or quota figure.
 
-**API endpoint:** `https://integrate.api.nvidia.com/v1` (OpenAI-compatible)
+**Current API endpoint:** `https://integrate.api.nvidia.com/v1` (OpenAI-compatible).
+This is the existing direct adapter endpoint; migration to Cloudflare Gateway
+is a separate pending integration step.
 
 ---
 
@@ -69,7 +76,13 @@ AI_CLOUDFLARE_DAILY_QUOTA_UNITS=10000
 the free tier). The local guard is set to 10,000 to prevent exceeding
 the actual free-tier budget.
 
-**API endpoint:** `https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/v1`
+**API endpoint:** `https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/v1`.
+
+The existing Gateway `nvidia-m` is configured with
+`multiprovider_enabled=true`, `byok_only=true`, and the dedicated
+Secrets Store `ai-gateway-provider-keys`. No provider keys are stored yet.
+The Gateway remains fail-closed for third-party requests without customer
+credentials.
 
 ---
 
@@ -131,13 +144,15 @@ it never silently activates a paid service.
 
 ## Verifying Actual Free-Tier Eligibility
 
-Before adding a provider key to `backend/.env`:
-1. Confirm the provider's free tier does not require a credit card
-2. Confirm the provider's API endpoint is publicly documented
-3. Add the key to `backend/.env` (never commit it)
-4. Set `AI_ENABLE_<PROVIDER>=true`
-5. Restart the backend: `cd backend && npm run start`
-6. Verify the provider appears as "configured" in `/api/ai/providers`
+Before enabling a provider:
+1. Verify the provider's current quota, model availability, and billing terms.
+2. Keep its API key in the runtime secret manager, not in Git or a committed env file.
+3. For Cloudflare BYOK, store the key under the Gateway's Provider Keys using the
+   `default` alias; do not send provider authorization headers from the app.
+4. Complete the provider-specific Gateway transport and verify an actual request
+   before claiming that provider is Gateway-routed.
+5. Set `AI_ENABLE_<PROVIDER>=true` only after the runtime secret is present.
+6. Verify `/api/ai/providers` and run a real, low-risk smoke test.
 
 ---
 
