@@ -26,8 +26,8 @@ function fail(name, detail = "") {
   logs.push(`  ✗ ${name}${detail ? ` — ${detail}` : ""}`);
 }
 
-async function req(path, { method = "GET", body, token } = {}) {
-  const headers = { "Content-Type": "application/json" };
+async function req(path, { method = "GET", body, token, headers: extraHeaders = {} } = {}) {
+  const headers = { "Content-Type": "application/json", ...extraHeaders };
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, {
     method,
@@ -311,50 +311,64 @@ async function main() {
       : fail("shop catalog categories", String(r.status));
   }
 
-  // —— MCP catalog endpoint tests ——
+  // —— MCP catalog bridge authentication and tool tests ——
   {
     const r = await req("/api/mcp");
     r.status === 200 && r.data?.tools && Array.isArray(r.data.tools)
-      ? ok("MCP list tools")
-      : fail("MCP list tools", String(r.status));
+      ? ok("MCP bridge advertises read-only tools")
+      : fail("MCP bridge advertises read-only tools", String(r.status));
+  }
+
+  const mcpHeaders = {
+    "x-mcp-worker-token": process.env.MCP_WORKER_TOKEN || "",
+  };
+
+  {
+    const r = await req("/api/mcp/tools/list_categories", { method: "POST" });
+    r.status === 401
+      ? ok("MCP bridge rejects unauthenticated calls")
+      : fail("MCP bridge rejects unauthenticated calls", String(r.status));
   }
 
   {
     const r = await req("/api/mcp/tools/list_categories", {
       method: "POST",
+      headers: mcpHeaders,
     });
     r.status === 200 && Array.isArray(r.data?.content)
-      ? ok("MCP list_categories tool")
-      : fail("MCP list_categories tool", String(r.status));
+      ? ok("MCP list_categories tool (authenticated)", String(r.data.content.length))
+      : fail("MCP list_categories tool (authenticated)", `${r.status} ${JSON.stringify(r.data)}`);
   }
 
   {
     const r = await req("/api/mcp/tools/search_models", {
       method: "POST",
+      headers: mcpHeaders,
       body: { query: "теست" },
     });
-    r.status === 200 && r.data?.content
-      ? ok("MCP search_models tool")
-      : fail("MCP search_models tool", String(r.status));
+    r.status === 200 && Array.isArray(r.data?.content)
+      ? ok("MCP search_models tool (authenticated)")
+      : fail("MCP search_models tool (authenticated)", `${r.status} ${JSON.stringify(r.data)}`);
   }
 
   {
-    // Use a real CurtainModel ID (not a CurtainCategory ID) for get_model
-    const existingModelId = modelId || categories[0]?.id;
-    if (existingModelId) {
+    // Use the model created by this test, not a category ID.
+    if (modelId) {
       const r = await req("/api/mcp/tools/get_model", {
         method: "POST",
-        body: { id: existingModelId },
+        headers: mcpHeaders,
+        body: { id: modelId },
       });
-      r.status === 200 && r.data?.content?.id
+      r.status === 200 && r.data?.content?.id === modelId
         ? ok("MCP get_model tool (found)")
-        : fail("MCP get_model tool (found)", String(r.status));
+        : fail("MCP get_model tool (found)", `${r.status} ${JSON.stringify(r.data)}`);
     }
   }
 
   {
     const r = await req("/api/mcp/tools/get_model", {
       method: "POST",
+      headers: mcpHeaders,
       body: { id: "nonexistent-model-xyz-12345" },
     });
     r.status === 404 && r.data?.content?.found === false
@@ -365,10 +379,11 @@ async function main() {
   {
     const r = await req("/api/mcp/tools/list_projects", {
       method: "POST",
+      headers: mcpHeaders,
     });
     r.status === 200 && Array.isArray(r.data?.content)
-      ? ok("MCP list_projects tool")
-      : fail("MCP list_projects tool", String(r.status));
+      ? ok("MCP list_projects tool (authenticated)")
+      : fail("MCP list_projects tool (authenticated)", `${r.status} ${JSON.stringify(r.data)}`);
   }
 
   // —— anon cannot write ——
