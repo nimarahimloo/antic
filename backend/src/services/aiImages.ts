@@ -229,8 +229,7 @@ export async function generateWorkspaceImage(input: {
           method: "POST",
           headers: {
             Authorization: `Bearer ${apiToken}`,
-            "cf-aig-gateway-id":
-              process.env.CLOUDFLARE_AI_GATEWAY_ID?.trim() || "nvidia-m",
+            // FLUX.2 uses the direct Workers AI REST endpoint; AI Gateway is reserved for chat.
           },
           body: form,
           signal: AbortSignal.timeout(120_000),
