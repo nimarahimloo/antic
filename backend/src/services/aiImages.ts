@@ -227,7 +227,11 @@ export async function generateWorkspaceImage(input: {
         `${CLOUDFLARE_AI_ROOT}/accounts/${accountId}/ai/run/${modelId}`,
         {
           method: "POST",
-          headers: { Authorization: `Bearer ${apiToken}` },
+          headers: {
+            Authorization: `Bearer ${apiToken}`,
+            "cf-aig-gateway-id":
+              process.env.CLOUDFLARE_AI_GATEWAY_ID?.trim() || "nvidia-m",
+          },
           body: form,
           signal: AbortSignal.timeout(120_000),
         },

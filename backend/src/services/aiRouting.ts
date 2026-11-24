@@ -123,10 +123,9 @@ async function getProviderUsageToday(providerId: string): Promise<{
 
 /* ─────────────────────────── candidate selection ─────────────────────────── */
 
-/** Priority-ordered free providers for chat. NVIDIA is first-class (priority 1),
- *  Cloudflare is the operational primary, Google/OpenRouter are optional fallbacks
- *  only when their API keys are configured. */
-const CHAT_PROVIDER_PRIORITY: AIProviderId[] = ["nvidia", "cloudflare", "google", "openrouter"];
+/** Priority-ordered free providers for chat. Cloudflare Workers AI is the
+ *  primary inference path; optional free providers are fallback-only. */
+const CHAT_PROVIDER_PRIORITY: AIProviderId[] = ["cloudflare", "nvidia", "google", "openrouter"];
 
 export { CHAT_PROVIDER_PRIORITY };
 
