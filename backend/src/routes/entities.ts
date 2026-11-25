@@ -1,3 +1,8 @@
+import { sendMail } from "../lib/mailer.js";
+import {
+  consultationConfirmationEmail,
+  consultationAdminEmail,
+} from "../lib/emailTemplates.js";
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import {
@@ -156,6 +161,41 @@ router.post("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
 
     if (meta.name === "CurtainCategory") afterCategoryWrite(row);
     if (meta.name === "CurtainModel") afterModelWrite(row);
+
+    // Send consultation request emails (non-blocking)
+    if (meta.name === "ConsultationRequest") {
+      const cr = row as {
+        id: string; fullName: string; phone: string; email: string | null;
+        city: string | null; spaceType: string | null; message: string | null;
+      };
+      if (cr.email) {
+        const { text, html } = consultationConfirmationEmail(cr.email, cr.fullName, cr.id);
+        sendMail({
+          to: cr.email,
+          subject: "دریافت درخواست مشاوره — پرده آنتیک",
+          text,
+          html,
+        }).catch(() => {});
+      }
+      // Admin notification
+      const adminEmail = process.env.ADMIN_EMAIL || "admin@antic.local";
+      const { text: adminText, html: adminHtml } = consultationAdminEmail(
+        adminEmail,
+        cr.fullName,
+        cr.phone,
+        cr.email,
+        cr.city,
+        cr.spaceType,
+        cr.message,
+        cr.id,
+      );
+      sendMail({
+        to: adminEmail,
+        subject: "درخواست مشاوره جدید — پرده آنتیک",
+        text: adminText,
+        html: adminHtml,
+      }).catch(() => {});
+    }
 
     res.status(201).json(toApi(row));
   } catch (err) {

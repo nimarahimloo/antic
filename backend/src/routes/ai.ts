@@ -49,6 +49,22 @@ import {
   selectChatRoute,
   selectImageRoute,
 } from "../services/aiRouting.js";
+import {
+  createMemory,
+  deleteMemory,
+  deleteAllMemories,
+  getMemory,
+  getMemoriesForContext,
+  listMemories,
+  searchMemoriesByContent,
+  updateMemory,
+  upsertMemory,
+  type CreateMemoryInput,
+  type MemoryType,
+  MEMORY_TYPES,
+  MEMORY_CATEGORIES,
+} from "../services/aiMemory.js";
+import { extractMemoriesFromConversation } from "../services/aiMemoryExtraction.js";
 
 const router = Router();
 const upload = multer({
@@ -455,6 +471,18 @@ router.post("/chat", async (req: AuthedRequest, res) => {
 
     const conversation = await ownedConversation(body.conversationId, ownerId);
     const toolDefinitions = createAITools();
+
+    // Retrieve relevant long-term memories for this user
+    const relevantMemories = await getMemoriesForContext(ownerId, conversation.id, 8);
+    const memoryContext = relevantMemories.length
+      ? `\n\n[حافظه‌های بلندمدت مرتبط با این کاربر:]\n` +
+        relevantMemories
+          .map((m) => `- [${m.type}] ${m.content} (اطمینان: ${Math.round(m.confidence * 100)}%, اهمیت: ${m.importance}/5)`)
+          .join("\n")
+      : "";
+
+    const systemPromptWithMemory = AI_SYSTEM_PROMPT + memoryContext;
+
     const validatedIncoming = await validateUIMessages({
       messages: body.messages,
       tools: toolDefinitions,
@@ -614,7 +642,7 @@ router.post("/chat", async (req: AuthedRequest, res) => {
 
       const result = streamText({
         model: getChatModel(providerId, modelId),
-        instructions: AI_SYSTEM_PROMPT,
+        instructions: systemPromptWithMemory,
         messages: modelMessages,
         tools: activeTools,
         stopWhen: isStepCount(6),
@@ -719,6 +747,13 @@ router.post("/chat", async (req: AuthedRequest, res) => {
               where: { id: conversation.id },
               data: { updatedAt: new Date() },
             });
+
+            // Trigger memory extraction in background (non-blocking)
+            if (outcome.status === "completed" && responseMessage?.id) {
+              void extractMemoriesFromConversation(ownerId, conversation.id, responseMessage.id).catch((err) => {
+                console.error("Background memory extraction failed:", err);
+              });
+            }
           } catch (error) {
             if (error && typeof error === 'object') {
               const err = error as Record<string, unknown>;
@@ -799,6 +834,164 @@ router.get("/breakers", async (_req: AuthedRequest, res) => {
 /** Diagnostic: per-provider usage for the current UTC day. */
 router.get("/provider-usage", async (_req: AuthedRequest, res) => {
   res.json(await getProviderUsageToday());
+});
+
+/* ─────────────────────────── Memory Management ─────────────────────────── */
+
+router.get("/memory/types", (_req, res) => {
+  res.json({ types: MEMORY_TYPES, categories: MEMORY_CATEGORIES });
+});
+
+router.get("/memory", async (req: AuthedRequest, res) => {
+  try {
+    const ownerId = userId(req);
+    const query = z
+      .object({
+        type: z.enum(["preference", "fact", "project_context", "communication_style", "decision", "correction"]).optional(),
+        category: z.string().trim().max(50).optional(),
+        conversationId: z.string().trim().min(1).optional(),
+        minImportance: z.coerce.number().int().min(1).max(5).optional(),
+        minConfidence: z.coerce.number().min(0).max(1).optional(),
+        includeExpired: z.coerce.boolean().optional(),
+        limit: z.coerce.number().int().min(1).max(200).optional(),
+        offset: z.coerce.number().int().min(0).optional(),
+        search: z.string().trim().max(200).optional(),
+      })
+      .parse(req.query);
+
+    if (query.search) {
+      const memories = await searchMemoriesByContent(ownerId, query.search, {
+        type: query.type,
+        category: query.category,
+        conversationId: query.conversationId,
+        minImportance: query.minImportance,
+        minConfidence: query.minConfidence,
+        includeExpired: query.includeExpired,
+        limit: query.limit,
+      });
+      return res.json({ memories, total: memories.length });
+    }
+
+    const result = await listMemories({
+      userId: ownerId,
+      type: query.type,
+      category: query.category,
+      conversationId: query.conversationId,
+      minImportance: query.minImportance,
+      minConfidence: query.minConfidence,
+      includeExpired: query.includeExpired,
+      limit: query.limit,
+      offset: query.offset,
+    });
+    res.json(result);
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
+router.post("/memory", async (req: AuthedRequest, res) => {
+  try {
+    const ownerId = userId(req);
+    const body = z
+      .object({
+        conversationId: z.string().trim().min(1).optional(),
+        type: z.enum(["preference", "fact", "project_context", "communication_style", "decision", "correction"]),
+        category: z.string().trim().max(50).optional(),
+        content: z.string().trim().min(5).max(2000),
+        sourceMessageId: z.string().trim().min(1).optional(),
+        confidence: z.number().min(0).max(1).optional(),
+        importance: z.number().int().min(1).max(5).optional(),
+        expiresAt: z.string().datetime().optional(),
+        metadata: z.record(z.unknown()).optional(),
+        deduplicate: z.boolean().optional(),
+      })
+      .parse(req.body || {});
+
+    const input: CreateMemoryInput = {
+      userId: ownerId,
+      conversationId: body.conversationId || null,
+      type: body.type,
+      category: body.category || null,
+      content: body.content,
+      sourceMessageId: body.sourceMessageId || null,
+      confidence: body.confidence,
+      importance: body.importance,
+      expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+      metadata: body.metadata || null,
+    };
+
+    const memory = body.deduplicate
+      ? await upsertMemory({ ...input, deduplicate: true })
+      : await createMemory(input);
+
+    res.status(201).json({ memory });
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
+router.get("/memory/:id", async (req: AuthedRequest, res) => {
+  try {
+    const ownerId = userId(req);
+    const memory = await getMemory(ownerId, routeParam(req, "id"));
+    if (!memory) throw new HttpError(404, " خاطره یافت نشد.");
+    res.json({ memory });
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
+router.patch("/memory/:id", async (req: AuthedRequest, res) => {
+  try {
+    const ownerId = userId(req);
+    const id = routeParam(req, "id");
+    const body = z
+      .object({
+        content: z.string().trim().min(5).max(2000).optional(),
+        type: z.enum(["preference", "fact", "project_context", "communication_style", "decision", "correction"]).optional(),
+        category: z.string().trim().max(50).nullable().optional(),
+        confidence: z.number().min(0).max(1).optional(),
+        importance: z.number().int().min(1).max(5).optional(),
+        expiresAt: z.string().datetime().nullable().optional(),
+        metadata: z.record(z.unknown()).nullable().optional(),
+      })
+      .parse(req.body || {});
+
+    const memory = await updateMemory(ownerId, id, {
+      content: body.content,
+      type: body.type,
+      category: body.category ?? undefined,
+      confidence: body.confidence,
+      importance: body.importance,
+      expiresAt: body.expiresAt ? new Date(body.expiresAt) : body.expiresAt === null ? null : undefined,
+      metadata: body.metadata ?? undefined,
+    });
+    res.json({ memory });
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
+router.delete("/memory/:id", async (req: AuthedRequest, res) => {
+  try {
+    const ownerId = userId(req);
+    await deleteMemory(ownerId, routeParam(req, "id"));
+    res.status(204).end();
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
+router.delete("/memory", async (req: AuthedRequest, res) => {
+  try {
+    const ownerId = userId(req);
+    const body = z.object({ confirm: z.literal(true) }).parse(req.body || {});
+    if (!body.confirm) throw new HttpError(400, "تأیید حذف تمام خاطرات الزامی است.");
+    const count = await deleteAllMemories(ownerId);
+    res.json({ deleted: count });
+  } catch (error) {
+    sendError(res, error);
+  }
 });
 
 /**

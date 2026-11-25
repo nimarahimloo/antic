@@ -85,3 +85,33 @@ export type AIWorkspaceUsage = {
     createdAt: string;
   }>;
 };
+
+export type AIMemoryType =
+  | "preference"
+  | "fact"
+  | "project_context"
+  | "communication_style"
+  | "decision"
+  | "correction";
+
+export type AIWorkspaceMemory = {
+  id: string;
+  userId: string;
+  conversationId: string | null;
+  type: AIMemoryType;
+  category: string | null;
+  content: string;
+  sourceMessageId: string | null;
+  confidence: number;
+  importance: number;
+  expiresAt: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AIMemoryTypeInfo = {
+  value: AIMemoryType;
+  label: string;
+  description: string;
+};

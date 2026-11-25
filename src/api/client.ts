@@ -8,6 +8,8 @@ import type {
   AIWorkspaceFile,
   AIWorkspaceProvider,
   AIWorkspaceUsage,
+  AIWorkspaceMemory,
+  AIMemoryTypeInfo,
 } from "@/types/ai-workspace";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api";
@@ -597,6 +599,75 @@ export const api = {
         height: number;
         estimatedQuotaUnits: number;
       }>;
+    },
+
+    // Memory management
+    async memoryTypes(): Promise<{ types: AIMemoryTypeInfo[]; categories: string[] }> {
+      return request("/ai/memory/types") as Promise<{ types: AIMemoryTypeInfo[]; categories: string[] }>;
+    },
+    async memories(params: {
+      type?: string;
+      category?: string;
+      conversationId?: string;
+      minImportance?: number;
+      minConfidence?: number;
+      includeExpired?: boolean;
+      limit?: number;
+      offset?: number;
+      search?: string;
+    } = {}): Promise<{ memories: AIWorkspaceMemory[]; total: number }> {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) searchParams.set(key, String(value));
+      });
+      const query = searchParams.toString();
+      return request(`/ai/memory${query ? `?${query}` : ""}`) as Promise<{ memories: AIWorkspaceMemory[]; total: number }>;
+    },
+    async createMemory(body: {
+      conversationId?: string;
+      type: string;
+      category?: string;
+      content: string;
+      sourceMessageId?: string;
+      confidence?: number;
+      importance?: number;
+      expiresAt?: string;
+      metadata?: Record<string, unknown>;
+      deduplicate?: boolean;
+    }): Promise<{ memory: AIWorkspaceMemory }> {
+      return request("/ai/memory", {
+        method: "POST",
+        body,
+      }) as Promise<{ memory: AIWorkspaceMemory }>;
+    },
+    async getMemory(id: string): Promise<{ memory: AIWorkspaceMemory }> {
+      return request(`/ai/memory/${encodeURIComponent(id)}`) as Promise<{ memory: AIWorkspaceMemory }>;
+    },
+    async updateMemory(
+      id: string,
+      body: {
+        content?: string;
+        type?: string;
+        category?: string | null;
+        confidence?: number;
+        importance?: number;
+        expiresAt?: string | null;
+        metadata?: Record<string, unknown> | null;
+      },
+    ): Promise<{ memory: AIWorkspaceMemory }> {
+      return request(`/ai/memory/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body,
+      }) as Promise<{ memory: AIWorkspaceMemory }>;
+    },
+    async deleteMemory(id: string): Promise<void> {
+      await request(`/ai/memory/${encodeURIComponent(id)}`, { method: "DELETE" });
+    },
+    async deleteAllMemories(confirm: boolean): Promise<{ deleted: number }> {
+      return request("/ai/memory", {
+        method: "DELETE",
+        body: { confirm },
+      }) as Promise<{ deleted: number }>;
     },
   },
 

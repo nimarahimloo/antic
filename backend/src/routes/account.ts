@@ -7,6 +7,8 @@ import { routeParam } from "../lib/routeParams.js";
 import { toApi } from "../lib/serialize.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { normPhone } from "./auth.js";
+import { sendMail } from "../lib/mailer.js";
+import { emailChangedEmail, passwordChangedEmail } from "../lib/emailTemplates.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -147,6 +149,18 @@ router.patch("/profile", async (req: AuthedRequest, res) => {
     }
 
     const updated = await prisma.user.update({ where: { id: user.id }, data });
+
+    // Send email change notification (non-blocking)
+    if (data.email && data.email !== user.email) {
+      const { text, html } = emailChangedEmail(data.email, data.email);
+      sendMail({
+        to: data.email,
+        subject: "ایمیل شما تغییر کرد — پرده آنتیک",
+        text,
+        html,
+      }).catch(() => {});
+    }
+
     res.json(toApi(updated));
   } catch (err) {
     sendError(res, err instanceof z.ZodError ? new HttpError(400, err.message) : err);
@@ -173,6 +187,18 @@ router.post("/password", async (req: AuthedRequest, res) => {
       where: { id: user.id },
       data: { passwordHash: await hashPassword(body.new_password) },
     });
+
+    // Send password change notification (non-blocking)
+    if (user.email) {
+      const { text, html } = passwordChangedEmail(user.email, user.fullName || undefined);
+      sendMail({
+        to: user.email,
+        subject: "رمز عبور شما تغییر کرد — پرده آنتیک",
+        text,
+        html,
+      }).catch(() => {});
+    }
+
     res.json({ ok: true });
   } catch (err) {
     sendError(res, err instanceof z.ZodError ? new HttpError(400, err.message) : err);

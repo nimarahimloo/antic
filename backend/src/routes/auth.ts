@@ -7,6 +7,7 @@ import { toApi } from "../lib/serialize.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { createPasswordResetToken, redeemPasswordResetToken } from "../lib/passwordReset.js";
 import { sendMail } from "../lib/mailer.js";
+import { welcomeEmail, passwordResetEmail } from "../lib/emailTemplates.js";
 
 const router = Router();
 
@@ -79,6 +80,13 @@ router.post("/register", async (req, res) => {
         role: "user",
       },
     });
+
+    // Send welcome email (non-blocking — failure must not block registration)
+    if (email) {
+      const { text, html } = welcomeEmail(email, user.fullName || undefined);
+      sendMail({ to: email, subject: "خوش آمدید به پرده آنتیک — Welcome to Antic Curtain", text, html }).catch(() => {});
+    }
+
     res.status(201).json(await issueAuth(user));
   } catch (err) {
     sendError(res, err instanceof z.ZodError ? new HttpError(400, err.message) : err);
@@ -152,20 +160,9 @@ router.post("/forgot-password", async (req, res) => {
 
     if (token) {
       const link = `${frontendBase()}/reset-password?token=${encodeURIComponent(token)}`;
+      const { text, html } = passwordResetEmail(email, link);
       try {
-        await sendMail({
-          to: email,
-          subject: "بازیابی رمز عبور — پرده آنتیک",
-          text: [
-            "سلام،",
-            "",
-            "برای بازنشانی رمز عبور حساب خود روی لینک زیر کلیک کنید:",
-            link,
-            "",
-            "این لینک ۳۰ دقیقه معتبر است و فقط یک‌بار قابل استفاده است.",
-            "اگر شما این درخواست را ثبت نکرده‌اید، این ایمیل را نادیده بگیرید.",
-          ].join("\n"),
-        });
+        await sendMail({ to: email, subject: "بازیابی رمز عبور — پرده آنتیک", text, html });
       } catch (err) {
         console.error("Failed to send password reset email:", err);
       }

@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import crypto from "crypto";
+import { paymentMiddlewareFromConfig } from "@x402/express";
+import { HTTPFacilitatorClient, type RoutesConfig } from "@x402/core/server";
 import authRoutes from "./routes/auth.js";
 import entityRoutes from "./routes/entities.js";
 import uploadRoutes from "./routes/upload.js";
@@ -19,6 +21,63 @@ import { prisma } from "./lib/prisma.js";
 import { buildSitemap } from "./lib/sitemap.js";
 import { wantsMarkdown, countTokens, pageMarkdown } from "./lib/markdown.js";
 import { isCloudflareConfigured } from "./services/aiProviders.js";
+
+/** Validate production configuration at startup. */
+function validateProductionConfig(): void {
+  if (process.env.NODE_ENV !== "production") return;
+
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // JWT_SECRET must be set and not default
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === "dev-secret-change-me") {
+    errors.push("JWT_SECRET must be set to a strong random value in production.");
+  }
+
+  // Admin credentials must not be defaults
+  if (process.env.ADMIN_EMAIL === "admin@antic.local" && process.env.ADMIN_PASSWORD === "admin123") {
+    errors.push("Default ADMIN_EMAIL/ADMIN_PASSWORD detected. Must set secure credentials in production.");
+  }
+
+  // Zarinpal merchant ID required for real payments
+  if (!process.env.ZARINPAL_MERCHANT_ID) {
+    errors.push("ZARINPAL_MERCHANT_ID is required for real payments in production.");
+  }
+  if (process.env.ZARINPAL_SANDBOX === "true") {
+    warnings.push("ZARINPAL_SANDBOX is enabled in production. Ensure this is intentional.");
+  }
+
+  // Email transport must be configured
+  const hasEmailTransport =
+    (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN) ||
+    (process.env.CLOUDFLARE_SMTP_USER && process.env.CLOUDFLARE_SMTP_PASS) ||
+    process.env.SMTP_HOST;
+  if (!hasEmailTransport) {
+    warnings.push("No email transport configured (Cloudflare API, Cloudflare SMTP, or SMTP). Emails will only log to console.");
+  }
+
+  // AI providers
+  if (!isCloudflareConfigured() && !process.env.NVIDIA_API_KEY && !process.env.GOOGLE_GENERATIVE_AI_API_KEY && !process.env.OPENROUTER_API_KEY) {
+    warnings.push("No AI provider configured. AI workspace will be unavailable.");
+  }
+
+  // MCP Worker token
+  if (!process.env.MCP_WORKER_TOKEN) {
+    warnings.push("MCP_WORKER_TOKEN not set. MCP Worker integration will fail.");
+  }
+
+  if (warnings.length) {
+    console.warn("⚠️  Production configuration warnings:");
+    for (const w of warnings) console.warn(`  - ${w}`);
+  }
+  if (errors.length) {
+    console.error("❌  Production configuration errors (server will not start):");
+    for (const e of errors) console.error(`  - ${e}`);
+    process.exit(1);
+  }
+}
+
+validateProductionConfig();
 
 const app = express();
 
@@ -186,6 +245,87 @@ app.use((req, _res, next) => {
   };
   next();
 });
+
+/* ------------------------------------------------------------------ */
+/* x402 Payment Protocol — agent-native HTTP payments                  */
+/* ------------------------------------------------------------------ */
+
+const X402_FACILITATOR_URL = process.env.X402_FACILITATOR_URL || "";
+const X402_WALLET_ADDRESS = process.env.X402_WALLET_ADDRESS || "";
+const X402_NETWORK = (process.env.X402_NETWORK || "eip155:8453") as `eip155:${string}`;
+const X402_SCHEME = "exact";
+const X402_PRICE = process.env.X402_PRICE || "0.01";
+const X402_ASSET = process.env.X402_ASSET || "USDC";
+
+/** Routes protected by x402 payment. Public discovery endpoints
+ *  (/.well-known/*, /api/health, /sitemap.xml, /robots.txt, /auth.md)
+ *  remain unauthenticated. */
+const X402_ROUTES: RoutesConfig = {
+  "/api/entities/*": {
+    accepts: [
+      {
+        scheme: X402_SCHEME,
+        payTo: X402_WALLET_ADDRESS,
+        price: X402_PRICE,
+        network: X402_NETWORK,
+        extra: { asset: X402_ASSET },
+      },
+    ],
+    resource: "Curtain catalog entities",
+    description: "Access to curtain category and model data",
+    mimeType: "application/json",
+  },
+  "/api/catalog/*": {
+    accepts: [
+      {
+        scheme: X402_SCHEME,
+        payTo: X402_WALLET_ADDRESS,
+        price: X402_PRICE,
+        network: X402_NETWORK,
+        extra: { asset: X402_ASSET },
+      },
+    ],
+    resource: "Shop accessory catalog",
+    description: "Access to shop categories and products",
+    mimeType: "application/json",
+  },
+  "/api/orders/*": {
+    accepts: [
+      {
+        scheme: X402_SCHEME,
+        payTo: X402_WALLET_ADDRESS,
+        price: X402_PRICE,
+        network: X402_NETWORK,
+        extra: { asset: X402_ASSET },
+      },
+    ],
+    resource: "Order management",
+    description: "Access to order creation and checkout",
+    mimeType: "application/json",
+  },
+};
+
+let x402Middleware: ((req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>) | null = null;
+
+if (X402_FACILITATOR_URL && X402_WALLET_ADDRESS) {
+  try {
+    const facilitatorClient = new HTTPFacilitatorClient({ url: X402_FACILITATOR_URL });
+    x402Middleware = paymentMiddlewareFromConfig(X402_ROUTES, facilitatorClient);
+    console.log(
+      `[x402] payment middleware enabled (facilitator=${X402_FACILITATOR_URL}, network=${X402_NETWORK}, wallet=${X402_WALLET_ADDRESS})`
+    );
+  } catch (err) {
+    console.error("[x402] failed to initialize payment middleware:", err);
+  }
+} else {
+  console.log(
+    "[x402] payment middleware disabled (set X402_FACILITATOR_URL and X402_WALLET_ADDRESS to enable)"
+  );
+}
+
+if (x402Middleware) {
+  app.use(x402Middleware);
+}
 
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 app.use("/uploads", express.static(path.resolve(uploadDir)));
@@ -577,6 +717,46 @@ app.get("/.well-known/agent-card.json", (_req, res) => {
 });
 
 /**
+ * Agentic Commerce Protocol (ACP) Discovery Document.
+ * Advertises this service as an ACP-compatible commerce agent for agent discovery.
+ * Served at /.well-known/acp.json with HTTP 200.
+ */
+app.get("/.well-known/acp.json", (_req, res) => {
+  const base = publicBaseUrl();
+  res.set("Content-Type", "application/json; charset=utf-8");
+  res.status(200).json({
+    protocol: {
+      name: "acp",
+      version: "1.0.0",
+    },
+    api_base_url: base,
+    transports: ["http", "streamable-http"],
+    capabilities: {
+      services: [
+        {
+          id: "curtain-catalog",
+          name: "Curtain Catalog",
+          description: "Browse and search curtain categories and models",
+          endpoint: `${base}/api/entities/CurtainCategory`,
+        },
+        {
+          id: "shop-catalog",
+          name: "Shop Catalog",
+          description: "Browse and search shop accessory categories and products",
+          endpoint: `${base}/api/catalog/categories`,
+        },
+        {
+          id: "mcp-tools",
+          name: "MCP Catalog Tools",
+          description: "Invoke MCP catalog tools over Streamable HTTP",
+          endpoint: `${base}/api/mcp`,
+        },
+      ],
+    },
+  });
+});
+
+/**
  * Serve individual SKILL.md skill artifacts referenced by the discovery index.
  * Content is embedded so it works in both dev (tsx) and production (dist)
  * builds without needing to copy asset files.
@@ -647,62 +827,65 @@ app.get("/.well-known/agent-skills/:skill.md", (req, res) => {
 });
 
 /**
- * API Catalog for agent discovery.
+ * API Catalog for agent discovery (RFC 9727).
  * Lists machine-readable endpoints that AI agents can use to discover
  * and interact with this service. Referenced via Link header rel="api-catalog".
+ * Served as application/linkset+json per RFC 9727.
  */
 app.get("/.well-known/api-catalog", (_req, res) => {
   const base = publicBaseUrl();
-  res.set("Content-Type", "application/json; charset=utf-8");
+  res.set("Content-Type", "application/linkset+json; charset=utf-8");
   res.status(200).json({
-    catalog: "antic-curtain-api-catalog",
-    version: "1.0.0",
-    description: "پرده آنتیک — Agent-accessible API catalog",
-    endpoints: [
+    linkset: [
       {
-        path: "/.well-known/api-catalog",
-        rel: "api-catalog",
-        description: "This API catalog document",
+        anchor: `${base}/`,
+        rel: ["service-desc", "service-doc", "status"],
+        href: `${base}/.well-known/api-catalog`,
       },
       {
-        path: "/.well-known/oauth-protected-resource",
-        rel: "service-desc",
-        description: "OAuth 2.0 Protected Resource Metadata (RFC 9728)",
+        anchor: `${base}/.well-known/oauth-protected-resource`,
+        rel: ["service-desc"],
+        href: `${base}/.well-known/oauth-protected-resource`,
       },
       {
-        path: "/.well-known/oauth-authorization-server",
-        rel: "service-doc",
-        description: "OAuth 2.0 Authorization Server Metadata (RFC 8414)",
+        anchor: `${base}/.well-known/oauth-authorization-server`,
+        rel: ["service-doc"],
+        href: `${base}/.well-known/oauth-authorization-server`,
       },
       {
-        path: "/.well-known/openid-configuration",
-        rel: "describedby",
-        description: "OpenID Connect Discovery 1.0",
+        anchor: `${base}/.well-known/openid-configuration`,
+        rel: ["service-doc"],
+        href: `${base}/.well-known/openid-configuration`,
       },
       {
-        path: "/.well-known/jwks.json",
-        rel: "service-desc",
-        description: "JSON Web Key Set (RFC 7517)",
+        anchor: `${base}/.well-known/jwks.json`,
+        rel: ["service-desc"],
+        href: `${base}/.well-known/jwks.json`,
       },
       {
-        path: "/.well-known/http-message-signatures-directory",
-        rel: "service-desc",
-        description: "HTTP Message Signatures Directory / Web Bot Auth JWKS",
+        anchor: `${base}/.well-known/http-message-signatures-directory`,
+        rel: ["service-desc"],
+        href: `${base}/.well-known/http-message-signatures-directory`,
       },
       {
-        path: "/auth.md",
-        rel: "service-doc",
-        description: "Agent Registration Discovery (auth.md)",
+        anchor: `${base}/auth.md`,
+        rel: ["service-doc"],
+        href: `${base}/auth.md`,
       },
       {
-        path: "/api/mcp",
-        rel: "api-catalog",
-        description: "MCP catalog tool bridge (list_categories, search_models, get_model, list_projects)",
+        anchor: `${base}/api/mcp`,
+        rel: ["service-desc"],
+        href: `${base}/api/mcp`,
       },
       {
-        path: "/sitemap.xml",
-        rel: "service-desc",
-        description: "XML sitemap of public pages",
+        anchor: `${base}/sitemap.xml`,
+        rel: ["service-desc"],
+        href: `${base}/sitemap.xml`,
+      },
+      {
+        anchor: `${base}/api/health`,
+        rel: ["status"],
+        href: `${base}/api/health`,
       },
     ],
   });

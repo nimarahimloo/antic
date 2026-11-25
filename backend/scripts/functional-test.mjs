@@ -9,6 +9,8 @@
  * Requires seeded admin: admin@antic.local / admin123 (or env overrides)
  */
 
+import "dotenv/config";
+
 const BASE = (process.env.BASE || "http://localhost:3001").replace(/\/$/, "");
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@antic.local";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";

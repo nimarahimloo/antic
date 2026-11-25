@@ -7,6 +7,7 @@
 
 import assert from "node:assert";
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { getAILimits, utcDayStart, reserveAIUsage } from "../src/services/aiUsage.ts";
 
 async function main() {
@@ -37,7 +38,20 @@ async function main() {
 
     // Clean up today's usage for the test user
     const start = utcDayStart();
-    const testUserId = "cmwmy403f0000ctey782uvcmv";
+    
+    // Create or find a test user
+    let testUser = await prisma.user.findFirst({ where: { email: "test-quota@antic.local" } });
+    if (!testUser) {
+      testUser = await prisma.user.create({
+        data: {
+          email: "test-quota@antic.local",
+          passwordHash: await bcrypt.hash("test123", 10),
+          fullName: "Test Quota User",
+          role: "user",
+        },
+      });
+    }
+    const testUserId = testUser.id;
 
     await prisma.aIUsage.deleteMany({
       where: { userId: testUserId, createdAt: { gte: start } },

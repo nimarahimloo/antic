@@ -22,6 +22,7 @@ model User {
   aiConversations AIConversation[]
   aiFiles         AIFile[]
   aiUsage         AIUsage[]
+  aiMemories      AIMemory[]
 }
 
 /// یک‌بارمصرف و زمان‌دار — برای بازیابی رمز عبور
@@ -270,6 +271,7 @@ model AIConversation {
   updatedAt DateTime        @updatedAt
   messages  AIChatMessage[]
   files     AIFile[]
+  memories  AIMemory[]
 
   @@index([userId, updatedAt])
 }
@@ -335,4 +337,29 @@ model AIUsage {
 
   @@index([userId, createdAt])
   @@index([userId, operation, createdAt])
+}
+
+/// Long-term persistent memory for the AI assistant.
+model AIMemory {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId  String?
+  conversation    AIConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  type            String      // preference | fact | project_context | communication_style | decision | correction
+  category        String?     // e.g., "curtain_catalog", "shop", "projects", "user_preferences"
+  content         String      // The actual memory content
+  sourceMessageId String?     // Reference to the message that created this memory
+  confidence      Float       @default(0.8) // 0.0 - 1.0, how confident we are this is accurate
+  importance      Int         @default(1)   // 1-5, higher = more important for retrieval
+  expiresAt       DateTime?   // Optional expiration for temporary memories
+  metadataJson    String?     // Additional structured data
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([userId, type])
+  @@index([userId, category])
+  @@index([userId, importance])
+  @@index([userId, createdAt])
+  @@index([conversationId])
 }

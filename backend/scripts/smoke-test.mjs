@@ -6,6 +6,8 @@
  *   BASE=http://localhost:3001 node scripts/smoke-test.mjs
  */
 
+import "dotenv/config";
+
 const BASE = (process.env.BASE || "http://localhost:3001").replace(/\/$/, "");
 
 let passed = 0;

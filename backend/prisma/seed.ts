@@ -87,6 +87,13 @@ function empty(v: unknown): boolean {
 async function seedAdmin() {
   const email = process.env.ADMIN_EMAIL || "admin@antic.local";
   const password = process.env.ADMIN_PASSWORD || "admin123";
+  const isDefaultAdmin = email === "admin@antic.local" && password === "admin123";
+  if (isDefaultAdmin && process.env.NODE_ENV === "production") {
+    throw new Error("Default ADMIN_EMAIL/ADMIN_PASSWORD detected in production. Must set secure credentials via environment variables.");
+  }
+  if (isDefaultAdmin) {
+    console.warn("⚠️  Using default admin credentials (admin@antic.local / admin123). Set ADMIN_EMAIL and ADMIN_PASSWORD in production.");
+  }
   const existing = await prisma.user.findUnique({ where: { email } });
   if (!existing) {
     await prisma.user.create({

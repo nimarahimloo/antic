@@ -1,3 +1,9 @@
+import { sendMail } from "../lib/mailer.js";
+import {
+  orderConfirmationEmail,
+  orderPaidEmail,
+  orderStatusEmail,
+} from "../lib/emailTemplates.js";
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
@@ -101,6 +107,26 @@ router.post("/checkout", optionalAuth, async (req: AuthedRequest, res) => {
         gateway: "zarinpal",
       },
     });
+
+    // Send order confirmation email (non-blocking)
+    if (body.customerEmail) {
+      const itemsSummary = items
+        .map((it) => `${it.quantity}× ${it.productId}`)
+        .join(", ");
+      const { text, html } = orderConfirmationEmail(
+        body.customerEmail,
+        order.id,
+        body.customerName,
+        amountToman,
+        itemsSummary,
+      );
+      sendMail({
+        to: body.customerEmail,
+        subject: "تایید سفارش — پرده آنتیک",
+        text,
+        html,
+      }).catch(() => {});
+    }
 
     if (!MERCHANT) {
       const demoAuth = `DEMO-${order.id}`;
@@ -242,6 +268,24 @@ router.get("/zarinpal/callback", async (req, res) => {
         where: { id: orderId },
         data: { status: "paid", refId, authority: verifiedAuthority },
       });
+
+      // Send order paid notification (non-blocking)
+      if (order.customerEmail) {
+        const { text, html } = orderPaidEmail(
+          order.customerEmail,
+          order.id,
+          order.customerName,
+          order.amountToman,
+          refId,
+        );
+        sendMail({
+          to: order.customerEmail,
+          subject: "پرداخت تایید شد — پرده آنتیک",
+          text,
+          html,
+        }).catch(() => {});
+      }
+
       return res.redirect(
         `${FRONT}/checkout/result?Status=OK&orderId=${orderId}&RefID=${refId}`
       );
@@ -319,6 +363,30 @@ router.patch("/:id/status", requireAdmin, async (req: AuthedRequest, res) => {
       where: { id: routeParam(req, "id") },
       data: { status },
     });
+
+    // Send order status update email (non-blocking)
+    if (row.customerEmail) {
+      const statusLabels: Record<string, string> = {
+        pending: "در انتظار پرداخت",
+        paid: "پرداخت شده",
+        failed: "پرداخت ناموفق",
+        cancelled: "لغو شده",
+      };
+      const { text, html } = orderStatusEmail(
+        row.customerEmail,
+        row.id,
+        row.customerName,
+        row.status,
+        statusLabels[row.status] || row.status,
+      );
+      sendMail({
+        to: row.customerEmail,
+        subject: "به‌روزرسانی وضعیت سفارش — پرده آنتیک",
+        text,
+        html,
+      }).catch(() => {});
+    }
+
     res.json({ id: row.id, status: row.status });
   } catch (err) {
     sendError(res, err);
