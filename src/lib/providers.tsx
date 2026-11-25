@@ -7,6 +7,7 @@ import { CartProvider } from "@/context/CartContext";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { useSmoothScroll } from "@/hooks/useSmoothScroll";
 import { PWARegistration } from "@/components/PWARegistration";
+import { WebMCPRegistration } from "@/components/WebMCPRegistration";
 
 function QueryProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -55,6 +56,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <SmoothScrollProvider>
             <AuthInitializer>{children}</AuthInitializer>
             <PWARegistration />
+            <WebMCPRegistration />
             <Toaster />
           </SmoothScrollProvider>
         </CartProvider>

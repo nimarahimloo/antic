@@ -9,6 +9,8 @@ import { SITE_PHONE_HREF } from "@/lib/siteContact";
 import CurtainDetailClient from "./CurtainDetailClient";
 import { CurtainDetailPageSkeleton } from "@/components/Skeletons";
 
+export const dynamic = "force-dynamic";
+
 interface CurtainDetailPageProps {
   params: Promise<{ id: string }>;
 }

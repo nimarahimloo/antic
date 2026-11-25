@@ -261,9 +261,74 @@ SMTP_FROM="no-reply@example.com"
 | `POST /api/auth/reset-password` | ثبت رمز عبور جدید |
 | `GET /api/app/public-settings` | تنظیمات عمومی (logo, hero slides, ...) |
 | `GET /sitemap.xml` | از دیتابیس تولید می‌شود |
-| `GET /robots.txt` | اشاره به sitemap |
+| `GET /robots.txt` | اشاره به sitemap + direttive Content-Signal (ai-train, search, ai-input) |
 | `GET /api/mcp` | اطلاعات ابزارهای MCP (نام، توضیح، پارامترها) |
 | `POST /api/mcp/tools/:name` | فراخوانی ابزار MCP (list_categories, search_models, get_model, list_projects) |
+
+## DNS for AI Discovery (DNS-AID)
+
+رکوردهای DNS-AID زیر در Zone `pardehantic.ir` زیر فضای نام `_agents` منتشر می‌شوند
+(منبع حقیقت: `deploy/dns/pardehantic.ir.zone`):
+
+```
+_index._agents.pardehantic.ir. 3600 IN SVCB 1 pardehantic.ir. \
+  alpn="h3,h2" port=443 mandatory=alpn,port \
+  key100000="agent-index" key100001="discovery" key100002="/.well-known"
+
+_a2a._agents.pardehantic.ir. 3600 IN SVCB 1 mcp.pardehantic.ir. \
+  alpn="h3,h2" port=443 mandatory=alpn,port \
+  key100000="agent-a2a" key100001="mcp" key100002="streamable-http"
+```
+
+- `_index._agents` → آدرس اصلی سایت (خدمات کشف `/.well-known/*` و `auth.md`)
+- `_a2a._agents` → Worker MCP (`mcp.pardehantic.ir/mcp`)
+- پارامترهای آزمایشی با نام عددی `keyNNNNN` تا زمان ثبت در IANA
+- DNSSEC را در Cloudflare (DNS → DNSSEC) فعال کنید تا resolvesرهایی که اعتبارسنجی می‌کنند داده تایید شده برگردانند
+
+اعتبارسنجی:
+
+```http
+POST https://isitagentready.com/api/scan
+Content-Type: application/json
+
+{"url": "https://pardehantic.ir"}
+```
+
+`checks.discoverability.dnsAid.status` باید `"pass"` باشد.
+
+جزئیات: `deploy/dns/README.md`
+
+## Link Response Headers (RFC 8288 + RFC 9727 §3)
+
+صفحه اصلی سایت هدرهای `Link` برای کشف ای‌جنت‌ها برمی‌گرداند. این هدرها در `next.config.mjs` (تابع `headers()`) برای مسیر `/` تنظیم می‌شوند:
+
+```
+Link: </.well-known/api-catalog>; rel="api-catalog"
+Link: </.well-known/oauth-protected-resource>; rel="service-desc"
+Link: </.well-known/oauth-authorization-server>; rel="service-doc"
+Link: </.well-known/openid-configuration>; rel="describedby"
+```
+
+Endpoint `/.well-known/api-catalog` در بک‌اند (`backend/src/app.ts`) لیستی از منابع قابل‌خواندنی توسط ماشین برای ای‌جنت‌ها برمی‌گرداند.
+
+اعتبارسنجی:
+
+```http
+POST https://isitagentready.com/api/scan
+Content-Type: application/json
+
+{"url": "https://pardehantic.ir"}
+```
+
+`checks.discoverability.linkHeaders.status` باید `"pass"` باشد.
+
+### Cloudflare Transform Rules (اختیاری، برای پروداکشن)
+
+به جای تنظیم در origin، می‌توان در Cloudflare Transform Rules برای مسیر `https://pardehantic.ir/` هدرهای `Link` را افزود:
+
+- نوع قوانین: Modify Response Header
+- هدر: `Link`
+- مقدار: `</.well-known/api-catalog>; rel="api-catalog"` (و بقیه)
 
 ## استقرار (Docker)
 

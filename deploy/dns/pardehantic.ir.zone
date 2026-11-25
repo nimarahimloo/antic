@@ -1,0 +1,58 @@
+; ============================================================================
+; DNS for AI Discovery (DNS-AID) — zone file for _agents.pardehantic.ir
+;
+; Publish these records in the Cloudflare DNS zone for pardehantic.ir so that
+; AI agents can discover this service's agent endpoints via DNS.
+;
+; Records:
+;   _index._agents.pardehantic.ir  -> agent index / resource discovery endpoint
+;   _a2a._agents.pardehantic.ir    -> Agent-to-Agent (A2A) / MCP endpoint
+;
+; Record type: SVCB (Service Binding) per RFC 9460.
+;   - alpn      : Application-Layer Protocol Negotiation identifiers
+;   - port      : TCP/TLS port (443 for HTTPS)
+;   - mandatory : SvcParamKeys a resolver must understand
+;   - keyNNNNN  : experimental DNS-AID custom parameters (unregistered)
+;
+; ============================================================================
+
+$ORIGIN _agents.pardehantic.ir.
+$TTL 3600
+
+; ---------------------------------------------------------------------------
+; _index._agents.pardehantic.ir
+;   Target: pardehantic.ir (base domain serving /.well-known discovery docs)
+;   ALPN: h3, h2 (HTTP/3 and HTTP/2 over TLS)
+; ---------------------------------------------------------------------------
+_index._agents.pardehantic.ir. 3600 IN SVCB 1 pardehantic.ir. \
+  alpn="h3,h2" \
+  port=443 \
+  mandatory=alpn,port \
+  key100000="agent-index" \
+  key100001="discovery" \
+  key100002="/.well-known"
+
+; ---------------------------------------------------------------------------
+; _a2a._agents.pardehantic.ir
+;   Target: mcp.pardehantic.ir (Streamable HTTP MCP worker)
+;   ALPN: h3, h2 (HTTP/3 and HTTP/2 over TLS)
+; ---------------------------------------------------------------------------
+_a2a._agents.pardehantic.ir. 3600 IN SVCB 1 mcp.pardehantic.ir. \
+  alpn="h3,h2" \
+  port=443 \
+  mandatory=alpn,port \
+  key100000="agent-a2a" \
+  key100001="mcp" \
+  key100002="streamable-http"
+
+; ============================================================================
+; DNSSEC
+; ============================================================================
+; Sign this zone with DNSSEC so validating resolvers return authenticated data.
+; In Cloudflare: DNS settings -> DNSSEC -> Enable. Cloudflare generates the
+; KSK/ZSK and publishes the DS record at the parent zone (nic.ir / registrar).
+;
+; Do NOT manually add DNSKEY/RRSIG records here unless you run your own
+; authoritative name server. Cloudflare manages DNSSEC signing automatically
+; once enabled at the zone level.
+; ============================================================================

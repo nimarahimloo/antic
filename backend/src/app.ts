@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
+import crypto from "crypto";
 import authRoutes from "./routes/auth.js";
 import entityRoutes from "./routes/entities.js";
 import uploadRoutes from "./routes/upload.js";
@@ -21,6 +22,152 @@ import { isCloudflareConfigured } from "./services/aiProviders.js";
 
 const app = express();
 
+/* ------------------------------------------------------------------ */
+/* Web Bot Auth — HTTP Message Signatures (IETF WebBotAuth WG)        */
+/* Publishes a JWKS at /.well-known/http-message-signatures-directory  */
+/* so receiving sites can verify signatures on requests this site's    */
+/* bot/agent sends.                                                    */
+/* ------------------------------------------------------------------ */
+
+const WEB_BOT_AUTH_KEY_ID = "web-bot-auth-1";
+const WEB_BOT_AUTH_AGENT = "antic-curtain-bot/1.0";
+
+type WebBotAuthJwk = JsonWebKey & {
+  kid: string;
+  use: string;
+  alg: string;
+};
+
+let webBotAuthPublicJwk: WebBotAuthJwk | null = null;
+let webBotAuthPrivateKey: crypto.KeyObject | null = null;
+
+function initWebBotAuth(): void {
+  const envSeed = process.env.WEB_BOT_AUTH_PRIVATE_KEY;
+  let privateKey: crypto.KeyObject | null = null;
+  let publicKeyJwk: { kty: string; crv: string; x: string } | null = null;
+
+  if (envSeed) {
+    try {
+      // base64url-encoded raw Ed25519 private seed (32 bytes)
+      const seedBuf = Buffer.from(envSeed, "base64url");
+      if (seedBuf.length === 32) {
+        privateKey = crypto.createPrivateKey({
+          key: seedBuf,
+          type: "ed25519",
+        } as any);
+        // Ed25519 private-key JWK includes the public "x" component
+        const privateJwk = privateKey.export({
+          format: "jwk",
+        } as any) as unknown as { kty: string; crv: string; x: string; d?: string };
+        publicKeyJwk = {
+          kty: privateJwk.kty,
+          crv: privateJwk.crv,
+          x: privateJwk.x,
+        };
+      }
+    } catch {
+      /* fall through to generating a new key */
+    }
+  }
+
+  if (!privateKey) {
+    const { privateKey: generated, publicKey: pubKey } =
+      crypto.generateKeyPairSync("ed25519");
+    privateKey = generated;
+    publicKeyJwk = pubKey.export({
+      format: "jwk",
+    } as any) as unknown as { kty: string; crv: string; x: string };
+    console.log(
+      `[web-bot-auth] generated Ed25519 key pair (kid=${WEB_BOT_AUTH_KEY_ID})`
+    );
+  }
+
+  webBotAuthPrivateKey = privateKey;
+
+  webBotAuthPublicJwk = {
+    kty: "OKP",
+    kid: WEB_BOT_AUTH_KEY_ID,
+    use: "sig",
+    alg: "EdDSA",
+    crv: publicKeyJwk!.crv,
+    x: publicKeyJwk!.x,
+  } as WebBotAuthJwk;
+}
+
+initWebBotAuth();
+
+function webBotAuthJwks(): { keys: WebBotAuthJwk[] } {
+  return { keys: webBotAuthPublicJwk ? [webBotAuthPublicJwk] : [] };
+}
+
+/**
+ * Sign an outbound HTTP request per RFC 9421 (HTTP Message Signatures).
+ * Returns the `Signature-Input` and `Signature` header values.
+ * Also sets `Signature-Agent` to identify this site's bot/agent.
+ */
+function signHttpRequest(opts: {
+  method: string;
+  targetUri: string;
+  authority: string;
+  headers: Record<string, string>;
+  body?: string;
+  created?: number;
+}): {
+  "Signature-Input": string;
+  Signature: string;
+  "Signature-Agent": string;
+} {
+  const {
+    method,
+    targetUri,
+    authority,
+    headers,
+    body,
+    created = Math.floor(Date.now() / 1000),
+  } = opts;
+
+  if (!webBotAuthPrivateKey) {
+    throw new Error("web-bot-auth private key not available");
+  }
+
+  const contentType = headers["content-type"] || "";
+  const contentLength = headers["content-length"] || String(body ? body.length : 0);
+
+  // Signature base string (RFC 9421 § 2.2) — covered components in order
+  const components: Array<[string, string]> = [
+    ["@method", method.toUpperCase()],
+    ["@target-uri", targetUri],
+    ["authority", authority],
+    ["content-type", contentType],
+    ["content-length", contentLength],
+  ];
+
+  const signatureBase = components.map(([name, value]) => `"${name}": ${value}`).join("\n");
+
+  const signature = crypto.sign(null, Buffer.from(signatureBase, "utf8"), webBotAuthPrivateKey);
+
+  const componentNames = components.map(([name]) => `"${name}"`).join(" ");
+
+  const signatureInput = `${componentNames}; created=${created}; keyid="${WEB_BOT_AUTH_KEY_ID}"`;
+  const signatureB64 = signature.toString("base64");
+
+  return {
+    "Signature-Input": `sig1=(${signatureInput})`,
+    Signature: `sig1=:${signatureB64}:`,
+    "Signature-Agent": WEB_BOT_AUTH_AGENT,
+  };
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      webBotAuth?: {
+        sign: typeof signHttpRequest;
+      };
+    }
+  }
+}
+
 const origin = process.env.CORS_ORIGIN || "http://localhost:3000";
 app.use(
   cors({
@@ -30,6 +177,15 @@ app.use(
 );
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+/** Attach Web Bot Auth signing helper to every request so route handlers
+ *  can sign outbound bot/agent requests when this service acts as a client. */
+app.use((req, _res, next) => {
+  (req as Express.Request & { webBotAuth?: { sign: typeof signHttpRequest } }).webBotAuth = {
+    sign: signHttpRequest,
+  };
+  next();
+});
 
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 app.use("/uploads", express.static(path.resolve(uploadDir)));
@@ -148,11 +304,45 @@ app.get("/sitemap.xml", async (_req, res) => {
   }
 });
 
-/** robots.txt pointing at the sitemap. */
+/** robots.txt pointing at the sitemap, with Content-Signal directives. */
 app.get("/robots.txt", (_req, res) => {
+  const base = process.env.PUBLIC_BASE_URL || "https://pardehantic.ir";
   res.set("Content-Type", "text/plain; charset=utf-8");
   res.status(200).send(
-    `User-agent: *\nAllow: /\n\nSitemap: ${process.env.PUBLIC_BASE_URL || "https://pardehantic.ir"}/sitemap.xml\n`
+    `# As a condition of accessing this website, you agree to
+# abide by the following content signals:
+#
+# (a)  If a content-signal = yes, you may collect content
+# for the corresponding use.
+# (b)  If a content-signal = no, you may not collect
+# content for the corresponding use.
+# (c)  If the website operator does not include a content
+# signal for a corresponding use, the website operator
+# neither grants nor restricts permission via content
+# signal with respect to the corresponding use.
+#
+# The content signals and their meanings are:
+# search: building a search index and providing search
+# results (e.g., returning hyperlinks and short excerpts
+# from your website's contents).  Search does not include
+# providing AI-generated search summaries.
+# ai-input: inputting content into one or more AI models
+# (e.g., retrieval augmented generation, grounding, or
+# other real-time taking of content for generative AI
+# search answers).
+# ai-train: training or fine-tuning AI models.
+#
+# ANY RESTRICTIONS EXPRESSED VIA CONTENT SIGNALS ARE
+# EXPRESS RESERVATIONS OF RIGHTS UNDER ARTICLE 4 OF THE
+# EUROPEAN UNION DIRECTIVE 2019/790 ON COPYRIGHT AND
+# RELATED RIGHTS IN THE DIGITAL SINGLE MARKET.
+
+User-Agent: *
+Content-Signal: ai-train=yes, search=yes, ai-input=yes
+Allow: /
+
+Sitemap: ${base}/sitemap.xml
+`
   );
 });
 
@@ -209,6 +399,7 @@ app.get("/.well-known/oauth-authorization-server", (_req, res) => {
         "urn:ietf:params:oauth:token-type:id-jag",
         "verified_email",
       ],
+      credential_types_supported: ["bearer"],
     },
     anonymous: {
       credential_types_supported: ["bearer"],
@@ -226,6 +417,295 @@ app.get("/.well-known/oauth-authorization-server", (_req, res) => {
 app.get("/.well-known/jwks.json", (_req, res) => {
   res.set("Content-Type", "application/json; charset=utf-8");
   res.status(200).json({ keys: [] });
+});
+
+/**
+ * HTTP Message Signatures Directory (Web Bot Auth / IETF WebBotAuth WG).
+ * Publishes the JSON Web Key Set containing the public key(s) that receiving
+ * sites can use to verify signatures on requests sent by this site's
+ * bot/agent. The matching private key stays on this server only.
+ */
+app.get("/.well-known/http-message-signatures-directory", (_req, res) => {
+  res.set("Content-Type", "application/json; charset=utf-8");
+  res.status(200).json(webBotAuthJwks());
+});
+
+/**
+ * MCP Server Card (SEP-1649).
+ * Advertises this service as an MCP server for agent discovery.
+ * Served at /.well-known/mcp/server-card.json with HTTP 200.
+ */
+app.get("/.well-known/mcp/server-card.json", (_req, res) => {
+  const base = publicBaseUrl();
+  res.set("Content-Type", "application/json; charset=utf-8");
+  res.status(200).json({
+    schemaVersion: "1.0.0",
+    serverInfo: {
+      name: "antic-curtain-mcp",
+      version: "1.0.0",
+      description: "پرده آنتیک — Read-only curtain catalog MCP server",
+    },
+    transport: {
+      type: "streamable-http",
+      endpoint: `${base}/api/mcp`,
+    },
+    capabilities: {
+      tools: {
+        list_categories: {
+          description: "لیست دسته‌بندی‌های پرده",
+        },
+        search_models: {
+          description: "جست‌وجوی مدل‌های پرده با متن یا دسته",
+          inputSchema: {
+            type: "object",
+            properties: {
+              query: { type: "string" },
+              category_slug: { type: "string" },
+              limit: { type: "number" },
+            },
+          },
+        },
+        get_model: {
+          description: "جزئیات یک مدل با id",
+          inputSchema: {
+            type: "object",
+            properties: { id: { type: "string" } },
+            required: ["id"],
+          },
+        },
+        list_projects: {
+          description: "لیست پروژه‌های اجرا شده",
+          inputSchema: {
+            type: "object",
+            properties: { limit: { type: "number" } },
+          },
+        },
+      },
+      resources: {
+        curtain_categories: {
+          description: "دسته‌بندی‌های پرده",
+          uri: `${base}/api/entities/CurtainCategory`,
+        },
+        curtain_models: {
+          description: "مدل‌های پرده",
+          uri: `${base}/api/entities/CurtainModel`,
+        },
+      },
+      prompts: {},
+    },
+  });
+});
+
+/**
+ * Agent Skills Discovery Index (RFC v0.2.0).
+ * Advertises the skills this site exposes for agent discovery.
+ * Served at /.well-known/agent-skills/index.json with HTTP 200.
+ */
+app.get("/.well-known/agent-skills/index.json", (_req, res) => {
+  const base = publicBaseUrl();
+  res.set("Content-Type", "application/json; charset=utf-8");
+  res.status(200).json({
+    $schema: "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
+    skills: [
+      {
+        name: "curtain-catalog",
+        type: "skill-md",
+        description: "Browse and search the curtain catalog (categories, models, settings)",
+        url: `${base}/.well-known/agent-skills/curtain-catalog.md`,
+        digest: "sha256:4c2ffb27d2034fa5c6be87dffad5c9987366d4baa06be352c4ea1e151048572c",
+      },
+      {
+        name: "shop-catalog",
+        type: "skill-md",
+        description: "Browse and search the shop accessory catalog (categories, products)",
+        url: `${base}/.well-known/agent-skills/shop-catalog.md`,
+        digest: "sha256:f6391fdf5a6aa74a65700bd53bf3fecf7f0e8a9e3e033fa34f209495c22ec986",
+      },
+      {
+        name: "mcp-tools",
+        type: "skill-md",
+        description: "Invoke MCP catalog tools over Streamable HTTP",
+        url: `${base}/.well-known/agent-skills/mcp-tools.md`,
+        digest: "sha256:346ecba9759aae37e16074aaac4493b63d878e4fcfab76c029242eb1655b6433",
+      },
+    ],
+  });
+});
+
+/**
+ * A2A Agent Card (A2A Protocol Specification).
+ * Advertises this service as an A2A-compatible agent for agent-to-agent discovery.
+ * Served at /.well-known/agent-card.json with HTTP 200.
+ */
+app.get("/.well-known/agent-card.json", (_req, res) => {
+  const base = publicBaseUrl();
+  res.set("Content-Type", "application/json; charset=utf-8");
+  res.status(200).json({
+    name: "پرده آنتیک A2A Agent",
+    version: "1.0.0",
+    description:
+      "پرده آنتیک — curtain and accessory catalog agent supporting A2A agent-to-agent communication",
+    supportedInterfaces: [
+      {
+        serviceUrl: `${base}/api/mcp`,
+        transport: "streamable-http",
+      },
+    ],
+    capabilities: {
+      streaming: true,
+      pushNotifications: false,
+      stateTransitionHistory: false,
+    },
+    skills: [
+      {
+        id: "curtain-catalog",
+        name: "Curtain Catalog",
+        description: "Browse and search curtain categories and models",
+      },
+      {
+        id: "shop-catalog",
+        name: "Shop Catalog",
+        description: "Browse and search shop accessory categories and products",
+      },
+      {
+        id: "mcp-tools",
+        name: "MCP Catalog Tools",
+        description: "Invoke MCP catalog tools over Streamable HTTP",
+      },
+    ],
+  });
+});
+
+/**
+ * Serve individual SKILL.md skill artifacts referenced by the discovery index.
+ * Content is embedded so it works in both dev (tsx) and production (dist)
+ * builds without needing to copy asset files.
+ */
+const SKILL_ARTIFACTS: Record<string, string> = {
+  "curtain-catalog": `# Curtain Catalog Skill
+
+Browse and search the پرده آنتیک curtain catalog. Retrieve curtain categories
+(with mechanisms and subcategories) and curtain models (fabric, dimensions,
+pricing, availability).
+
+## Tools
+
+- \`list_categories\` — list curtain categories
+- \`get_curtain_models\` — get curtain models, optionally filtered by category
+- \`get_public_settings\` — get public site settings
+
+## Endpoints
+
+- \`GET /.well-known/mcp/server-card.json\` — MCP server card
+- \`GET /api/entities/CurtainCategory\` — curtain categories
+- \`GET /api/entities/CurtainModel\` — curtain models
+- \`GET /api/app/public-settings\` — public settings
+`,
+  "shop-catalog": `# Shop Catalog Skill
+
+Browse and search the پرده آنتیک online shop accessory catalog. Retrieve
+shop categories and accessory products (curtain rods, rings, hooks, ties,
+etc.) with filtering and pagination.
+
+## Tools
+
+- \`search_shop_products\` — search shop products
+- \`get_shop_categories\` — list shop categories
+
+## Endpoints
+
+- \`GET /api/catalog/categories\` — shop categories
+- \`GET /api/catalog/products\` — shop products
+`,
+  "mcp-tools": `# MCP Tools Skill
+
+Invoke the پرده آنتیک MCP catalog tool bridge over Streamable HTTP. Tools
+expose read-only access to curtain categories, curtain models, shop products,
+and executed projects.
+
+## Tools
+
+- \`list_categories\` — list curtain categories
+- \`search_models\` — search curtain models by text or category
+- \`get_model\` — get curtain model details by id
+- \`list_projects\` — list executed projects
+
+## Endpoint
+
+- \`POST /api/mcp/tools/:name\` — invoke an MCP catalog tool
+`,
+};
+
+app.get("/.well-known/agent-skills/:skill.md", (req, res) => {
+  const { skill } = req.params;
+  const content = SKILL_ARTIFACTS[skill as keyof typeof SKILL_ARTIFACTS];
+  if (content === undefined) {
+    return res.status(404).json({ error: "Skill not found" });
+  }
+  res.set("Content-Type", "text/markdown; charset=utf-8");
+  res.status(200).send(content);
+});
+
+/**
+ * API Catalog for agent discovery.
+ * Lists machine-readable endpoints that AI agents can use to discover
+ * and interact with this service. Referenced via Link header rel="api-catalog".
+ */
+app.get("/.well-known/api-catalog", (_req, res) => {
+  const base = publicBaseUrl();
+  res.set("Content-Type", "application/json; charset=utf-8");
+  res.status(200).json({
+    catalog: "antic-curtain-api-catalog",
+    version: "1.0.0",
+    description: "پرده آنتیک — Agent-accessible API catalog",
+    endpoints: [
+      {
+        path: "/.well-known/api-catalog",
+        rel: "api-catalog",
+        description: "This API catalog document",
+      },
+      {
+        path: "/.well-known/oauth-protected-resource",
+        rel: "service-desc",
+        description: "OAuth 2.0 Protected Resource Metadata (RFC 9728)",
+      },
+      {
+        path: "/.well-known/oauth-authorization-server",
+        rel: "service-doc",
+        description: "OAuth 2.0 Authorization Server Metadata (RFC 8414)",
+      },
+      {
+        path: "/.well-known/openid-configuration",
+        rel: "describedby",
+        description: "OpenID Connect Discovery 1.0",
+      },
+      {
+        path: "/.well-known/jwks.json",
+        rel: "service-desc",
+        description: "JSON Web Key Set (RFC 7517)",
+      },
+      {
+        path: "/.well-known/http-message-signatures-directory",
+        rel: "service-desc",
+        description: "HTTP Message Signatures Directory / Web Bot Auth JWKS",
+      },
+      {
+        path: "/auth.md",
+        rel: "service-doc",
+        description: "Agent Registration Discovery (auth.md)",
+      },
+      {
+        path: "/api/mcp",
+        rel: "api-catalog",
+        description: "MCP catalog tool bridge (list_categories, search_models, get_model, list_projects)",
+      },
+      {
+        path: "/sitemap.xml",
+        rel: "service-desc",
+        description: "XML sitemap of public pages",
+      },
+    ],
+  });
 });
 
 /**
@@ -266,7 +746,7 @@ app.get("/auth.md", async (_req, res) => {
 
 ## Agent Audience
 
-igkeiten (\`agents\`) و کلاینت‌های هواشناسی می‌توانند با ثبت‌نام در این API به منابع محفوظ دسترسی یابند.
+وکیل‌های هوش مصنوعی و کلاینت‌های هوش مصنوعی می‌توانند با ثبت‌نام در این API به منابع محفوظ دسترسی یابند.
 
 ## Registration
 

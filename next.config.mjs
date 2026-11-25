@@ -77,6 +77,16 @@ const nextConfig = {
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
         ],
       },
+      // Agent discovery Link headers on the homepage (RFC 8288 + RFC 9727 §3)
+      {
+        source: '/',
+        headers: [
+          { key: 'Link', value: '</.well-known/api-catalog>; rel="api-catalog"' },
+          { key: 'Link', value: '</.well-known/oauth-protected-resource>; rel="service-desc"' },
+          { key: 'Link', value: '</.well-known/oauth-authorization-server>; rel="service-doc"' },
+          { key: 'Link', value: '</.well-known/openid-configuration>; rel="describedby"' },
+        ],
+      },
       {
         source: '/uploads/:path*',
         headers: [
