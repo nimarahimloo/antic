@@ -39,9 +39,10 @@ function validateProductionConfig(): void {
     errors.push("Default ADMIN_EMAIL/ADMIN_PASSWORD detected. Must set secure credentials in production.");
   }
 
-  // Zarinpal merchant ID required for real payments
+  // Payment provider is optional for application startup.
+  // Checkout already rejects real payments with HTTP 503 when unconfigured.
   if (!process.env.ZARINPAL_MERCHANT_ID) {
-    errors.push("ZARINPAL_MERCHANT_ID is required for real payments in production.");
+    warnings.push("Zarinpal is not configured. Real checkout is disabled (HTTP 503).");
   }
   if (process.env.ZARINPAL_SANDBOX === "true") {
     warnings.push("ZARINPAL_SANDBOX is enabled in production. Ensure this is intentional.");
