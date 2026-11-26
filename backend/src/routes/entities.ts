@@ -20,6 +20,143 @@ import { ensureCategoryTemplateBackground } from "../services/categoryTemplate.j
 import { renderOneModel } from "../services/renderQueue.js";
 import { syncMediaUsage, extractImageUrls } from "../lib/mediaSync.js";
 
+/** Parse the JSON subcategories field stored on CurtainCategory rows. */
+function parseCategorySubs(raw: unknown): Array<{ name: string; slug: string }> {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .map((s) => {
+        if (typeof s === "string") return { name: s, slug: s };
+        return { name: String(s.name || s.slug || ""), slug: String(s.slug || s.name || "").trim() };
+      })
+      .filter((s) => s.slug);
+  }
+  if (typeof raw === "string") {
+    try {
+      return parseCategorySubs(JSON.parse(raw));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
+ * Rebuild the parent->subcategories JSON for a category row.
+ * Replaces any existing entry for `childSlug` with {name, slug: childSlug}.
+ */
+function writeSubEntry(
+  existingSubs: Array<{ name: string; slug: string }>,
+  childName: string,
+  childSlug: string,
+): Array<{ name: string; slug: string }> {
+  const filtered = existingSubs.filter((s) => s.slug.toLowerCase() !== childSlug.toLowerCase());
+  return [...filtered, { name: childName, slug: childSlug }];
+}
+
+/**
+ * Remove a child slug from a category's subcategories JSON.
+ */
+function removeSubEntry(
+  existingSubs: Array<{ name: string; slug: string }>,
+  childSlug: string,
+): Array<{ name: string; slug: string }> {
+  return existingSubs.filter((s) => s.slug.toLowerCase() !== childSlug.toLowerCase());
+}
+
+/**
+ * Collect every descendant slug of a category by walking the subcategories tree.
+ * Includes the starting slug itself.
+ */
+function collectDescendantSlugs(
+  categories: Array<{ id: string; slug: string; subcategories: string | null }>,
+  startSlug: string,
+): Set<string> {
+  const bySlug = new Map<string, { id: string; slug: string; subcategories: string | null }>();
+  for (const c of categories) bySlug.set(c.slug.toLowerCase(), c);
+
+  const found = new Set<string>();
+  const queue: string[] = [startSlug.toLowerCase()];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (found.has(current)) continue;
+    found.add(current);
+    const cat = bySlug.get(current);
+    if (!cat) continue;
+    for (const sub of parseCategorySubs(cat.subcategories)) {
+      const subSlug = sub.slug.toLowerCase();
+      if (!found.has(subSlug)) queue.push(subSlug);
+    }
+  }
+  return found;
+}
+
+/**
+ * Update the parent->subcategories links when a CurtainCategory's parent changes.
+ * Runs inside the same transaction as the category update.
+ * - Removes this category from its old parent's subcategories (if any)
+ * - Adds this category to the new parent's subcategories (if parentSlug given)
+ * - Prevents selecting self or any descendant as parent (cycle prevention)
+ */
+async function updateCategoryParentHierarchy(
+  tx: any,
+  categoryId: string,
+  newParentSlug: string | null,
+  categoryName: string,
+): Promise<void> {
+  const allCats = await tx.curtainCategory.findMany({
+    select: { id: true, slug: true, name: true, subcategories: true },
+  });
+
+  const category = allCats.find((c: { id: string }) => c.id === categoryId);
+  if (!category) return;
+
+  const categorySlug = category.slug;
+  const categorySlugLower = categorySlug.toLowerCase();
+
+  // Cycle: cannot select self as parent
+  if (newParentSlug && newParentSlug.toLowerCase() === categorySlugLower) {
+    throw new HttpError(400, "نمی‌تواند دسته به عنوان والد خود انتخاب شود");
+  }
+
+  // Cycle: cannot select a descendant as parent
+  const descendants = collectDescendantSlugs(allCats, categorySlug);
+  if (newParentSlug && descendants.has(newParentSlug.toLowerCase())) {
+    throw new HttpError(400, "نمی‌تواند یک زیردسته را به عنوان والد انتخاب کرد");
+  }
+
+  // Find old parents: categories whose subcategories list this slug
+  const oldParents = allCats.filter((c: { subcategories: string | null }) =>
+    parseCategorySubs(c.subcategories).some((s) => s.slug.toLowerCase() === categorySlugLower)
+  );
+
+  // Remove from old parents (skip if same as new parent)
+  for (const oldParent of oldParents) {
+    if (newParentSlug && oldParent.slug.toLowerCase() === newParentSlug.toLowerCase()) continue;
+    const next = removeSubEntry(parseCategorySubs(oldParent.subcategories), categorySlug);
+    await tx.curtainCategory.update({
+      where: { id: oldParent.id },
+      data: { subcategories: JSON.stringify(next) },
+    });
+  }
+
+  // Add to new parent
+  if (newParentSlug) {
+    const newParent = allCats.find((c: { slug: string }) => c.slug.toLowerCase() === newParentSlug.toLowerCase());
+    if (newParent) {
+      const existing = parseCategorySubs(newParent.subcategories);
+      if (!existing.some((s) => s.slug.toLowerCase() === categorySlugLower)) {
+        await tx.curtainCategory.update({
+          where: { id: newParent.id },
+          data: {
+            subcategories: JSON.stringify(writeSubEntry(existing, categoryName, categorySlug)),
+          },
+        });
+      }
+    }
+  }
+}
+
 const router = Router();
 
 // ---------- Collection relation helpers ----------
@@ -228,11 +365,15 @@ router.post("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
     if (!canWrite(meta, req.user, true)) throw new HttpError(403, "Forbidden");
     const body = req.body || {};
     const collectionIds = Array.isArray(body.collectionIds) ? body.collectionIds : [];
+
+    // parentSlug is a virtual field for CurtainCategory hierarchy — not a Prisma column.
+    const parentSlug = typeof body.parentSlug === "string" ? body.parentSlug : null;
+
     const data = fromApi(body, meta.name);
     if (Object.keys(data).length === 0) throw new HttpError(400, "Empty payload");
 
-    // collectionIds is a relation field, not a scalar — strip before Prisma create
-    const { collectionIds: _cid, ...createData } = data;
+    // Strip virtual/relation fields before Prisma create
+    const { collectionIds: _cid, parentSlug: _ps, ...createData } = data;
 
     let row: any;
     if (meta.name === "Project" || meta.name === "CurtainCategory") {
@@ -245,6 +386,27 @@ router.post("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
         } else {
           // @ts-expect-error dynamic input
           created = await tx.curtainCategory.create({ data: createData });
+        }
+
+        // When creating a CurtainCategory with a parent, add it to the parent's subcategories
+        if (meta.name === "CurtainCategory" && parentSlug) {
+          const parent = await tx.curtainCategory.findUnique({
+            where: { slug: parentSlug },
+            select: { id: true, name: true, slug: true, subcategories: true },
+          });
+          if (parent) {
+            const existing = parseCategorySubs(parent.subcategories);
+            if (!existing.some((s) => s.slug.toLowerCase() === String(created.slug).toLowerCase())) {
+              await tx.curtainCategory.update({
+                where: { id: parent.id },
+                data: {
+                  subcategories: JSON.stringify(
+                    writeSubEntry(existing, String(created.name), String(created.slug)),
+                  ),
+                },
+              });
+            }
+          }
         }
 
         if (collectionIds.length > 0) {
@@ -323,11 +485,16 @@ router.put("/:Entity/:id", requireAdmin, async (req: AuthedRequest, res) => {
     const body = req.body || {};
     const hasCollectionIds = "collectionIds" in body;
     const collectionIds = hasCollectionIds && Array.isArray(body.collectionIds) ? body.collectionIds : null;
+
+    // parentSlug is a virtual field for CurtainCategory hierarchy — not a Prisma column.
+    // It is managed via the parent row's subcategories JSON.
+    const parentSlug = typeof body.parentSlug === "string" ? body.parentSlug : null;
+
     const data = fromApi(body, meta.name);
     if (Object.keys(data).length === 0) throw new HttpError(400, "Empty payload");
 
-    // collectionIds is a relation field, not a scalar — strip before Prisma update
-    const { collectionIds: _cid, ...updateData } = data;
+    // Strip virtual/relation fields before Prisma update
+    const { collectionIds: _cid, parentSlug: _ps, ...updateData } = data;
 
     let row: any;
     if (meta.name === "Project" || meta.name === "CurtainCategory") {
@@ -339,6 +506,11 @@ router.put("/:Entity/:id", requireAdmin, async (req: AuthedRequest, res) => {
           updated = await tx.project.update({ where: { id: entityId }, data: updateData });
         } else {
           updated = await tx.curtainCategory.update({ where: { id: entityId }, data: updateData });
+        }
+
+        // Manage parent->subcategories links when parent changes (CurtainCategory only)
+        if (meta.name === "CurtainCategory" && parentSlug !== undefined) {
+          await updateCategoryParentHierarchy(tx, entityId, parentSlug, String(updated.name));
         }
 
         // Only touch collection relations when the caller explicitly sent collectionIds

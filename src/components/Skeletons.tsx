@@ -512,6 +512,89 @@ export function AboutPageSkeleton() {
 }
 
 /**
+ * Project Detail Page Skeleton
+ */
+export function ProjectDetailPageSkeleton() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="bg-background pb-20"
+    >
+      <div className="mx-auto max-w-4xl px-5 py-8 lg:px-10 lg:py-12">
+        <div className="mb-8 flex items-center gap-2">
+          <SkeletonBox className="h-4 w-12" />
+          <SkeletonBox className="h-3 w-3" />
+          <SkeletonBox className="h-4 w-12" />
+          <SkeletonBox className="h-3 w-3" />
+          <SkeletonBox className="h-4 w-24" />
+        </div>
+
+        <div className="mb-12 overflow-hidden rounded-3xl border border-secondary/60">
+          <SkeletonBox className="aspect-[16/9] w-full" />
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <div className="rounded-2xl border border-secondary/60 bg-card p-6 lg:p-8">
+              <SkeletonBox className="h-8 w-2/3 mb-6" />
+              <SkeletonBox className="h-4 w-32 mb-6 rounded-full border border-primary/40 bg-primary/10" />
+              <SkeletonText lines={3} />
+              <SkeletonBox className="mt-8 grid gap-4 lg:grid-cols-3 h-20" />
+              <SkeletonBox className="mt-6 grid gap-6 lg:grid-cols-3 h-40" />
+            </div>
+
+            <div className="mt-12">
+              <SkeletonBox className="h-6 w-40 mb-6" />
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {[...Array(3)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 * i }}
+                    className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-secondary/50 bg-card"
+                  >
+                    <SkeletonBox className="absolute inset-0" />
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-1">
+            <div className="sticky top-24 space-y-6">
+              <div className="rounded-2xl border border-secondary/60 bg-card p-6">
+                <SkeletonBox className="h-6 w-32 mb-4" />
+                <dl className="space-y-4">
+                  <div>
+                    <SkeletonBox className="h-3 w-24 mb-1" />
+                    <SkeletonBox className="h-4 w-40" />
+                  </div>
+                  <div>
+                    <SkeletonBox className="h-3 w-20 mb-1" />
+                    <SkeletonBox className="h-4 w-32" />
+                  </div>
+                  <div>
+                    <SkeletonBox className="h-3 w-16 mb-1" />
+                    <SkeletonBox className="h-4 w-24" />
+                  </div>
+                </dl>
+              </div>
+
+              <div className="rounded-2xl border border-secondary/60 bg-card p-6">
+                <SkeletonBox className="h-12 w-full rounded-full mb-3" />
+                <SkeletonBox className="h-12 w-full rounded-full border border-secondary/50 bg-transparent" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+/**
  * Product Detail Page Skeleton
  */
 export function ProductDetailPageSkeleton() {

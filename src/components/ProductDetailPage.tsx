@@ -1,7 +1,7 @@
 "use client";
 
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useProductDetail } from "@/hooks/useProductDetail";
 import { useVariantOptions } from "@/hooks/useVariantOptions";
@@ -9,13 +9,57 @@ import { productGallery, storeImage } from "@/lib/storeImage";
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductSpecs from "@/components/product/ProductSpecs";
 import RelatedProjects from "@/components/RelatedProjects";
-import { ArrowRight, Phone, Truck, ShieldCheck, Headphones, Store, BadgeCheck } from "lucide-react";
+import ProductCard from "@/components/ProductCard";
+import { searchProducts } from "@/rest/store-catalog";
+import { ArrowRight, Phone, Truck, ShieldCheck, Headphones, Store, BadgeCheck, Loader2 } from "lucide-react";
 
 export default function ProductDetailPage({ slug }: { slug: string }) {
   const d = useProductDetail(slug);
   const { optionGroups, modifierGroups } = useVariantOptions(
     d.options, d.modifiers, d.selectedOptions, d.modifierValues
   );
+
+  // Similar products: same category, excluding current, published only
+  const [similarProducts, setSimilarProducts] = useState<Array<{ id: string; slug: string; name: string; image?: string }>>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [similarError, setSimilarError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!d.product?.categoryId) {
+      setSimilarProducts([]);
+      return;
+    }
+    let cancelled = false;
+    setSimilarLoading(true);
+    setSimilarError(null);
+
+    searchProducts({
+      categoryId: d.product.categoryId,
+      limit: 6,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        const products = (res?.products || [])
+          .filter((p) => p.id !== d.product!.id && p.visible !== false)
+          .map((p) => ({
+            id: p.id,
+            slug: p.slug,
+            name: p.name,
+            image: (p as { media?: { main?: { image?: { url: string } } } }).media?.main?.image?.url || p.image,
+          }));
+        setSimilarProducts(products);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setSimilarError(err.message || "خطا در بارگذاری محصولات مشابه");
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setSimilarLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [d.product?.categoryId, d.product?.id]);
 
   const images = useMemo(
     () =>
@@ -248,6 +292,68 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
         productCategorySlug={d.product?.categoryId ? undefined : undefined}
         limit={6}
       />
+
+      {/* Similar Products Section */}
+      <section className="border-t border-secondary/60 bg-background pt-16 pb-8">
+        <div className="mx-auto max-w-7xl px-5 lg:px-10">
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="font-display text-lg font-bold text-foreground">
+              محصولات مشابه
+            </h2>
+          </div>
+
+          {similarLoading ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="animate-pulse rounded-2xl border border-secondary/50 bg-card/40 p-5">
+                  <div className="aspect-[4/5] rounded-xl bg-secondary/30 mb-3" />
+                  <div className="h-4 w-3/4 rounded bg-secondary/30 mb-1.5" />
+                  <div className="h-3 w-1/2 rounded bg-secondary/30" />
+                </div>
+              ))}
+            </div>
+          ) : similarError ? (
+            <p className="font-body text-sm text-destructive text-center py-8">
+              {similarError}
+              <button
+                onClick={() => {
+                  setSimilarError(null);
+                  setSimilarLoading(true);
+                  searchProducts({ categoryId: d.product?.categoryId || "", limit: 6 })
+                    .then((res) => {
+                      const products = (res?.products || [])
+                        .filter((p) => p.id !== d.product!.id && p.visible !== false)
+                        .map((p) => ({
+                          id: p.id,
+                          slug: p.slug,
+                          name: p.name,
+                          image: (p as { media?: { main?: { image?: { url: string } } } }).media?.main?.image?.url || p.image,
+                        }));
+                      setSimilarProducts(products);
+                    })
+                    .finally(() => setSimilarLoading(false));
+                }}
+                className="mt-2 text-xs text-primary underline hover:text-primary"
+              >
+                تلاش دوباره
+              </button>
+            </p>
+          ) : similarProducts.length === 0 ? (
+            <p className="font-body text-sm text-muted-foreground text-center py-8">
+              محصول مشابهی در این دسته ثبت نشده است.
+            </p>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {similarProducts.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p as { id: string; slug: string; name: string; image?: string; [key: string]: unknown }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

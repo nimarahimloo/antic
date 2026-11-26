@@ -11,6 +11,7 @@ import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import { useConfirmation } from "@/hooks/useConfirmation";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
+import CategoryTreeSelector from "@/components/admin/CategoryTreeSelector";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -22,16 +23,24 @@ interface FieldConfig {
   key: string;
   label: string;
   required?: boolean;
-  type?: "text" | "number" | "select" | "textarea" | "boolean" | "image" | "gallery" | "list" | "sublist" | "multiselect" | string;
+  type?: "text" | "number" | "select" | "textarea" | "boolean" | "image" | "gallery" | "list" | "sublist" | "multiselect" | "tree" | string;
   placeholder?: string;
   default?: unknown;
   getOptions?: (form: Record<string, unknown>, options: Record<string, unknown>) => Array<{ value: string; label: string }>;
+  // For tree type: compute initial value from the record being edited
+  getInitialValue?: (record: Record<string, unknown>) => unknown;
   clearFields?: string[];
   // For multiselect: fetch options from an API endpoint
   optionsApi?: string;
   // Display field for selected items
   optionLabel?: string;
   optionValue?: string;
+  // For tree type: pre-computed hierarchical options { value, label, parentSlug?, level? }
+  treeOptions?: Array<{ value: string; label: string; parentSlug?: string | null; level?: number }>;
+  // For tree type: slug of the category being edited (excluded from selection to prevent cycles)
+  excludeSlug?: string | null;
+  // For tree type: descendant slugs of the category being edited (cycle prevention)
+  descendantSlugs?: Set<string>;
 }
 
 interface ColumnConfig {
@@ -46,6 +55,8 @@ interface AdminEntityPageProps {
   fields: FieldConfig[];
   columns: ColumnConfig[];
   options?: Record<string, Array<{ value: string; label: string }>>;
+  // For tree fields: map of categoryId → descendant slugs (cycle prevention)
+  descendantSlugs?: Record<string, Set<string>>;
   sortBy?: string;
   autoAnalyzeFabric?: boolean;
 }
@@ -56,6 +67,7 @@ export default function AdminEntityPage({
   fields,
   columns,
   options = {},
+  descendantSlugs = {},
   sortBy = "-created_date",
   autoAnalyzeFabric = false,
 }: AdminEntityPageProps) {
@@ -108,8 +120,11 @@ export default function AdminEntityPage({
     const initial: Record<string, unknown> = {};
     fields.forEach((f) => {
       const v = record[f.key];
-      if (f.type === "boolean") initial[f.key] = !!v;
-      else if (f.type === "gallery") {
+      if (f.getInitialValue) {
+        initial[f.key] = f.getInitialValue(record);
+      } else if (f.type === "boolean") {
+        initial[f.key] = !!v;
+      } else if (f.type === "gallery") {
         if (Array.isArray(v)) initial[f.key] = v.slice(0, GALLERY_MAX);
         else if (typeof v === "string" && v.trim()) {
           try {
@@ -165,6 +180,29 @@ export default function AdminEntityPage({
             </option>
           ))}
         </select>
+      );
+    }
+    if (f.type === "tree") {
+      const editingSlug = editing?.slug ? String(editing.slug) : null;
+      const exclude = f.excludeSlug ?? editingSlug ?? null;
+      const descendants =
+        f.descendantSlugs ||
+        (editing?.id ? descendantSlugs[String(editing.id)] : undefined) ||
+        new Set<string>();
+      return (
+        <div className="w-full">
+          <CategoryTreeSelector
+            value={String(form[f.key] ?? "")}
+            onChange={(v) =>
+              setForm((s) => ({ ...s, [f.key]: v }))
+            }
+            options={f.treeOptions || []}
+            excludeSlug={exclude}
+            descendantSlugs={descendants}
+            placeholder={f.placeholder || "انتخاب دسته والد…"}
+            className="w-full"
+          />
+        </div>
       );
     }
     if (f.type === "textarea") {

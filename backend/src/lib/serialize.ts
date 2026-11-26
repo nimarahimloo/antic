@@ -82,6 +82,7 @@ const ALLOWED: Record<string, Set<string>> = {
     "backgroundImage",
     "backgroundGradient",
     "collectionIds",
+    "parentSlug",
     "seoTitle",
     "seoDescription",
     "seoCanonicalUrl",
