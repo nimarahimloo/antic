@@ -33,16 +33,20 @@ export default function AdminLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isLoadingAuth, authChecked, logout } = useAuth();
   const isAdmin = Boolean(isAuthenticated && user?.role === "admin");
 
+  // Do not redirect while AuthProvider is still restoring the persisted session.
+  // This prevents a false login redirect when an admin page is loaded directly.
   useEffect(() => {
+    if (!authChecked || isLoadingAuth) return;
     if (!isAdmin) {
-      router.push("/login?returnTo=/admin");
+      const returnTo = pathname || "/admin";
+      router.replace(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }
-  }, [isAdmin, router]);
+  }, [authChecked, isLoadingAuth, isAdmin, pathname, router]);
 
-  if (!isAdmin) {
+  if (!authChecked || isLoadingAuth || !isAdmin) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
