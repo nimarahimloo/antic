@@ -64,7 +64,7 @@ async function main() {
       assert(info.height > 0);
     }),
     test("detects SVG by magic bytes", async () => {
-      const buf = Buffer.from('<?xml version="1.0"?><svg width="100" height="100"></svg>');
+      const buf = Buffer.from('<?xml version="1.0"?><svg width="100" height="100"><rect width="50" height="50" fill="red"/></svg>');
       const info = await validateMediaFile(buf);
       assert.strictEqual(info.mimeType, "image/svg+xml");
       assert.strictEqual(info.isSvg, true);
@@ -111,6 +111,10 @@ async function main() {
     test("rejects SVG with only dangerous content", () => {
       const dirty = '<svg><script>alert("xss")</script></svg>';
       assert.throws(() => sanitizeSvg(dirty), /svg-empty/);
+    }),
+    test("rejects empty SVG (no renderable content)", async () => {
+      const buf = Buffer.from('<?xml version="1.0"?><svg width="100" height="100"></svg>');
+      await assert.rejects(() => validateMediaFile(buf), /svg-empty-after-sanitization/);
     }),
     test("computes stable SHA256", () => {
       const a = computeSha256(Buffer.from("hello"));

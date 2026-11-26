@@ -47,6 +47,8 @@
     "dompurify": "^3.5.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.7.5",
+    "helmet": "^8.3.0",
     "jsdom": "^31.0.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.0",

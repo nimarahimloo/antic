@@ -8,6 +8,7 @@ import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { createPasswordResetToken, redeemPasswordResetToken } from "../lib/passwordReset.js";
 import { sendMail } from "../lib/mailer.js";
 import { welcomeEmail, passwordResetEmail } from "../lib/emailTemplates.js";
+import { loginRateLimiter, registerRateLimiter, forgotPasswordRateLimiter, forgotPasswordAccountRateLimiter, resetPasswordRateLimiter } from "../lib/rateLimit.js";
 
 const router = Router();
 
@@ -36,7 +37,8 @@ async function issueAuth(user: { id: string; email: string | null; role: string 
   return { user: toApi(user), token };
 }
 
-router.post("/register", async (req, res) => {
+/** Registration rate limiter — applied before the handler */
+router.post("/register", registerRateLimiter, async (req, res) => {
   try {
     const body = z
       .object({
@@ -93,7 +95,8 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.post("/login", async (req, res) => {
+/** Login rate limiter — only counts failed attempts */
+router.post("/login", loginRateLimiter, async (req, res) => {
   try {
     const body = z
       .object({
@@ -145,8 +148,9 @@ router.post("/logout", (_req, res) => {
  *
  * Always answers 200 with the same body so the endpoint cannot be used to
  * enumerate which email addresses have accounts. The reset link is emailed.
+ * Rate limited by both IP (3/hour) and account (1/15min) for defense in depth.
  */
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", forgotPasswordRateLimiter, forgotPasswordAccountRateLimiter, async (req, res) => {
   try {
     const body = z.object({ email: z.string().min(1) }).parse(req.body);
     const email = normEmail(body.email);
@@ -179,7 +183,7 @@ router.post("/forgot-password", async (req, res) => {
  *
  * Redeems a single-use reset token and sets the new password.
  */
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", resetPasswordRateLimiter, async (req, res) => {
   try {
     const body = z
       .object({

@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import path from "path";
 import crypto from "crypto";
 import { paymentMiddlewareFromConfig } from "@x402/express";
@@ -82,6 +83,70 @@ function validateProductionConfig(): void {
 validateProductionConfig();
 
 const app = express();
+
+/** Trust first proxy (e.g., nginx, Cloudflare Tunnel) for correct client IP,
+ *  X-Forwarded-Proto, and X-Forwarded-Host headers.
+ *  Only enable when running behind a trusted reverse proxy.
+ *  In local dev without a proxy, this has no effect (Express ignores it).
+ *  NOTE: If deployed behind Cloudflare + another proxy (nginx/ALB), set to 2
+ *  or use `true` to trust all proxies (requires Cloudflare IP ranges allowlist).
+ *  Validate in staging: log req.ip vs req.headers['cf-connecting-ip']. */
+app.set("trust proxy", 1);
+
+/** Security headers via Helmet.
+ *  CSP is configured carefully to allow the AI workspace, inline scripts
+ *  for development, and required external resources without breaking the app.
+ *  Production CSP allows 'unsafe-eval' for Next.js webpack runtime chunks.
+ *  'unsafe-inline' is avoided in production; use nonce/hash if needed.
+ *  Development CSP retains relaxed settings for hot-reload and debugging. */
+const isProduction = process.env.NODE_ENV === "production";
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        // Production: 'unsafe-eval' required for Next.js webpack runtime.
+        // 'unsafe-inline' is NOT allowed in production (use nonce/hash for inline scripts).
+        scriptSrc: isProduction
+          ? ["'self'", "'unsafe-eval'"]
+          : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        // style-src: 'unsafe-inline' is needed for Tailwind/inline styles in both environments.
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        fontSrc: ["'self'", "data:"],
+        connectSrc: ["'self'", "https:", "wss:"],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        // upgradeInsecureRequests: empty array includes the directive (no value), null omits it.
+        upgradeInsecureRequests: isProduction ? [] : null,
+      },
+    },
+    // crossOriginEmbedderPolicy: "credentialless" allows cross-origin resources
+    // without CORP header while isolating the document. This is compatible with
+    // AI provider integrations that don't send CORP headers.
+    // If AI image generation (FLUX.2) breaks, test with "require-corp" and ensure
+    // third-party origins send Cross-Origin-Resource-Policy headers.
+    crossOriginEmbedderPolicy: { policy: "credentialless" },
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    originAgentCluster: true,
+    xDnsPrefetchControl: { allow: false },
+    xFrameOptions: { action: "deny" },
+    xPoweredBy: true,
+    strictTransportSecurity: isProduction
+      ? { maxAge: 15552000, includeSubDomains: true, preload: true }
+      : false,
+    xContentTypeOptions: true,
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    // xXssProtection is deprecated (removed from Chrome/Firefox/Edge).
+    // It can introduce XSS in older browsers. Modern CSP replaces it.
+    xXssProtection: false,
+  })
+);
 
 /* ------------------------------------------------------------------ */
 /* Web Bot Auth — HTTP Message Signatures (IETF WebBotAuth WG)        */
