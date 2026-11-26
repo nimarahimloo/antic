@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Upload, X, Image as ImageIcon, Image as LibImage } from "lucide-react";
 import { api } from "@/api/client";
-import { refreshRenderTemplates } from "@/hooks/useRenderTemplates";
 import { filterInstallCategories } from "@/lib/installCategories";
 import { apiErrorMessage } from "@/lib/apiError";
-import { adminToast } from "@/lib/adminToast";
+import { adminToasts } from "@/lib/adminToast";
 import { OptimizedImage } from "@/components/ui/image";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 interface CurtainCategoryItem {
   id?: string;
@@ -32,6 +33,9 @@ export function InstallReferenceManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [pickerSlug, setPickerSlug] = useState<string | null>(null);
+
+  // Confirmation dialog for reference removal
+  const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
 
   const installCats = useMemo(
     () => filterInstallCategories(categories),
@@ -74,9 +78,8 @@ export function InstallReferenceManager() {
           note: "real-install",
         });
       }
-      refreshRenderTemplates();
       await load();
-      adminToast("create", "نمونه نصب واقعی", slug);
+      adminToasts.uploaded("نمونه نصب واقعی", slug);
     } catch (e) {
       setError(apiErrorMessage(e));
     } finally {
@@ -84,12 +87,22 @@ export function InstallReferenceManager() {
     }
   }
 
-  const remove = async (id: string) => {
+  const handleRemove = async (id: string) => {
+    const ref = refs.find((r) => r.id === id);
+    const refLabel = ref ? ` (${ref.style})` : "";
+    const confirmed = await confirm({
+      title: "حذف نمونه نصب",
+      description: `آیا مطمئن هستید که می‌خواهید این نمونه نصب واقعی${refLabel} حذف شود؟`,
+      confirmLabel: "حذف",
+      cancelLabel: "انصراف",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
     try {
       await api.entities.InstallReference.delete(id);
-      refreshRenderTemplates();
       await load();
-      adminToast("delete", "نمونه نصب واقع");
+      adminToasts.deleted("نمونه نصب واقعی", "");
     } catch {
       setError("حذف ناموفق");
     }
@@ -193,7 +206,7 @@ export function InstallReferenceManager() {
                         <button
                           type="button"
                           aria-label="حذف"
-                          onClick={() => remove(r.id)}
+                          onClick={() => handleRemove(r.id)}
                           className="absolute left-0.5 top-0.5 rounded-full bg-background/90 p-0.5 shadow"
                         >
                           <X className="h-3 w-3" />
@@ -222,11 +235,6 @@ export function InstallReferenceManager() {
           onSelect={(selected) => {
             const mediaList = Array.isArray(selected) ? selected : [selected];
             if (mediaList.length && pickerSlug) {
-              const files = mediaList.map((m) => ({
-                url: m.url,
-                name: m.originalName,
-              }));
-              // Create install references for each selected media
               const promises = mediaList.map((m) =>
                 api.entities.InstallReference.create({
                   style: pickerSlug!,
@@ -236,15 +244,28 @@ export function InstallReferenceManager() {
               );
               Promise.all(promises)
                 .then(() => {
-                  refreshRenderTemplates();
                   return load();
                 })
-                .then(() => adminToast("create", "نمونه نصب واقعی", pickerSlug))
+                .then(() => adminToasts.uploaded("نمونه نصب واقعی", pickerSlug))
                 .catch((e) => setError(apiErrorMessage(e)));
             }
             setPickerSlug(null);
           }}
           title="انتخاب عکس نصب از کتابخانه"
+        />
+      )}
+
+      {dialogState.open && dialogState.options && (
+        <ConfirmationDialog
+          open={dialogState.open}
+          onOpenChange={handleCancel}
+          title={dialogState.options.title}
+          description={dialogState.options.description}
+          confirmLabel={dialogState.options.confirmLabel}
+          cancelLabel={dialogState.options.cancelLabel}
+          variant={dialogState.options.variant}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
         />
       )}
     </section>

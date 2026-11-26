@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { adminToast } from "@/lib/adminToast";
+import { useConfirmationToast } from "@/hooks/useConfirmationToast";
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "/api";
 
@@ -22,6 +23,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function AdminOrdersPage() {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
+  const { confirm } = useConfirmationToast();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -40,6 +42,18 @@ export default function AdminOrdersPage() {
   }, [load]);
 
   async function setStatus(id: string, status: string) {
+    const label = STATUS_LABEL[status] || status;
+    const confirmed = await confirm({
+      title: `تغییر وضعیت به «${label}»`,
+      description: `آیا مطمئن هستید که می‌خواهید وضعیت سفارش به «${label}» تغییر کند؟`,
+      confirmLabel: "تأیید",
+      cancelLabel: "انصراف",
+    });
+    if (!confirmed) {
+      load(); // Reset the select to previous value
+      return;
+    }
+
     try {
       const res = await fetch(`${API}/orders/${id}/status`, {
         method: "PATCH",
@@ -47,10 +61,11 @@ export default function AdminOrdersPage() {
         body: JSON.stringify({ status }),
       });
       if (!res.ok) throw new Error("به‌روزرسانی وضعیت ناموفق بود");
-      adminToast("update", "سفارش", STATUS_LABEL[status] || status);
+      adminToast("update", "سفارش", label);
       load();
     } catch (e) {
       adminToast("error", "سفارش", e instanceof Error ? e.message : "خطا در تغییر وضعیت");
+      load();
     }
   }
 

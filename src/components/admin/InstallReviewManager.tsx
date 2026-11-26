@@ -5,6 +5,9 @@ import { Check, Loader2, RefreshCw, X } from "lucide-react";
 import RenderCompareDialog from "@/components/admin/RenderCompareDialog";
 import { api } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
+import { adminToasts } from "@/lib/adminToast";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const BADGE = {
   approved: ["تأییدشده", "border-primary/60 text-primary"],
@@ -31,6 +34,26 @@ export function InstallReviewManager() {
   const [rows, setRows] = useState<CurtainModelRow[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [compare, setCompare] = useState<CurtainModelRow | null>(null);
+
+  // Confirmation dialogs for approve/reject/regenerate
+  const {
+    confirm,
+    dialogState: approveDialogState,
+    handleConfirm: handleApproveConfirm,
+    handleCancel: handleApproveCancel,
+  } = useConfirmation();
+  const {
+    confirm: confirmReject,
+    dialogState: rejectDialogState,
+    handleConfirm: handleRejectConfirm,
+    handleCancel: handleRejectCancel,
+  } = useConfirmation();
+  const {
+    confirm: confirmRegenerate,
+    dialogState: regenerateDialogState,
+    handleConfirm: handleRegenerateConfirm,
+    handleCancel: handleRegenerateCancel,
+  } = useConfirmation();
 
   const reload = useCallback(() => {
     api.entities.CurtainModel.list("-updated_date", 200)
@@ -65,6 +88,45 @@ export function InstallReviewManager() {
 
   const regenerate = (m: CurtainModelRow) =>
     act(m.id, () => api.functions.invoke("generateInstallImage", { model_id: m.id, regenerate: true }) as Promise<void>);
+
+  const handleApprove = async (m: CurtainModelRow) => {
+    const confirmed = await confirm({
+      title: "تأیید نمای نصب",
+      description: `آیا مطمئن هستید که می‌خواهید نمای نصب مدل «${m.code}» تأیید شود؟ این نما برای مشتریان قابل مشاهده خواهد بود.`,
+      confirmLabel: "تأیید",
+      cancelLabel: "انصراف",
+      variant: "primary",
+    });
+    if (!confirmed) return;
+    setStatus(m, "approved");
+    adminToasts.approved("نمای نصب", m.code);
+  };
+
+  const handleReject = async (m: CurtainModelRow) => {
+    const confirmed = await confirmReject({
+      title: "رد نمای نصب",
+      description: `آیا مطمئن هستید که می‌خواهید نمای نصب مدل «${m.code}» رد شود؟ این نما برای مشتریان مخفی می‌ماند.`,
+      confirmLabel: "رد",
+      cancelLabel: "انصراف",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+    setStatus(m, "rejected");
+    adminToasts.rejected("نمای نصب", m.code);
+  };
+
+  const handleRegenerate = async (m: CurtainModelRow) => {
+    const confirmed = await confirmRegenerate({
+      title: "بازتولید نمای نصب",
+      description: `آیا می‌خواهید نمای نصب مدل «${m.code}» مجدداً تولید شود؟ این کار می‌تواند چند لحظه طول بکشد.`,
+      confirmLabel: "بازتولید",
+      cancelLabel: "انصراف",
+      variant: "warning",
+    });
+    if (!confirmed) return;
+    regenerate(m);
+    adminToasts.regenerated("نمای نصب", m.code);
+  };
 
   if (!rows) {
     return (
@@ -105,7 +167,8 @@ export function InstallReviewManager() {
               <button
                 type="button"
                 onClick={() => setCompare(m)}
-                className="flex w-full gap-2 text-right" title="مقایسه در کنار هم"
+                className="flex w-full gap-2 text-right"
+                title="مقایسه در کنار هم"
               >
                 {m.install_image ? (
                   <img src={m.install_image} alt={m.code} className="aspect-[4/3] w-2/3 rounded-lg object-cover" />
@@ -134,21 +197,21 @@ export function InstallReviewManager() {
                   <>
                     <button
                       type="button"
-                      onClick={() => setStatus(m, "approved")}
+                      onClick={() => handleApprove(m)}
                       className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-primary/50 py-1.5 text-[10px] text-primary"
                     >
                       <Check className="h-3 w-3" /> تأیید
                     </button>
                     <button
                       type="button"
-                      onClick={() => setStatus(m, "rejected")}
+                      onClick={() => handleReject(m)}
                       className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-secondary/70 py-1.5 text-[10px] text-muted-foreground"
                     >
                       <X className="h-3 w-3" /> رد
                     </button>
                     <button
                       type="button"
-                      onClick={() => regenerate(m)}
+                      onClick={() => handleRegenerate(m)}
                       className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-secondary/70 py-1.5 text-[10px] text-muted-foreground"
                     >
                       <RefreshCw className="h-3 w-3" /> ساخت دوباره
@@ -160,6 +223,49 @@ export function InstallReviewManager() {
           );
         })}
       </div>
+
+      {approveDialogState.open && approveDialogState.options && (
+        <ConfirmationDialog
+          open={approveDialogState.open}
+          onOpenChange={handleApproveCancel}
+          title={approveDialogState.options.title}
+          description={approveDialogState.options.description}
+          confirmLabel={approveDialogState.options.confirmLabel}
+          cancelLabel={approveDialogState.options.cancelLabel}
+          variant={approveDialogState.options.variant}
+          onConfirm={handleApproveConfirm}
+          onCancel={handleApproveCancel}
+        />
+      )}
+
+      {rejectDialogState.open && rejectDialogState.options && (
+        <ConfirmationDialog
+          open={rejectDialogState.open}
+          onOpenChange={handleRejectCancel}
+          title={rejectDialogState.options.title}
+          description={rejectDialogState.options.description}
+          confirmLabel={rejectDialogState.options.confirmLabel}
+          cancelLabel={rejectDialogState.options.cancelLabel}
+          variant={rejectDialogState.options.variant}
+          onConfirm={handleRejectConfirm}
+          onCancel={handleRejectCancel}
+        />
+      )}
+
+      {regenerateDialogState.open && regenerateDialogState.options && (
+        <ConfirmationDialog
+          open={regenerateDialogState.open}
+          onOpenChange={handleRegenerateCancel}
+          title={regenerateDialogState.options.title}
+          description={regenerateDialogState.options.description}
+          confirmLabel={regenerateDialogState.options.confirmLabel}
+          cancelLabel={regenerateDialogState.options.cancelLabel}
+          variant={regenerateDialogState.options.variant}
+          onConfirm={handleRegenerateConfirm}
+          onCancel={handleRegenerateCancel}
+        />
+      )}
+
       <RenderCompareDialog model={compare} onClose={() => setCompare(null)} />
     </div>
   );

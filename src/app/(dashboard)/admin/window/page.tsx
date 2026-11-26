@@ -6,12 +6,14 @@ import { Card } from "@/components/ui/card";
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
-import { adminToast } from "@/lib/adminToast";
+import { adminToast, adminToasts } from "@/lib/adminToast";
 import { OptimizedImage } from "@/components/ui/image";
 import { RenderTemplateManager } from "@/components/admin/RenderTemplateManager";
 import { InstallReferenceManager } from "@/components/admin/InstallReferenceManager";
 import { InstallReviewManager } from "@/components/admin/InstallReviewManager";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 interface VirtualWindowSetting {
   id: string;
@@ -213,6 +215,9 @@ export default function AdminWindowPage() {
   const [error, setError] = useState("");
   const [hint, setHint] = useState("");
 
+  // Confirmation for save
+  const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -246,6 +251,15 @@ export default function AdminWindowPage() {
   );
 
   const handleSave = useCallback(async () => {
+    const confirmed = await confirm({
+      title: "ذخیره تنظیمات پنجره",
+      description: "آیا می‌خواهید تغییرات رنگ‌های پنجره و تصویر نمای ذخیره شود؟",
+      confirmLabel: "ذخیره",
+      cancelLabel: "انصراف",
+      variant: "primary",
+    });
+    if (!confirmed) return;
+
     setSaving(true);
     setError("");
     setHint("");
@@ -269,7 +283,7 @@ export default function AdminWindowPage() {
       }
 
       setHint("تنظیمات پنجره ذخیره شد.");
-      adminToast("update", "تنظیمات پنجره", "رنگ دیواره، فریم، ریل و نمای");
+      adminToasts.settingsSaved("تنظیمات پنجره");
     } catch (e) {
       const msg = apiErrorMessage(e);
       setError(msg);
@@ -330,6 +344,20 @@ export default function AdminWindowPage() {
 
         {/* بازبینی نصب (install review) */}
         <InstallReviewManager />
+
+        {dialogState.open && dialogState.options && (
+          <ConfirmationDialog
+            open={dialogState.open}
+            onOpenChange={handleCancel}
+            title={dialogState.options.title}
+            description={dialogState.options.description}
+            confirmLabel={dialogState.options.confirmLabel}
+            cancelLabel={dialogState.options.cancelLabel}
+            variant={dialogState.options.variant}
+            onConfirm={handleConfirm}
+            onCancel={handleCancel}
+          />
+        )}
       </div>
     </div>
   );

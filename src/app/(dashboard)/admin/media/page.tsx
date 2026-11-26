@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Trash2, Image as ImageIcon, Upload, Search, Filter, Plus } from "lucide-react";
 import { api, type Media } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
-import { adminToast } from "@/lib/adminToast";
+import { adminToast, adminToasts } from "@/lib/adminToast";
 import { OptimizedImage } from "@/components/ui/image";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const PAGE_SIZE = 24;
 
@@ -20,6 +22,9 @@ export default function AdminMediaLibraryPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Confirmation dialogs for delete/force delete
+  const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
 
   const ALLOWED_MIMES: string[] = [
     "image/jpeg",
@@ -59,7 +64,7 @@ export default function AdminMediaLibraryPage() {
   const handleSave = (media: Media | Media[]) => {
     const list = Array.isArray(media) ? media : [media];
     if (list.length === 0) return;
-    adminToast("create", "انتخاب از کتابخانه", `${list.length} تصویر انتخاب شد`);
+    adminToasts.uploaded("انتخاب از کتابخانه", `${list.length} تصویر انتخاب شد`);
     setPickerOpen(false);
     // Refresh to reflect any newly uploaded media
     setOffset(0);
@@ -69,11 +74,19 @@ export default function AdminMediaLibraryPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("این تصویر را حذف کنید؟ اگر در جای‌های دیگری استفاده شده باشد، حذف ممکن نیست.")) return;
+    const confirmed = await confirm({
+      title: "حذف رسانه",
+      description: "این تصویر را حذف کنید؟ اگر در جای‌های دیگری استفاده شده باشد، حذف ممکن نیست (خطای ۴۰۹ دریافت خواهید کرد). برای حذف قوالی از دکمه «حذف قوالی» استفاده کنید.",
+      confirmLabel: "حذف",
+      cancelLabel: "انصراف",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
     setDeleting(id);
     try {
       await api.media.delete(id);
-      adminToast("delete", "رسانه", "حذف شد.");
+      adminToasts.deleted("رسانه", "");
       void load();
     } catch (e) {
       // 409 = in use
@@ -98,11 +111,19 @@ export default function AdminMediaLibraryPage() {
   };
 
   const handleForceDelete = async (id: string) => {
-    if (!window.confirm("مطمئن هستید؟ این تصویر قوالی از همه جای‌های استفاده‌شده حذف می‌شود.")) return;
+    const confirmed = await confirm({
+      title: "حذف قوالی رسانه",
+      description: "مطمئن هستید؟ این تصویر قوالی از همه جای‌های استفاده‌شده حذف می‌شود. این کار بازگشت‌پذیر نیست.",
+      confirmLabel: "حذف قوالی",
+      cancelLabel: "انصراف",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
     setDeleting(id);
     try {
       await api.media.delete(id, true);
-      adminToast("delete", "رسانه", "قوالی حذف شد.");
+      adminToasts.deleted("رسانه", "قوالی");
       void load();
     } catch (e) {
       setError(apiErrorMessage(e));
@@ -115,6 +136,7 @@ export default function AdminMediaLibraryPage() {
     try {
       await api.media.update(media.id, { [field]: value });
       setItems((prev) => prev.map((m) => (m.id === media.id ? { ...m, [field]: value } : m)));
+      adminToasts.updated("رسانه", media.originalName || media.filename);
     } catch (e) {
       adminToast("error", "به‌روزرسانی ناموفق", apiErrorMessage(e));
     }
@@ -266,9 +288,7 @@ export default function AdminMediaLibraryPage() {
             ))}
           </div>
         )}
-      </div>
 
-      {!loading && total > 0 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-secondary/60 bg-background/50">
           <div className="font-body text-xs text-muted-foreground">
             نمایش {offset + 1}–{Math.min(offset + items.length, total)} از {total}
@@ -290,7 +310,29 @@ export default function AdminMediaLibraryPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {dialogState.open && dialogState.options && (
+        <ConfirmationDialog
+          open={dialogState.open}
+          onOpenChange={handleCancel}
+          title={dialogState.options.title}
+          description={dialogState.options.description}
+          confirmLabel={dialogState.options.confirmLabel}
+          cancelLabel={dialogState.options.cancelLabel}
+          variant={dialogState.options.variant}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        />
       )}
+
+      <MediaPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        mode="multi"
+        onSelect={handleSave}
+        title="انتخاب تصویر از کتابخانه"
+      />
     </div>
   );
 }

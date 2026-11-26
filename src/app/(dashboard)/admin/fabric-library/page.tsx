@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
 import { api } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
-import { adminToast } from "@/lib/adminToast";
+import { adminToast, adminToasts } from "@/lib/adminToast";
 import { Upload, Loader2, Image as ImageIcon, X, Trash2, Palette, Image as LibImage } from "lucide-react";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const HARMONY_SLUGS = ["cotton", "silk", "sheer", "velvet"];
 
@@ -29,6 +31,9 @@ export default function AdminFabricLibraryPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hints, setHints] = useState<Record<string, string>>({});
   const [pickerSlug, setPickerSlug] = useState<string | null>(null);
+
+  // Confirmation for save
+  const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
 
   // local state for form values
   const [formData, setFormData] = useState<Record<string, { backgroundImage: string; backgroundGradient: string }>>({});
@@ -72,6 +77,15 @@ export default function AdminFabricLibraryPage() {
   }
 
   async function save(slug: string) {
+    const confirmed = await confirm({
+      title: "ذخیره پس‌زمینه هارمونی",
+      description: `آیا می‌خواهید تغییرات پس‌زمینه برای بافت «${FALLBACK_NAMES[slug]}» ذخیره شود؟`,
+      confirmLabel: "ذخیره",
+      cancelLabel: "انصراف",
+      variant: "primary",
+    });
+    if (!confirmed) return;
+
     setSaving(slug);
     setErrors((prev) => ({ ...prev, [slug]: "" }));
     const data = formData[slug];
@@ -82,7 +96,7 @@ export default function AdminFabricLibraryPage() {
         backgroundImage: data.backgroundImage || null,
         backgroundGradient: data.backgroundGradient || null,
       });
-      adminToast("update", "پس‌زمینه هارمونی", FALLBACK_NAMES[slug]);
+      adminToasts.updated("پس‌زمینه هارمونی", FALLBACK_NAMES[slug]);
       setHints((prev) => ({ ...prev, [slug]: "ذخیره شد." }));
     } catch (e) {
       setErrors((prev) => ({ ...prev, [slug]: apiErrorMessage(e) }));
@@ -237,6 +251,20 @@ export default function AdminFabricLibraryPage() {
             setPickerSlug(null);
           }}
           title="انتخاب تصویر پس‌زمینه از کتابخانه"
+        />
+      )}
+
+      {dialogState.open && dialogState.options && (
+        <ConfirmationDialog
+          open={dialogState.open}
+          onOpenChange={handleCancel}
+          title={dialogState.options.title}
+          description={dialogState.options.description}
+          confirmLabel={dialogState.options.confirmLabel}
+          cancelLabel={dialogState.options.cancelLabel}
+          variant={dialogState.options.variant}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
         />
       )}
     </div>

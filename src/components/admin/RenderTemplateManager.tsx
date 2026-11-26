@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Upload, Trash2, Image as LibImage } from "lucide-react";
 import { api } from "@/api/client";
-import { refreshRenderTemplates } from "@/hooks/useRenderTemplates";
 import { resolveStyle, MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
 import { filterInstallCategories } from "@/lib/installCategories";
 import { apiErrorMessage } from "@/lib/apiError";
-import { adminToast } from "@/lib/adminToast";
+import { adminToasts } from "@/lib/adminToast";
 import { OptimizedImage } from "@/components/ui/image";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 interface CurtainCategoryItem {
   id?: string;
@@ -32,6 +33,9 @@ export function RenderTemplateManager() {
   const [okMsg, setOkMsg] = useState("");
   const [loading, setLoading] = useState(true);
   const [pickerSlug, setPickerSlug] = useState<string | null>(null);
+
+  // Confirmation dialog for template removal
+  const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
 
   const installCats = useMemo(
     () => filterInstallCategories(categories),
@@ -77,22 +81,6 @@ export function RenderTemplateManager() {
     [installCats, imageOf],
   );
 
-  async function run(key: string, task: () => Promise<void>) {
-    setBusy(key);
-    setError("");
-    setOkMsg("");
-    try {
-      await task();
-      refreshRenderTemplates();
-      await reload();
-      setOkMsg("ذخیره شد.");
-    } catch (e) {
-      setError(apiErrorMessage(e));
-    } finally {
-      setBusy(null);
-    }
-  }
-
   const uploadSingle = async (cat: CurtainCategoryItem, file: File) => {
     const media = await api.media.upload(file);
     const url = media.url;
@@ -130,7 +118,7 @@ export function RenderTemplateManager() {
       for (const file of files) {
         await uploadSingle(cat, file);
       }
-      adminToast("create", "قالب رنگ سبز", cat.name);
+      adminToasts.uploaded("قالب سبز", cat.name);
       await reload();
     } catch (e) {
       setError(apiErrorMessage(e));
@@ -139,13 +127,31 @@ export function RenderTemplateManager() {
     }
   };
 
-  const remove = async (cat: CurtainCategoryItem) => {
-    if (!window.confirm(`قالب سبز دسته «${cat.name}» حذف شود؟`)) return;
+  const handleRemove = async (cat: CurtainCategoryItem) => {
+    const confirmed = await confirm({
+      title: "حذف قالب سبز",
+      description: `آیا مطمئن هستید که می‌خواهید قالب سبز دسته «${cat.name}» حذف شود؟ این کار باعث می‌شود مدل‌های این دسته بدون قالب رندر شوند.`,
+      confirmLabel: "حذف",
+      cancelLabel: "انصراف",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
     const existing = rowOf(cat.slug);
     if (existing) {
-      await run(cat.slug, async () => {
+      setBusy(cat.slug);
+      setError("");
+      setOkMsg("");
+      try {
         await api.entities.RenderTemplate.delete(existing.id);
-      });
+        await reload();
+        setOkMsg("قالب حذف شد.");
+        adminToasts.deleted("قالب سبز", cat.name);
+      } catch (e) {
+        setError(apiErrorMessage(e));
+      } finally {
+        setBusy(null);
+      }
     }
   };
 
@@ -253,7 +259,7 @@ export function RenderTemplateManager() {
                     <button
                       type="button"
                       disabled={busy === cat.slug}
-                      onClick={() => remove(cat)}
+                      onClick={() => handleRemove(cat)}
                       aria-label="حذف قالب"
                       className="rounded-lg border border-secondary/70 px-2 text-muted-foreground hover:border-destructive hover:text-destructive"
                     >
@@ -301,7 +307,6 @@ export function RenderTemplateManager() {
                     void api.entities.RenderTemplate.create({ style: mechanism, image: url });
                   }
                 }
-                void refreshRenderTemplates();
                 void reload();
                 setOkMsg("ذخیره شد.");
               }
@@ -309,6 +314,20 @@ export function RenderTemplateManager() {
             setPickerSlug(null);
           }}
           title="انتخاب قالب سبز از کتابخانه"
+        />
+      )}
+
+      {dialogState.open && dialogState.options && (
+        <ConfirmationDialog
+          open={dialogState.open}
+          onOpenChange={handleCancel}
+          title={dialogState.options.title}
+          description={dialogState.options.description}
+          confirmLabel={dialogState.options.confirmLabel}
+          cancelLabel={dialogState.options.cancelLabel}
+          variant={dialogState.options.variant}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
         />
       )}
     </div>

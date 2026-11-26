@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
 import { Trash2, Loader2 } from "lucide-react";
-import { adminToast } from "@/lib/adminToast";
+import { adminToast, adminToasts } from "@/lib/adminToast";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const STATUS_OPTIONS = [
   { value: "new", label: "جدید" },
@@ -16,6 +18,9 @@ export default function AdminRequestsPage() {
   const [requests, setRequests] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+
+  // Confirmation dialogs
+  const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -36,7 +41,7 @@ export default function AdminRequestsPage() {
     try {
       await api.entities.ConsultationRequest.update(String(record.id), { status });
       const label = STATUS_OPTIONS.find((s) => s.value === status)?.label || status;
-      adminToast("update", "درخواست", `${String(record.name || "")} — ${label}`);
+      adminToasts.statusChanged("درخواست", String(record.name || ""), label);
     } catch (err) {
       setRequests((rs) => rs.map((r) => (r.id === record.id ? { ...r, status: prev } : r)));
       adminToast("error", "درخواست", apiErrorMessage(err));
@@ -44,11 +49,19 @@ export default function AdminRequestsPage() {
   }
 
   async function remove(record: Record<string, unknown>) {
-    if (!window.confirm(`حذف درخواست «${String(record.name)}»؟`)) return;
+    const confirmed = await confirm({
+      title: "حذف درخواست مشاوره",
+      description: `آیا مطمئن هستید که می‌خواهید درخواست «${String(record.name)}» حذف شود؟ این عمل بازگشت‌پذیر نیست.`,
+      confirmLabel: "حذف",
+      cancelLabel: "انصراف",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
     try {
       await api.entities.ConsultationRequest.delete(String(record.id));
       setRequests((rs) => rs.filter((r) => r.id !== record.id));
-      adminToast("delete", "درخواست", String(record.name || ""));
+      adminToasts.deleted("درخواست", String(record.name || ""));
     } catch (err) {
       adminToast("error", "درخواست", apiErrorMessage(err));
     }
@@ -162,6 +175,20 @@ export default function AdminRequestsPage() {
           </table>
         </div>
       </div>
+
+      {dialogState.open && dialogState.options && (
+        <ConfirmationDialog
+          open={dialogState.open}
+          onOpenChange={handleCancel}
+          title={dialogState.options.title}
+          description={dialogState.options.description}
+          confirmLabel={dialogState.options.confirmLabel}
+          cancelLabel={dialogState.options.cancelLabel}
+          variant={dialogState.options.variant}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        />
+      )}
     </div>
   );
 }

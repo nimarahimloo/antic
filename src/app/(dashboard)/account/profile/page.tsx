@@ -4,7 +4,9 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/api/client";
-import { adminToast } from "@/lib/adminToast";
+import { adminToast, adminToasts } from "@/lib/adminToast";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none focus:border-primary";
@@ -21,8 +23,20 @@ export default function AccountProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [pwdSaving, setPwdSaving] = useState(false);
 
+  // Confirmation dialogs
+  const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
+
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
+    const confirmed = await confirm({
+      title: "ذخیره پروفایل",
+      description: "آیا می‌خواهید تغییرات اطلاعات شخصی ذخیره شود؟",
+      confirmLabel: "ذخیره",
+      cancelLabel: "انصراف",
+      variant: "primary",
+    });
+    if (!confirmed) return;
+
     setSaving(true);
     try {
       await api.account.updateProfile({
@@ -31,7 +45,7 @@ export default function AccountProfilePage() {
         email: email || "",
       });
       await checkUserAuth();
-      adminToast("update", "پروفایل");
+      adminToasts.updated("پروفایل");
     } catch (err) {
       adminToast("error", "پروفایل", err instanceof Error ? err.message : "خطا");
     } finally {
@@ -41,6 +55,15 @@ export default function AccountProfilePage() {
 
   async function savePassword(e: React.FormEvent) {
     e.preventDefault();
+    const confirmed = await confirm({
+      title: "تغییر رمز عبور",
+      description: "آیا می‌خواهید رمز عبور خود را تغییر دهید؟ پس از تغییر، باید دوباره وارد شوید.",
+      confirmLabel: "تغییر",
+      cancelLabel: "انصراف",
+      variant: "warning",
+    });
+    if (!confirmed) return;
+
     setPwdSaving(true);
     try {
       await api.account.changePassword({
@@ -49,7 +72,7 @@ export default function AccountProfilePage() {
       });
       setCurrentPassword("");
       setNewPassword("");
-      adminToast("update", "رمز عبور");
+      adminToasts.updated("رمز عبور");
     } catch (err) {
       adminToast("error", "رمز عبور", err instanceof Error ? err.message : "خطا");
     } finally {
@@ -99,6 +122,20 @@ export default function AccountProfilePage() {
           به‌روزرسانی رمز
         </button>
       </form>
+
+      {dialogState.open && dialogState.options && (
+        <ConfirmationDialog
+          open={dialogState.open}
+          onOpenChange={handleCancel}
+          title={dialogState.options.title}
+          description={dialogState.options.description}
+          confirmLabel={dialogState.options.confirmLabel}
+          cancelLabel={dialogState.options.cancelLabel}
+          variant={dialogState.options.variant}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        />
+      )}
     </div>
   );
 }

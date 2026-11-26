@@ -5,10 +5,12 @@ import { UploadCloud, X, Loader2, Check, Package, ChevronDown, Image as LibImage
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
-import { adminToast } from "@/lib/adminToast";
+import { adminToast, adminToasts } from "@/lib/adminToast";
 import { Card } from "@/components/ui/card";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 interface BulkItem {
   id: string;
@@ -27,7 +29,7 @@ interface Category {
 }
 
 export default function AdminBulkUploadPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { categories, loading: catsLoading } = useCurtainCategories();
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [subcategory, setSubcategory] = useState<string>("");
   const [items, setItems] = useState<BulkItem[]>([]);
@@ -37,26 +39,14 @@ export default function AdminBulkUploadPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [bulkPickerOpen, setBulkPickerOpen] = useState(false);
 
+  // Confirmation for bulk create
+  const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
+
   useEffect(() => {
-    let cancelled = false;
-    api.entities.CurtainCategory
-      .list("order", 200)
-      .then((data) => {
-        if (cancelled) return;
-        const list = (Array.isArray(data) ? data : []) as Category[];
-        if (list.length) {
-          setCategories(list);
-          setSelectedCategory(list[0]?.slug || "");
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load categories:", err);
-        adminToast("error", "دسته‌بندی‌ها", apiErrorMessage(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (categories.length) {
+      setSelectedCategory(categories[0]?.slug || "");
+    }
+  }, [categories]);
 
   const category = categories.find((c) => c.slug === selectedCategory);
 
@@ -117,6 +107,16 @@ export default function AdminBulkUploadPage() {
   const handleBulkCreate = useCallback(async () => {
     const valid = items.filter((i) => i.code && i.image);
     if (!valid.length || !selectedCategory) return;
+
+    const confirmed = await confirm({
+      title: "ثبت گروهی مدل‌های پرده",
+      description: `آیا مطمئن هستید که می‌خواهید ${valid.length} مدل پرده را در دسته «${category?.name || selectedCategory}» ثبت کنید؟ این عملیات قابل بازگشت نیست.`,
+      confirmLabel: "ثبت گروهی",
+      cancelLabel: "انصراف",
+      variant: "primary",
+    });
+    if (!confirmed) return;
+
     setCreating(true);
     try {
       const records = valid.map((i) => ({
@@ -137,7 +137,7 @@ export default function AdminBulkUploadPage() {
       setCreated(records.length);
       setItems([]);
       setSubcategory("");
-      adminToast("create", "مدل پرده", `${records.length} مورد با موفقیت ثبت شد`);
+      adminToasts.created("مدل پرده", `${records.length} مورد`);
       setTimeout(() => setCreated(0), 4000);
     } catch (e) {
       const msg = apiErrorMessage(e);
@@ -147,7 +147,7 @@ export default function AdminBulkUploadPage() {
     }
   }, [items, selectedCategory, subcategory]);
 
-  if (categories.length === 0 && !creating) {
+  if (catsLoading) {
     return (
       <div className="bg-background min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -356,6 +356,20 @@ export default function AdminBulkUploadPage() {
           </Card>
         )}
       </div>
+
+      {dialogState.open && dialogState.options && (
+        <ConfirmationDialog
+          open={dialogState.open}
+          onOpenChange={handleCancel}
+          title={dialogState.options.title}
+          description={dialogState.options.description}
+          confirmLabel={dialogState.options.confirmLabel}
+          cancelLabel={dialogState.options.cancelLabel}
+          variant={dialogState.options.variant}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        />
+      )}
 
       <MediaPicker
         open={bulkPickerOpen}

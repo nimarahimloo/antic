@@ -6,7 +6,7 @@ import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
 import { useAuth } from "@/lib/AuthContext";
-import { adminToast } from "@/lib/adminToast";
+import { adminToast, adminToasts } from "@/lib/adminToast";
 import AdminPageHeroes, {
   buildDefaultPageHeroes,
   normalizePageHeroes,
@@ -14,6 +14,8 @@ import AdminPageHeroes, {
 } from "@/components/admin/AdminPageHeroes";
 import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -92,6 +94,9 @@ export default function AdminSettingsPage() {
   const [sitemapEnabled, setSitemapEnabled] = useState(true);
   const [verificationGoogle, setVerificationGoogle] = useState("");
   const [verificationBing, setVerificationBing] = useState("");
+
+  // Confirmation for save
+  const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
 
   useEffect(() => {
     let cancelled = false;
@@ -203,6 +208,15 @@ export default function AdminSettingsPage() {
   }
 
   async function save() {
+    const confirmed = await confirm({
+      title: "ذخیره تنظیمات ظاهری",
+      description: "آیا می‌خواهید تغییرات لوگو، بنر هیرو و تنظیمات ظاهری ذخیره شود؟",
+      confirmLabel: "ذخیره",
+      cancelLabel: "انصراف",
+      variant: "primary",
+    });
+    if (!confirmed) return;
+
     setSaving(true);
     setError("");
     setHint("");
@@ -245,7 +259,7 @@ export default function AdminSettingsPage() {
         if (created?.id) setSettingId(String(created.id));
       }
       setHint("ذخیره شد. تغییرات در سایت اعمال می‌شود.");
-      adminToast("update", "تنظیمات", "لوگو و هیرو بنر");
+      adminToasts.settingsSaved("تنظیمات ظاهری");
       if (typeof checkAppState === "function") {
         await checkAppState();
       }
@@ -423,35 +437,49 @@ export default function AdminSettingsPage() {
         </div>
       </div>
 
+    {dialogState.open && dialogState.options && (
+      <ConfirmationDialog
+        open={dialogState.open}
+        onOpenChange={handleCancel}
+        title={dialogState.options.title}
+        description={dialogState.options.description}
+        confirmLabel={dialogState.options.confirmLabel}
+        cancelLabel={dialogState.options.cancelLabel}
+        variant={dialogState.options.variant}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
+    )}
+
+    <MediaPicker
+      open={logoPickerOpen}
+      onOpenChange={setLogoPickerOpen}
+      mode="single"
+      onSelect={(selected) => {
+        const media = Array.isArray(selected) ? selected[0] : selected;
+        if (media) setLogoUrl(media.url);
+      }}
+      title="انتخاب لوگو از کتابخانه"
+    />
+
+    {slidePickerOpen && (
       <MediaPicker
-        open={logoPickerOpen}
-        onOpenChange={setLogoPickerOpen}
+        open={slidePickerOpen.open}
+        onOpenChange={(o) => setSlidePickerOpen(o ? { open: true, idx: slidePickerOpen.idx } : null)}
         mode="single"
         onSelect={(selected) => {
           const media = Array.isArray(selected) ? selected[0] : selected;
-          if (media) setLogoUrl(media.url);
+          if (media && slidePickerOpen) {
+            setSlides((prev) =>
+              prev.map((s, i) => (i === slidePickerOpen.idx ? { ...s, image: media.url } : s))
+            );
+          }
+          setSlidePickerOpen(null);
         }}
-        title="انتخاب لوگو از کتابخانه"
+        title="انتخاب تصویر اسلاید از کتابخانه"
       />
-
-      {slidePickerOpen && (
-        <MediaPicker
-          open={slidePickerOpen.open}
-          onOpenChange={(o) => setSlidePickerOpen(o ? { open: true, idx: slidePickerOpen.idx } : null)}
-          mode="single"
-          onSelect={(selected) => {
-            const media = Array.isArray(selected) ? selected[0] : selected;
-            if (media && slidePickerOpen) {
-              setSlides((prev) =>
-                prev.map((s, i) => (i === slidePickerOpen.idx ? { ...s, image: media.url } : s))
-              );
-            }
-            setSlidePickerOpen(null);
-          }}
-          title="انتخاب تصویر اسلاید از کتابخانه"
-        />
-      )}
-    </div>
+    )}
+  </div>
   );
 }
 

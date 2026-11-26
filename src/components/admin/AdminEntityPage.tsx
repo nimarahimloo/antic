@@ -5,10 +5,12 @@ import { api } from "@/api/client";
 import { Plus, Pencil, Trash2, X, Loader2, Upload, Sparkles, Image } from "lucide-react";
 import { compressImage } from "@/lib/compressImage";
 import { analyzeFabric } from "@/components/catalog/photo/fabricAnalyzer";
-import { adminToast } from "@/lib/adminToast";
+import { adminToast, adminToasts } from "@/lib/adminToast";
 import { apiErrorMessage } from "@/lib/apiError";
 import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -71,6 +73,9 @@ export default function AdminEntityPage({
   const [error, setError] = useState("");
   const [tableError, setTableError] = useState("");
   const [hint, setHint] = useState("");
+
+  // Confirmation dialog for delete operations
+  const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -138,7 +143,7 @@ export default function AdminEntityPage({
 
   function renderFieldInput(f: FieldConfig) {
     const fieldOptions = typeof f.getOptions === "function" ? f.getOptions(form, options) : options[f.key] || [];
-    
+
     if (f.type === "select") {
       return (
         <select
@@ -429,10 +434,24 @@ export default function AdminEntityPage({
       }
     });
     if (payload.code && !payload.name) payload.name = payload.code;
+
+    // Show confirmation for update operations
+    const isEdit = Boolean(editing?.id);
+    if (isEdit) {
+      const recordLabel = String(payload.name || payload.title || payload.code || payload.slug || editing?.id || "این مورد");
+      const confirmed = await confirm({
+        title: `ویرایش ${title}`,
+        description: `آیا مطمئن هستید که می‌خواهید تغییرات در «${recordLabel}» ذخیره شود؟`,
+        confirmLabel: "ذخیره تغییرات",
+        cancelLabel: "انصراف",
+        variant: "primary",
+      });
+      if (!confirmed) return;
+    }
+
     setSaving(true);
     setError("");
     try {
-      const isEdit = Boolean(editing?.id);
       const entitiesApi = api.entities[entity as keyof typeof api.entities];
       if (isEdit && editing) await entitiesApi.update(String(editing.id), payload);
       else await entitiesApi.create(payload);
@@ -451,7 +470,15 @@ export default function AdminEntityPage({
 
   async function remove(record: Record<string, unknown>) {
     const label = String(record[columns[0]?.key] ?? "این مورد");
-    if (!window.confirm(`حذف «${label}»؟ این عمل بازگشت‌پذیر نیست.`)) return;
+    const confirmed = await confirm({
+      title: `حذف ${title}`,
+      description: `آیا مطمئن هستید که می‌خواهید «${label}» حذف شود؟ این عمل بازگشت‌پذیر نیست.`,
+      confirmLabel: "حذف",
+      cancelLabel: "انصراف",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
     try {
       const entitiesApi = api.entities[entity as keyof typeof api.entities];
       await entitiesApi.delete(String(record.id));
@@ -693,6 +720,20 @@ export default function AdminEntityPage({
             </div>
           </form>
         </div>
+      )}
+
+      {dialogState.open && dialogState.options && (
+        <ConfirmationDialog
+          open={dialogState.open}
+          onOpenChange={handleCancel}
+          title={dialogState.options.title}
+          description={dialogState.options.description}
+          confirmLabel={dialogState.options.confirmLabel}
+          cancelLabel={dialogState.options.cancelLabel}
+          variant={dialogState.options.variant}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        />
       )}
 
       <MediaPicker

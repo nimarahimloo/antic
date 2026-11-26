@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { Loader2, Plus, Trash2, Star } from "lucide-react";
 import { api } from "@/api/client";
-import { adminToast } from "@/lib/adminToast";
+import { adminToast, adminToasts } from "@/lib/adminToast";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none focus:border-primary";
@@ -22,26 +24,29 @@ const empty = {
 
 export default function AccountAddressesPage() {
   interface Address {
-  id: string;
-  title?: string;
-  full_name?: string;
-  fullName?: string;
-  phone?: string;
-  province?: string;
-  city?: string;
-  address?: string;
-  postal_code?: string;
-  postalCode?: string;
-  is_default?: boolean;
-  isDefault?: boolean;
-}
+    id: string;
+    title?: string;
+    full_name?: string;
+    fullName?: string;
+    phone?: string;
+    province?: string;
+    city?: string;
+    address?: string;
+    postal_code?: string;
+    postalCode?: string;
+    is_default?: boolean;
+    isDefault?: boolean;
+  }
 
-const [rows, setRows] = useState<Address[]>([]);
+  const [rows, setRows] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<typeof empty>(empty);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
+
+  // Confirmation dialogs
+  const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
 
   async function load() {
     setLoading(true);
@@ -86,10 +91,10 @@ const [rows, setRows] = useState<Address[]>([]);
     try {
       if (editingId) {
         await api.account.updateAddress(editingId, form);
-        adminToast("update", "آدرس");
+        adminToasts.updated("آدرس", form.title);
       } else {
         await api.account.createAddress(form);
-        adminToast("create", "آدرس");
+        adminToasts.created("آدرس", form.title);
       }
       setOpen(false);
       await load();
@@ -101,10 +106,21 @@ const [rows, setRows] = useState<Address[]>([]);
   }
 
   async function remove(id: string) {
-    if (!window.confirm("این آدرس حذف شود؟")) return;
+    const address = rows.find((a) => String(a.id) === id);
+    const label = address ? String(address.title || "این آدرس") : "این آدرس";
+
+    const confirmed = await confirm({
+      title: "حذف آدرس",
+      description: `آیا مطمئن هستید که می‌خواهید «${label}» حذف شود؟ این عمل بازگشت‌پذیر نیست.`,
+      confirmLabel: "حذف",
+      cancelLabel: "انصراف",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
     try {
       await api.account.deleteAddress(id);
-      adminToast("delete", "آدرس");
+      adminToasts.deleted("آدرس", label);
       await load();
     } catch (err) {
       adminToast("error", "آدرس", err instanceof Error ? err.message : "خطا");
@@ -222,6 +238,20 @@ const [rows, setRows] = useState<Address[]>([]);
             </button>
           </div>
         </form>
+      )}
+
+      {dialogState.open && dialogState.options && (
+        <ConfirmationDialog
+          open={dialogState.open}
+          onOpenChange={handleCancel}
+          title={dialogState.options.title}
+          description={dialogState.options.description}
+          confirmLabel={dialogState.options.confirmLabel}
+          cancelLabel={dialogState.options.cancelLabel}
+          variant={dialogState.options.variant}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        />
       )}
     </div>
   );
