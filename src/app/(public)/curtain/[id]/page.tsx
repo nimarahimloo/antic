@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Phone, CheckCircle2, ExternalLink } from "lucide-react";
 import { getCurtainModel, getProjectsByCategory } from "@/lib/server-data";
 import CurtainPreview from "@/components/catalog/CurtainPreview";
 import ProjectCard from "@/components/ProjectCard";

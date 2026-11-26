@@ -16,9 +16,11 @@ export const MECHANISM_KEYS = [
   "shade",
   "double",
   "roller",
-];
+] as const;
 
-export const MECHANISM_LABELS = {
+export type MechanismKey = (typeof MECHANISM_KEYS)[number];
+
+export const MECHANISM_LABELS: Record<MechanismKey, string> = {
   drape: "پرده کلاسیک / چین‌دار",
   wave: "اورسی موجی",
   panel: "ترک پنل",
@@ -34,7 +36,7 @@ export const MECHANISM_LABELS = {
   roller: "کرکره",
 };
 
-export function styleFabricScale(style) {
+export function styleFabricScale(style: MechanismKey | string): number {
   switch (style) {
     case "zebra":
       return 1.05;
@@ -65,13 +67,28 @@ export function styleFabricScale(style) {
   }
 }
 
-function normalizeMechanism(value) {
-  if (!value || typeof value !== "string") return null;
-  const v = value.toLowerCase().trim();
-  return MECHANISM_KEYS.includes(v) ? v : null;
+interface FabricLike {
+  mechanism?: string | null;
+  curtain_style?: string | null;
+  curtainStyle?: string | null;
+  category_slug?: string | null;
+  categorySlug?: string | null;
+  subcategory?: string | null;
+  name?: string | null;
+  code?: string | null;
+  [key: string]: unknown;
 }
 
-export function resolveStyle(fabric, categoryMechanisms = null) {
+function normalizeMechanism(value: unknown): MechanismKey | null {
+  if (!value || typeof value !== "string") return null;
+  const v = value.toLowerCase().trim();
+  return MECHANISM_KEYS.includes(v as MechanismKey) ? (v as MechanismKey) : null;
+}
+
+export function resolveStyle(
+  fabric: FabricLike | null | undefined,
+  categoryMechanisms: Record<string, MechanismKey | string> | null = null
+): MechanismKey | string {
   if (!fabric) return "drape";
 
   const explicit =
@@ -114,14 +131,19 @@ export function resolveStyle(fabric, categoryMechanisms = null) {
   if (/roman|رومن/.test(hay) || cat === "roman" || sub === "shade-roman") return "roman";
   if (/zebra|زبرا/.test(hay) || cat === "zebra" || cat === "zebra-printed") return "zebra";
   if (cat === "double-shade" || cat === "double" || sub === "double-shade") return "double";
-  if (cat === "shade-blackout" || cat === "shade-screen" || cat === "mini-shade" || cat === "shade")
+  if (
+    cat === "shade-blackout" ||
+    cat === "shade-screen" ||
+    cat === "mini-shade" ||
+    cat === "shade"
+  )
     return "shade";
   if (/roller|کرکره|blind|wooden-blind|metal-blind/.test(hay) || cat === "roller") return "roller";
   if (cat === "turk-panel" || cat === "panel" || cat === "track-panel" || /ترک.?پنل/.test(hay))
     return "panel";
   if (cat === "aurora" || cat === "wave" || /اورسی|موج/.test(hay)) return "wave";
 
-  const map = {
+  const map: Record<string, MechanismKey | string> = {
     printed: "drape",
     cubism: "drape",
     sheer: "drape",
@@ -137,11 +159,15 @@ export function resolveStyle(fabric, categoryMechanisms = null) {
     classic: "drape",
   };
   if (map[cat]) return map[cat];
-  if (MECHANISM_KEYS.includes(cat)) return cat;
+  if (MECHANISM_KEYS.includes(cat as MechanismKey)) return cat;
   return "drape";
 }
 
-export function pickTemplateUrl(fabric, templatesByKey, categoryMechanisms = null) {
+export function pickTemplateUrl(
+  fabric: FabricLike | null | undefined,
+  templatesByKey: Record<string, string | null> | null,
+  categoryMechanisms: Record<string, MechanismKey | string> | null = null
+) {
   if (!templatesByKey || typeof templatesByKey !== "object") return null;
   const style = resolveStyle(fabric, categoryMechanisms);
   const cat = String(fabric?.category_slug || fabric?.categorySlug || "")

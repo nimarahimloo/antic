@@ -1,10 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import CategoryCoverCard from "@/components/CategoryCoverCard";
 import { mosaicGridClass, mosaicItemClass } from "@/lib/mosaicLayout";
-import PageHero from "@/components/PageHero";
 
 interface ProjectCategory {
   id: string;

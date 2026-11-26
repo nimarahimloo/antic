@@ -11,7 +11,7 @@ import ProductSpecs from "@/components/product/ProductSpecs";
 import RelatedProjects from "@/components/RelatedProjects";
 import ProductCard from "@/components/ProductCard";
 import { searchProducts } from "@/rest/store-catalog";
-import { ArrowRight, Phone, Truck, ShieldCheck, Headphones, Store, BadgeCheck, Loader2 } from "lucide-react";
+import { ArrowRight, Phone, Truck, ShieldCheck, Headphones, Store, BadgeCheck } from "lucide-react";
 
 export default function ProductDetailPage({ slug }: { slug: string }) {
   const d = useProductDetail(slug);

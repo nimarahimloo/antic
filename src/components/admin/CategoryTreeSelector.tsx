@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo, useState } from "react";
-import { Search, ChevronRight, ChevronDown, X, Circle } from "lucide-react";
+import { ChevronRight, ChevronDown, X, Circle } from "lucide-react";
 
 interface CategoryNode {
   id: string;
@@ -15,7 +15,7 @@ interface CategoryNode {
 interface CategoryTreeSelectorProps {
   value: string;
   onChange: (slug: string) => void;
-  options: Array<{ value: string; label: string }>;
+  options: Array<{ value: string; label: string; parentSlug?: string | null; level?: number }>;
   excludeSlug?: string | null; // current category being edited (prevent self-selection)
   descendantSlugs?: Set<string>; // slugs that would create a cycle
   placeholder?: string;
@@ -67,8 +67,8 @@ export default function CategoryTreeSelector({
         id: o.value,
         name: o.label,
         slug: o.value,
-        parentSlug: (o as any).parentSlug || null,
-        level: (o as any).level || 0,
+        parentSlug: o.parentSlug ?? null,
+        level: o.level ?? 0,
         children: [],
       };
       bySlug.set(o.value, node);

@@ -6,11 +6,11 @@
 
 export { resolveStyle } from "@/lib/curtainStyleResolve";
 
-export function shade(hex, amt) {
+export function shade(hex: string | null | undefined, amt: number): string {
   if (!hex || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) return "#3b352c";
   let h = hex.slice(1);
   if (h.length === 3) h = h.split("").map((c) => c + c).join("");
-  const nums = h.match(/../g).map((x) => parseInt(x, 16));
+  const nums = h.match(/../g)!.map((x) => parseInt(x, 16));
   const t = amt < 0 ? 0 : 255;
   const p = Math.abs(amt);
   return (
@@ -20,7 +20,7 @@ export function shade(hex, amt) {
 }
 
 /** پارچهٔ تور/شفاف؟ — روی شفافیت و نحوهٔ عبور نور اثر دارد */
-export function isSheer(fabric) {
+export function isSheer(fabric: { fabric?: string | null; name?: string | null; texture?: string | null; subcategory?: string | null; category_slug?: string | null; [key: string]: unknown } | null | undefined): boolean {
   const hay = [fabric?.fabric, fabric?.name, fabric?.texture, fabric?.subcategory]
     .map((v) => (v || "").toLowerCase())
     .join(" ");
@@ -30,9 +30,15 @@ export function isSheer(fabric) {
   );
 }
 
-const fold = (background, blend = "multiply", opacity = 1) => ({ background, blend, opacity });
+interface Fold {
+  background: string;
+  blend: string;
+  opacity: number;
+}
 
-const PLEAT_FOLDS = [
+const fold = (background: string, blend = "multiply", opacity = 1): Fold => ({ background, blend, opacity });
+
+const PLEAT_FOLDS: Fold[] = [
   fold(
     "repeating-linear-gradient(90deg, rgba(255,255,255,0.26) 0px, rgba(255,255,255,0.07) 5px, rgba(0,0,0,0.26) 10px, rgba(0,0,0,0.5) 13px, rgba(0,0,0,0.26) 16px, rgba(255,255,255,0.05) 21px, rgba(255,255,255,0.26) 24px)",
     "overlay"
@@ -43,7 +49,7 @@ const PLEAT_FOLDS = [
   ),
 ];
 
-const DRAPE_FOLDS = [
+const DRAPE_FOLDS: Fold[] = [
   fold(
     "repeating-linear-gradient(90deg, rgba(255,255,255,0.17) 0px, rgba(255,255,255,0.05) 40px, transparent 78px, rgba(0,0,0,0.05) 105px, rgba(0,0,0,0.36) 132px, rgba(0,0,0,0.05) 158px, transparent 184px)",
     "overlay"
@@ -54,7 +60,7 @@ const DRAPE_FOLDS = [
   ),
 ];
 
-const WAVE_FOLDS = [
+const WAVE_FOLDS: Fold[] = [
   fold(
     "repeating-linear-gradient(90deg, rgba(255,255,255,0.2) 0px, rgba(255,255,255,0.06) 26px, transparent 50px, rgba(0,0,0,0.04) 62px, rgba(0,0,0,0.34) 82px, rgba(0,0,0,0.04) 100px, transparent 114px)",
     "overlay"
@@ -65,7 +71,35 @@ const WAVE_FOLDS = [
   ),
 ];
 
-export const STYLE_CFG = {
+export interface StyleConfig {
+  mount?: string;
+  tile?: string;
+  folds?: Fold[];
+  panelGap?: boolean;
+  heading?: boolean;
+  sheerAlpha?: number;
+  cassette?: boolean;
+  panelCount?: number;
+  panelEdge?: boolean;
+  stack?: boolean;
+  pockets?: boolean;
+  bodyBottom?: string;
+  hem?: boolean;
+  bands?: { period: number; fabricBand: number };
+  bar?: boolean;
+  chain?: boolean;
+  box?: boolean;
+  inside?: boolean;
+  track?: boolean;
+  rod?: boolean;
+  smooth?: boolean;
+  double?: boolean;
+  slats?: boolean;
+  ladder?: boolean;
+  pullCord?: boolean;
+}
+
+export const STYLE_CFG: Record<string, StyleConfig> = {
   drape: {
     mount: "rod",
     tile: "38% auto",

@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ExternalLink, ChevronLeft } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { api } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
-import { OptimizedImage } from "@/components/ui/image";
 import { getCategoryProjects, RelatedProject } from "@/rest/store-catalog";
 import { ProjectsPageSkeleton } from "@/components/Skeletons";
 

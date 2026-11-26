@@ -409,6 +409,7 @@ export default function AIWorkspacePage() {
     () => providers.filter((provider) => provider.configured),
     [providers],
   );
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const selectedModel = useMemo(() => {
     if (selectedModelKey === "auto") return null;
     for (const provider of configuredProviders) {
@@ -468,8 +469,18 @@ export default function AIWorkspacePage() {
     } finally {
       setMemoryLoading(false);
     }
-  }, [memoryFilterType, memoryFilterCategory, memorySearch, memoryPage]);
+  }, [
+    memoryFilterType,
+    memoryFilterCategory,
+    memorySearch,
+    memoryPage,
+    setMemoryLoading,
+    setMemoryError,
+    setMemories,
+    setMemoryTotal,
+  ]);
 
+// eslint-disable-next-line react-hooks/preserve-manual-memoization
   const createMemory = useCallback(async () => {
     setMemoryFormError(null);
     try {
@@ -485,7 +496,7 @@ export default function AIWorkspacePage() {
     } catch (err) {
       setMemoryFormError(errorMessage(err));
     }
-  }, [conversationId, memoryFormData, loadMemories]);
+  }, [conversationId, memoryFormData, loadMemories, setMemoryFormError, setShowMemoryForm, setMemoryPage]);
 
   const updateMemory = useCallback(async () => {
     if (!editingMemory) return;
@@ -498,7 +509,14 @@ export default function AIWorkspacePage() {
     } catch (err) {
       setMemoryFormError(errorMessage(err));
     }
-  }, [editingMemory, memoryFormData, loadMemories]);
+  }, [
+    editingMemory,
+    memoryFormData,
+    loadMemories,
+    setMemoryFormError,
+    setEditingMemory,
+    setMemoryPage,
+  ]);
 
   const deleteMemory = useCallback(async (id: string) => {
     if (!window.confirm("این خاطره حذف شود؟")) return;
@@ -509,7 +527,7 @@ export default function AIWorkspacePage() {
     } catch (err) {
       setMemoryError(errorMessage(err));
     }
-  }, []);
+  }, [setMemories, setMemoryTotal, setMemoryError]);
 
   const clearAllMemories = useCallback(async () => {
     if (!window.confirm("تمام خاطرات کاربر حذف می‌شوند. این عمل غیرقابل بازگشت است. ادامه دهید؟")) return;
@@ -520,7 +538,7 @@ export default function AIWorkspacePage() {
     } catch (err) {
       setMemoryError(errorMessage(err));
     }
-  }, []);
+  }, [setMemories, setMemoryTotal, setMemoryError]);
 
   const startEditMemory = useCallback((memory: AIWorkspaceMemory) => {
     setEditingMemory(memory);
@@ -532,14 +550,14 @@ export default function AIWorkspacePage() {
       importance: memory.importance,
     });
     setShowMemoryForm(true);
-  }, []);
+  }, [setEditingMemory, setMemoryFormData, setShowMemoryForm]);
 
   const cancelMemoryForm = useCallback(() => {
     setShowMemoryForm(false);
     setEditingMemory(null);
     setMemoryFormData({ type: "preference", category: "", content: "", confidence: 0.8, importance: 3 });
     setMemoryFormError(null);
-  }, []);
+  }, [setShowMemoryForm, setEditingMemory, setMemoryFormData, setMemoryFormError]);
 
   useEffect(() => {
     let active = true;

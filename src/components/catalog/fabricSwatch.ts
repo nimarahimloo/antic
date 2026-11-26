@@ -1,7 +1,17 @@
 // تولید لوکال نمونهٔ پارچه روی Canvas — رنگ، جنس و بافت از فیلدهای مدل گرفته می‌شود.
 // کاملاً در مرورگر اجرا می‌شود؛ بدون API و بدون اعتبار.
 
-function detectMaterial(fabric: Record<string, unknown> | undefined) {
+interface FabricLike {
+  material?: string | null;
+  fabric?: string | null;
+  texture?: string | null;
+  subcategory?: string | null;
+  category_slug?: string | null;
+  color_code?: string | null;
+  [key: string]: unknown;
+}
+
+function detectMaterial(fabric: FabricLike | null | undefined): "velvet" | "silk" | "sheer" | "cotton" {
   const hay = [
     fabric?.material,
     fabric?.fabric,
@@ -9,7 +19,7 @@ function detectMaterial(fabric: Record<string, unknown> | undefined) {
     fabric?.subcategory,
     fabric?.category_slug,
   ]
-    .map((v) => String(v || "").toLowerCase())
+    .map((v) => (v || "").toLowerCase())
     .join(" ");
   if (/مخمل|velvet/.test(hay)) return "velvet";
   if (/ساتن|ابریشم|silk|satin|براق/.test(hay)) return "silk";
@@ -17,7 +27,7 @@ function detectMaterial(fabric: Record<string, unknown> | undefined) {
   return "cotton";
 }
 
-function hexToRgb(hex: string) {
+function hexToRgb(hex: string | null | undefined): { r: number; g: number; b: number } {
   const h = (hex || "#cfc3ad").replace("#", "");
   return {
     r: parseInt(h.slice(0, 2), 16),
@@ -34,7 +44,7 @@ function shift(c: { r: number; g: number; b: number }, amt: number) {
   };
 }
 
-function rgb(c: { r: number; g: number; b: number }, a: number) {
+function rgb(c: { r: number; g: number; b: number }, a = 1): string {
   return a < 1 ? `rgba(${c.r},${c.g},${c.b},${a})` : `rgb(${c.r},${c.g},${c.b})`;
 }
 
@@ -64,15 +74,15 @@ function drawWeave(ctx: CanvasRenderingContext2D, w: number, h: number, base: { 
   const dark = shift(base, -22);
   ctx.globalAlpha = 0.2;
   for (let y = 0; y < h; y += 3) {
-    ctx.fillStyle = rgb(light, 1);
+    ctx.fillStyle = rgb(light);
     ctx.fillRect(0, y, w, 1);
-    ctx.fillStyle = rgb(dark, 1);
+    ctx.fillStyle = rgb(dark);
     ctx.fillRect(0, y + 1.5, w, 1);
   }
   for (let x = 0; x < w; x += 3) {
-    ctx.fillStyle = rgb(dark, 1);
+    ctx.fillStyle = rgb(dark);
     ctx.fillRect(x, 0, 1, h);
-    ctx.fillStyle = rgb(light, 1);
+    ctx.fillStyle = rgb(light);
     ctx.fillRect(x + 1.5, 0, 1, h);
   }
   ctx.globalAlpha = 1;
@@ -106,17 +116,18 @@ function drawSheerVeil(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.fillRect(0, 0, w, h);
 }
 
-export function renderFabricCanvas(canvas: HTMLCanvasElement, fabric: Record<string, unknown>) {
+export function renderFabricCanvas(canvas: HTMLCanvasElement | null, fabric: FabricLike | null | undefined) {
+  if (!canvas) return;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const w = canvas.width;
   const h = canvas.height;
-  const base = hexToRgb(String(fabric?.color_code || ""));
+  const base = hexToRgb(fabric?.color_code);
   const mat = detectMaterial(fabric);
-  const tex = String(fabric?.texture || "").toLowerCase();
-  const cat = String(fabric?.category_slug || "");
+  const tex = (fabric?.texture || "").toLowerCase();
+  const cat = fabric?.category_slug;
 
-  ctx.fillStyle = rgb(base, 1);
+  ctx.fillStyle = rgb(base);
   ctx.fillRect(0, 0, w, h);
 
   if (mat === "velvet") drawVelvetNap(ctx, w, h);
@@ -139,7 +150,7 @@ export function renderFabricCanvas(canvas: HTMLCanvasElement, fabric: Record<str
 }
 
 // ساخت Canvas نمونه برای استفاده در شیدر WebGL
-export function makeSwatchCanvas(fabric: Record<string, unknown>, size = 256) {
+export function makeSwatchCanvas(fabric: FabricLike | null | undefined, size = 256): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = c.height = size;
   renderFabricCanvas(c, fabric);

@@ -76,16 +76,23 @@ void main(){
   o = vec4(srgb(mix(despill, shaded, kSoft)), 1.);
 }`;
 
-function shader(gl, type, src) {
+function shader(gl: WebGL2RenderingContext, type: number, src: string) {
   const s = gl.createShader(type);
+  if (!s) throw new Error("createShader failed");
   gl.shaderSource(s, src);
   gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) || "unknown shader error");
   return s;
 }
 
-function texture(gl, unit, source, repeat) {
+function texture(
+  gl: WebGL2RenderingContext,
+  unit: number,
+  source: HTMLImageElement | HTMLCanvasElement,
+  repeat: boolean
+) {
   const t = gl.createTexture();
+  if (!t) throw new Error("createTexture failed");
   gl.activeTexture(gl.TEXTURE0 + unit);
   gl.bindTexture(gl.TEXTURE_2D, t);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -100,17 +107,23 @@ function texture(gl, unit, source, repeat) {
   return t;
 }
 
-export function analyzeTemplate(image) {
+export function analyzeTemplate(image: HTMLImageElement): {
+  mean: number;
+  coverage: number;
+  top: number;
+  logStd: number;
+} {
   const w = 224;
   const h = Math.max(1, Math.round((224 * image.naturalHeight) / image.naturalWidth));
   const c = Object.assign(document.createElement("canvas"), { width: w, height: h });
   const ctx = c.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return { mean: 1, coverage: 0, top: 0, logStd: 0.12 };
   ctx.drawImage(image, 0, 0, w, h);
   const d = ctx.getImageData(0, 0, w, h).data;
   let sum = 0,
     n = 0,
     top = h;
-  const logs = [];
+  const logs: number[] = [];
   for (let i = 0; i < d.length; i += 4) {
     const r = d[i] / 255,
       g = d[i + 1] / 255,
@@ -130,7 +143,13 @@ export function analyzeTemplate(image) {
   return { mean: n ? sum / n : 1, coverage: n / (w * h), top: 1 - top / h, logStd };
 }
 
-export function materialProfile(material) {
+export function materialProfile(material: string | null | undefined): {
+  id: number;
+  detail: number;
+  tile: number;
+  warp: number;
+  ao: number;
+} {
   switch ((material || "cotton").toLowerCase()) {
     case "velvet":
       return { id: 1, detail: 0.22, tile: 1.0, warp: 0.04, ao: 0.42 };
@@ -145,17 +164,25 @@ export function materialProfile(material) {
   }
 }
 
-export function renderPhoto(canvas, photo, fabric, info, materialOrScale, scaleOverride) {
-  canvas.width = photo.naturalWidth;
-  canvas.height = photo.naturalHeight;
+export function renderPhoto(
+  canvas: HTMLCanvasElement,
+  photo: HTMLImageElement | HTMLCanvasElement,
+  fabric: HTMLImageElement | HTMLCanvasElement,
+  info: { mean?: number; top?: number; logStd?: number },
+  materialOrScale: string | number,
+  scaleOverride?: number
+) {
+  canvas.width = (photo as HTMLImageElement).naturalWidth || photo.width || 1;
+  canvas.height = (photo as HTMLImageElement).naturalHeight || photo.height || 1;
   const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true, antialias: false });
   if (!gl) throw new Error("WebGL2 unavailable");
 
   const prog = gl.createProgram();
+  if (!prog) throw new Error("createProgram failed");
   gl.attachShader(prog, shader(gl, gl.VERTEX_SHADER, VS));
   gl.attachShader(prog, shader(gl, gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) || "unknown link error");
   gl.useProgram(prog);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
@@ -166,11 +193,11 @@ export function renderPhoto(canvas, photo, fabric, info, materialOrScale, scaleO
 
   // CLAMP_TO_EDGE — no repeating stamps
   const textures = [texture(gl, 0, photo, false), texture(gl, 1, fabric, false)];
-  const fw = fabric.naturalWidth || fabric.width || 1;
-  const fh = fabric.naturalHeight || fabric.height || 1;
+  const fw = (fabric as HTMLImageElement).naturalWidth || fabric.width || 1;
+  const fh = (fabric as HTMLImageElement).naturalHeight || fabric.height || 1;
 
   let material = "cotton";
-  let scale;
+  let scale: number | undefined;
   if (typeof materialOrScale === "string") {
     material = materialOrScale;
     scale = typeof scaleOverride === "number" ? scaleOverride : undefined;
@@ -182,15 +209,15 @@ export function renderPhoto(canvas, photo, fabric, info, materialOrScale, scaleO
   if (scale == null) scale = profile.tile;
   scale = Math.min(1.35, Math.max(0.75, scale));
 
-  const u = (name) => gl.getUniformLocation(prog, name);
+  const u = (name: string) => gl.getUniformLocation(prog, name);
   gl.uniform1i(u("uPhoto"), 0);
   gl.uniform1i(u("uFabric"), 1);
   gl.uniform2f(u("uSize"), canvas.width, canvas.height);
   // full-width mapping: tile size = canvas width * scale
   gl.uniform1f(u("uTile"), canvas.width * scale);
   gl.uniform1f(u("uAspect"), fw / Math.max(fh, 1));
-  gl.uniform1f(u("uMean"), info.mean);
-  gl.uniform1f(u("uTop"), info.top);
+  gl.uniform1f(u("uMean"), info.mean ?? 1);
+  gl.uniform1f(u("uTop"), info.top ?? 0);
   gl.uniform1i(u("uMat"), profile.id);
   gl.uniform1f(u("uDetail"), profile.detail);
   gl.uniform1f(u("uWarp"), profile.warp);

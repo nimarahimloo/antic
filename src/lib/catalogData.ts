@@ -5,7 +5,7 @@
  * این فایل فقط برای جلوگیری از import شکسته نگه داشته شده و export خالی می‌دهد.
  */
 
-export const CATEGORIES = [];
-export const PREMIUM_FEATURES = [];
-export const FABRIC_COLLECTION = [];
-export const ALL_CATEGORIES = [];
+export const CATEGORIES: never[] = [];
+export const PREMIUM_FEATURES: never[] = [];
+export const FABRIC_COLLECTION: never[] = [];
+export const ALL_CATEGORIES: never[] = [];

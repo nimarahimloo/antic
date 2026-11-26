@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { ZoomIn, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { mediaKey } from "@/lib/storeImage";
-import { OptimizedImage, ProductImage } from "@/components/ui/image";
+import { OptimizedImage } from "@/components/ui/image";
 import { cn } from "@/lib/utils";
 
 interface ImageItem {

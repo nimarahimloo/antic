@@ -5,7 +5,7 @@ import { api } from "@/api/client";
 import { Plus, Pencil, Trash2, X, Loader2, Upload, Sparkles, Image } from "lucide-react";
 import { compressImage } from "@/lib/compressImage";
 import { analyzeFabric } from "@/components/catalog/photo/fabricAnalyzer";
-import { adminToast, adminToasts } from "@/lib/adminToast";
+import { adminToast } from "@/lib/adminToast";
 import { apiErrorMessage } from "@/lib/apiError";
 import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
 import { MediaPicker } from "@/components/media/MediaPicker";

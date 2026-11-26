@@ -1,20 +1,42 @@
-import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildRoom, loadView, lighting } from '@/components/catalog/renderer/room';
-import { sampleImage } from '@/components/catalog/renderer/textiles';
-import { buildCurtain } from '@/components/catalog/renderer/model';
-import { disposeGroup } from '@/components/catalog/renderer/mesh';
-import { calibrate, targetColor } from '@/components/catalog/renderer/calibrate';
+import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { SSAOPass } from "three/addons/postprocessing/SSAOPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { buildRoom, loadView, lighting } from "@/components/catalog/renderer/room";
+import { sampleImage } from "@/components/catalog/renderer/textiles";
+import { buildCurtain } from "@/components/catalog/renderer/model";
+import { disposeGroup } from "@/components/catalog/renderer/mesh";
+import { calibrate, targetColor } from "@/components/catalog/renderer/calibrate";
+
+interface EngineSettings {
+  wall_color?: string;
+  frame_color?: string;
+  rail_color?: string;
+  view_image?: string;
+}
+
+interface FabricLike {
+  id?: string | null;
+  code?: string | null;
+  image?: string | null;
+  color_code?: string | null;
+  category_slug?: string | null;
+  [key: string]: unknown;
+}
 
 /**
  * Local GPU curtain engine.
  * Fabric image is cached; open/raise only rebuilds geometry so drag stays smooth.
  */
-export function createCurtainEngine(host, canvas, context, settings, status) {
+export function createCurtainEngine(
+  host: HTMLElement,
+  canvas: HTMLCanvasElement,
+  context: WebGLRenderingContext | undefined,
+  settings: EngineSettings,
+  status: (state: { error?: string; loading?: boolean; warning?: string; calibration?: { deltaE: number } | null }) => void
+) {
   const renderer = new THREE.WebGLRenderer({ canvas, context, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -24,7 +46,7 @@ export function createCurtainEngine(host, canvas, context, settings, status) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(settings.wall_color);
+  scene.background = new THREE.Color(settings.wall_color ?? "#75634f");
   const camera = new THREE.PerspectiveCamera(43, 4 / 3, 0.05, 40);
   camera.position.set(0.49, 1.78, 4.14);
   camera.lookAt(0, 1.7, 0);
@@ -56,13 +78,13 @@ export function createCurtainEngine(host, canvas, context, settings, status) {
 
   let alive = true;
   let revision = 0;
-  let curtain = null;
+  let curtain: THREE.Group | null = null;
   let frame = 0;
   let loop = 0;
-  let fabricKey = '';
-  let fabricRef = null;
-  let imageRef = null;
-  
+  let fabricKey = "";
+  let fabricRef: FabricLike | null | undefined = null;
+  let imageRef: HTMLImageElement | null = null;
+
   let scaleRef = 0.65;
   let motionUntil = 0;
 
@@ -113,26 +135,35 @@ export function createCurtainEngine(host, canvas, context, settings, status) {
   observer.observe(host);
   resize();
 
-  loadView(view, settings.view_image).then(() => {
+  loadView(view, settings.view_image ?? undefined).then(() => {
     if (alive) render();
     else view.material.map?.dispose();
   });
 
-  canvas.addEventListener('webglcontextlost', () => {
-    if (alive) status({ error: 'نمایش سه‌بعدی متوقف شد؛ صفحه را دوباره باز کنید.' });
+  canvas.addEventListener("webglcontextlost", () => {
+    if (alive) status({ error: "نمایش سه‌بعدی متوقف شد؛ صفحه را دوباره باز کنید." });
   });
 
-  const rebuild = (fabric, image, open, scale, withCalibrate) => {
+  const rebuild = (
+    fabric: FabricLike | null | undefined,
+    image: HTMLImageElement | null,
+    open: number,
+    scale: number,
+    withCalibrate: boolean
+  ) => {
     if (curtain) {
       disposeGroup(curtain);
       curtain = null;
     }
     curtain = buildCurtain(fabric, image, settings, open, scale);
     scene.add(curtain);
-    openRef = open;
     scaleRef = scale;
     if (withCalibrate) {
-      const calibration = calibrate({ renderer, composer, scene, camera }, curtain, targetColor(fabric, image));
+      const calibration = calibrate(
+        { renderer, composer, scene, camera },
+        curtain,
+        targetColor(fabric, image)
+      );
       status({ loading: false, calibration });
     }
     startMotionLoop(450);
@@ -140,8 +171,10 @@ export function createCurtainEngine(host, canvas, context, settings, status) {
   };
 
   return {
-    async update(fabric, open, scale) {
-      const key = fabric ? `${fabric.id || fabric.code || ''}|${fabric.image || ''}|${fabric.color_code || ''}|${fabric.category_slug || ''}` : '';
+    async update(fabric: FabricLike | null | undefined, open: number, scale: number) {
+      const key = fabric
+        ? `${fabric.id || fabric.code || ""}|${fabric.image || ""}|${fabric.color_code || ""}|${fabric.category_slug || ""}`
+        : "";
       const sameFabric = key && key === fabricKey;
 
       // Fast path: only openness changed — no network, keep texture
@@ -151,18 +184,18 @@ export function createCurtainEngine(host, canvas, context, settings, status) {
       }
 
       const version = ++revision;
-      status({ loading: true, warning: '', calibration: null });
+      status({ loading: true, warning: "", calibration: null });
       fabricKey = key;
       fabricRef = fabric;
       imageRef = null;
 
       rebuild(fabric, null, open, scale, false);
 
-      let image = null;
+      let image: HTMLImageElement | null = null;
       if (fabric?.image) {
         image = await sampleImage(fabric.image).catch(() => {
           if (alive && version === revision) {
-            status({ warning: 'عکس پارچه بارگذاری نشد؛ فعلاً رنگ مدل نمایش داده می‌شود.' });
+            status({ warning: "عکس پارچه بارگذاری نشد؛ فعلاً رنگ مدل نمایش داده می‌شود." });
           }
           return null;
         });
@@ -170,7 +203,7 @@ export function createCurtainEngine(host, canvas, context, settings, status) {
       if (!alive || version !== revision) return;
       imageRef = image;
       if (image) rebuild(fabric, image, open, scale, true);
-      else {
+      else if (curtain) {
         const calibration = calibrate(
           { renderer, composer, scene, camera },
           curtain,
@@ -182,11 +215,8 @@ export function createCurtainEngine(host, canvas, context, settings, status) {
     },
 
     /** Immediate open change for drag (no await) */
-    setOpen(open) {
-      if (!fabricRef) {
-        openRef = open;
-        return;
-      }
+    setOpen(open: number) {
+      if (!fabricRef) return;
       rebuild(fabricRef, imageRef, open, scaleRef, false);
     },
 

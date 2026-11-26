@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
+import { OptimizedImage } from "@/components/ui/image";
 import { api } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
-import { adminToast, adminToasts } from "@/lib/adminToast";
-import { Upload, Loader2, Image as ImageIcon, X, Trash2, Palette, Image as LibImage } from "lucide-react";
+import { adminToasts } from "@/lib/adminToast";
+import { Upload, Loader2, Image as ImageIcon, Palette, Image as LibImage } from "lucide-react";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import { useConfirmation } from "@/hooks/useConfirmation";

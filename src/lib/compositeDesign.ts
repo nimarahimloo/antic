@@ -1,11 +1,35 @@
 import { STYLE_CFG, shade } from "@/components/catalog/windowStyles";
 
+interface CompositeOpts {
+  style?: string;
+  color?: string;
+  openness?: number;
+  width?: number;
+  height?: number;
+  x?: number;
+  y?: number;
+  fabricImage?: string | null;
+}
+
+interface StyleConfig {
+  mount?: string;
+  cassette?: boolean;
+  sheerAlpha?: number;
+  tile?: string;
+  folds?: Array<{ background: string; blend?: string; opacity?: number }>;
+  slats?: boolean;
+  bands?: boolean;
+  stack?: boolean;
+  smooth?: boolean;
+  panelCount?: number;
+}
+
 /**
  * compositeDesign — عکس پنجره + پرده را روی canvas ترکیب می‌کند و خروجی DataURL می‌دهد.
  * اگر fabricImage داده شود، بافت عکس پارچه با تایل‌بندی مناسب روی بدنه پرده اعمال می‌شود
  * و سایه‌های چین، نورپردازی و عمق روی آن می‌افتد.
  */
-export function compositeDesign(photoUrl, opts) {
+export function compositeDesign(photoUrl: string, opts: CompositeOpts = {}): Promise<string> {
   const {
     style = "drape",
     color = "#C9A227",
@@ -27,11 +51,12 @@ export function compositeDesign(photoUrl, opts) {
       canvas.width = W;
       canvas.height = H;
       const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("could not get canvas context"));
 
       // ۱. عکس پس‌زمینه
       ctx.drawImage(img, 0, 0, W, H);
 
-      const cfg = STYLE_CFG[style] || STYLE_CFG.drape;
+      const cfg = (STYLE_CFG[style] || STYLE_CFG.drape) as StyleConfig | undefined;
       const darkColor = shade(color, -0.25);
       const lightColor = shade(color, 0.15);
 
@@ -39,14 +64,14 @@ export function compositeDesign(photoUrl, opts) {
       const cy = (y / 100) * H;
       const cw = (width / 100) * W;
       const ch = ((height / 100) * H) * (1 - openness * 0.35);
-      const opacity = cfg.sheerAlpha || 1;
+      const opacity = cfg?.sheerAlpha ?? 1;
 
-      const drawCurtain = (fabricImg) => {
+      const drawCurtain = (fabricImg: HTMLImageElement | null) => {
         ctx.save();
         ctx.globalAlpha = opacity;
 
         // میله
-        if (cfg.mount === "rod") {
+        if (cfg?.mount === "rod") {
           const grad = ctx.createLinearGradient(0, cy - 6, 0, cy);
           grad.addColorStop(0, "#E8C547");
           grad.addColorStop(1, "#A67C00");
@@ -55,7 +80,7 @@ export function compositeDesign(photoUrl, opts) {
         }
 
         // کاست
-        if (cfg.cassette) {
+        if (cfg?.cassette) {
           ctx.fillStyle = shade(color, -0.4);
           ctx.fillRect(cx, cy - 3, cw, 5);
         }
@@ -68,9 +93,9 @@ export function compositeDesign(photoUrl, opts) {
 
         if (fabricImg) {
           // تایل‌بندی بافت پارچه با مقیاس مناسب
-          const tilePct = parseFloat(cfg.tile) || 38;
+          const tilePct = parseFloat(cfg?.tile ?? "38") || 38;
           const tileW = (tilePct / 100) * cw;
-          const tileH = fabricImg.naturalHeight * (tileW / fabricImg.naturalWidth);
+          const tileH = (fabricImg.naturalHeight * tileW) / fabricImg.naturalWidth;
           const cols = Math.ceil(cw / tileW) + 1;
           const rows = Math.ceil(ch / tileH) + 1;
           for (let r = 0; r < rows; r++) {
@@ -93,15 +118,15 @@ export function compositeDesign(photoUrl, opts) {
         ctx.rect(cx, cy, cw, ch);
         ctx.clip();
 
-        if (cfg.folds) {
+        if (cfg?.folds) {
           cfg.folds.forEach((f) => {
             ctx.save();
-            ctx.globalCompositeOperation = f.blend || "source-over";
-            ctx.globalAlpha = (f.opacity || 1) * opacity * (fabricImg ? 0.5 : 0.7);
+            ctx.globalCompositeOperation = (f.blend ?? "source-over") as CanvasRenderingContext2D["globalCompositeOperation"];
+            ctx.globalAlpha = ((f.opacity ?? 1) * opacity * (fabricImg ? 0.5 : 0.7));
             drawGradientPattern(ctx, f.background, cx, cy, cw, ch);
             ctx.restore();
           });
-        } else if (cfg.slats) {
+        } else if (cfg?.slats) {
           const slatH = Math.max(12, H * 0.012);
           for (let sy = cy; sy < cy + ch; sy += slatH * 2) {
             ctx.fillStyle = darkColor;
@@ -109,13 +134,13 @@ export function compositeDesign(photoUrl, opts) {
             ctx.fillStyle = lightColor;
             ctx.fillRect(cx, sy + slatH, cw, 2);
           }
-        } else if (cfg.bands) {
+        } else if (cfg?.bands) {
           const bandW = Math.max(20, W * 0.02);
           for (let bx = cx; bx < cx + cw; bx += bandW * 2) {
             ctx.fillStyle = "rgba(0,0,0,0.4)";
             ctx.fillRect(bx + bandW, cy, bandW, ch);
           }
-        } else if (cfg.stack) {
+        } else if (cfg?.stack) {
           const pocketH = Math.max(20, H * 0.02);
           for (let sy = cy; sy < cy + ch; sy += pocketH) {
             ctx.fillStyle = darkColor;
@@ -123,7 +148,7 @@ export function compositeDesign(photoUrl, opts) {
             ctx.fillStyle = lightColor;
             ctx.fillRect(cx, sy + pocketH - 3, cw, 3);
           }
-        } else if (cfg.smooth) {
+        } else if (cfg?.smooth) {
           const grad = ctx.createLinearGradient(cx, 0, cx + cw, 0);
           grad.addColorStop(0, shade(color, -0.15));
           grad.addColorStop(0.5, shade(color, 0.1));
@@ -161,7 +186,7 @@ export function compositeDesign(photoUrl, opts) {
         ctx.restore();
 
         // پنل‌ها
-        if (cfg.panelCount && cfg.panelCount > 1) {
+        if (cfg?.panelCount && cfg.panelCount > 1) {
           for (let i = 1; i < cfg.panelCount; i++) {
             const px = cx + (cw * i) / cfg.panelCount;
             ctx.fillStyle = "rgba(0,0,0,0.25)";
@@ -198,7 +223,7 @@ export function compositeDesign(photoUrl, opts) {
   });
 }
 
-function drawGradientPattern(ctx, cssBg, x, y, w, h) {
+function drawGradientPattern(ctx: CanvasRenderingContext2D, cssBg: string, x: number, y: number, w: number, h: number) {
   if (cssBg.includes("repeating-linear-gradient")) {
     const isVertical = cssBg.includes("90deg");
     const step = Math.max(8, Math.min(w, h) * 0.03);

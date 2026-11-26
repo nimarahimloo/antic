@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { getCurtainCategories } from "@/lib/server-data";
-import ProjectsList from "@/components/ProjectsList";
 import { ProjectsPageSkeleton } from "@/components/Skeletons";
 import ProjectsListClientWrapper from "./ProjectsListClientWrapper";
 

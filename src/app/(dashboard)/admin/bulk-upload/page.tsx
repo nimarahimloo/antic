@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { UploadCloud, X, Loader2, Check, Package, ChevronDown, Image as LibImage } from "lucide-react";
+import { UploadCloud, X, Loader2, Check, Package, Image as LibImage } from "lucide-react";
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";

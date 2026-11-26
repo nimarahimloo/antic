@@ -2,7 +2,7 @@
  * نرمال‌سازی URL رسانه برای سایت و ادمین.
  * مسیرهای نسبی /uploads/... روی همان origin سرو می‌شوند (پراکسی Vite / nginx).
  */
-export function mediaUrl(src) {
+export function mediaUrl(src: string | null | undefined): string {
   if (!src || typeof src !== "string") return "";
   const s = src.trim();
   if (!s) return "";

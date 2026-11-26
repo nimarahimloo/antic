@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ExternalLink, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { getRelatedProjects, RelatedProject } from "@/rest/store-catalog";
 
 interface RelatedProjectsProps {

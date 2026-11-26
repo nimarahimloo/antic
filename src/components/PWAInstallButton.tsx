@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download, X, Smartphone } from "lucide-react";
+import { Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PWAInstallButtonProps {

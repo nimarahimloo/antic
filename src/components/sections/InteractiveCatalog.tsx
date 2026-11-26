@@ -13,13 +13,7 @@ import { api } from "@/api/client";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 import { getRootCategories, parseSubs } from "@/lib/categoryTree";
 import { getCategoryProjects, getCurtainModelRelatedProjects, RelatedProject } from "@/rest/store-catalog";
-import {
-  CatalogCardSkeleton,
-  ProjectCardSkeleton,
-  CurtainPreviewSkeleton,
-  CategoryScrollerSkeleton,
-  SubcategoryFilterSkeleton,
-} from "./InteractiveCatalogSkeletons";
+import { CatalogCardSkeleton, CurtainPreviewSkeleton } from "./InteractiveCatalogSkeletons";
 
 /**
  * کاتالوگ تعاملی — صفحات models

@@ -1,26 +1,44 @@
 // موتور تحلیل لوکال پارچه — رنگ غالب، جنس، بافت و طرح را از روی عکس استخراج می‌کند.
 // کاملاً در مرورگر با Canvas API — بدون API خارجی.
 
-const cache = new Map();
+const cache = new Map<string, Promise<FabricAnalysisResult | null>>();
 
-function loadImage(url) {
+interface FabricAnalysisResult {
+  material: string;
+  materialFa: string;
+  fabric: string;
+  texture: string;
+  isPatterned: boolean;
+  profile: { id: number; target: number; sheen: number; detail: number };
+  colorHex: string;
+  color: string;
+  colorRgb: { r: number; g: number; b: number };
+  avgLuminance: number;
+  contrast: number;
+  sheenRatio: number;
+  roughness: number;
+  patternScale: number;
+  hueSpread: number;
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
-    img.onerror = reject;
+    img.onerror = () => reject(new Error("فشل در بارگذاری تصویر"));
     img.src = url;
   });
 }
 
-const PROFILES = {
+const PROFILES: Record<string, { id: number; target: number; sheen: number; detail: number }> = {
   cotton: { id: 0, target: 0.26, sheen: 0, detail: 0.35 },
   velvet: { id: 1, target: 0.4, sheen: 0.55, detail: 0.25 },
   silk: { id: 2, target: 0.34, sheen: 0.7, detail: 0.3 },
   sheer: { id: 3, target: 0.16, sheen: 0.15, detail: 0.2 },
 };
 
-const MATERIAL_FA = {
+const MATERIAL_FA: Record<string, string> = {
   cotton: "نخی / کتان",
   velvet: "مخمل",
   silk: "ابریشم / ساتن",
@@ -28,7 +46,7 @@ const MATERIAL_FA = {
 };
 
 /** نام تقریبی رنگ فارسی از RGB — برای پارچه ساده؛ طرح‌دار معمولاً «چندرنگ» */
-export function persianColorName(r, g, b) {
+export function persianColorName(r: number, g: number, b: number): string {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const sat = max === 0 ? 0 : (max - min) / max;
@@ -65,9 +83,10 @@ export function persianColorName(r, g, b) {
 /**
  * تحلیل خودکار تصویر پارچه
  */
-export async function analyzeFabric(url) {
+export async function analyzeFabric(url: string | null | undefined): Promise<FabricAnalysisResult | null> {
   if (!url) return null;
-  if (cache.has(url)) return cache.get(url);
+  const cached = cache.get(url);
+  if (cached) return cached;
 
   const promise = (async () => {
     try {
@@ -78,6 +97,7 @@ export async function analyzeFabric(url) {
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return null;
       ctx.drawImage(img, 0, 0, w, h);
       const data = ctx.getImageData(0, 0, w, h).data;
 
@@ -86,7 +106,7 @@ export async function analyzeFabric(url) {
         bSum = 0,
         n = 0;
       const lumas = new Float32Array(w * h);
-      const hues = [];
+      const hues: number[] = [];
 
       for (let i = 0, p = 0; i < data.length; i += 4, p++) {
         const a = data[i + 3];
@@ -205,10 +225,10 @@ export async function analyzeFabric(url) {
   })();
 
   cache.set(url, promise);
-  return promise;
+  return promise ?? null;
 }
 
-function detectPatternRepeat(lumas, w, h) {
+function detectPatternRepeat(lumas: Float32Array, w: number, h: number): number {
   const maxLag = Math.min(Math.floor(w / 2), 35);
   let bestLag = 0,
     bestVal = 0;

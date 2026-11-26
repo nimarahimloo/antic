@@ -26,17 +26,23 @@ const SPACE_ONLY = new Set([
 const FABRIC_HINT =
   /shade|roman|pleated|zebra|roller|silk|velvet|sheer|panel|turk|kitchen|office|cubism|printed|aurora|cotton|drape|wave|double|blind/;
 
-function isInCatalog(cat) {
-  const raw = cat?.in_catalog ?? cat?.inCatalog;
+interface Category {
+  id?: string;
+  name: string;
+  slug: string;
+  mechanism?: string | undefined;
+  inCatalog?: boolean;
+  in_catalog?: boolean;
+}
+
+function isInCatalog(cat: Category): boolean {
+  const raw = cat.in_catalog ?? cat.inCatalog;
   // پیش‌فرض: در کاتالوگ هست؛ فقط اگر صریحاً false باشد حذف شود
-  if (raw === false || raw === 0 || raw === "false" || raw === "0") return false;
+  if (raw === false || String(raw) === "false" || String(raw) === "0") return false;
   return true;
 }
 
-/**
- * @param {{ slug?: string, mechanism?: string|null, name?: string, inCatalog?: boolean, in_catalog?: boolean }} cat
- */
-export function isInstallCategory(cat) {
+export function isInstallCategory(cat: Category | null | undefined): boolean {
   if (!cat?.slug) return false;
   // بدون تیک کاتالوگ → اصلاً در صفحه قالب نصب نیاید
   if (!isInCatalog(cat)) return false;
@@ -50,6 +56,6 @@ export function isInstallCategory(cat) {
   return false;
 }
 
-export function filterInstallCategories(categories) {
+export function filterInstallCategories(categories: Category[] | null | undefined): Category[] {
   return (Array.isArray(categories) ? categories : []).filter(isInstallCategory);
 }

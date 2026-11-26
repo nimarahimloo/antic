@@ -12,7 +12,7 @@ import AdminPageHeroes, {
   normalizePageHeroes,
   serializePageHeroes,
 } from "@/components/admin/AdminPageHeroes";
-import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
+import { OptimizedImage } from "@/components/ui/image";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import { useConfirmation } from "@/hooks/useConfirmation";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";

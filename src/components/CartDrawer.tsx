@@ -14,7 +14,6 @@ export function formatToman(amount: number | string | null | undefined): string 
 }
 
 export default function CartDrawer() {
-  if (!CART_ENABLED) return null;
   const { cart, isOpen, setIsOpen, removeItem, updateQuantity, checkout, loading, error, clearError } =
     useCart();
 
@@ -37,6 +36,7 @@ export default function CartDrawer() {
     return () => document.removeEventListener("keydown", onKey);
   }, [isOpen, setIsOpen]);
 
+  if (!CART_ENABLED) return null;
   if (!isOpen) return null;
 
   return (
