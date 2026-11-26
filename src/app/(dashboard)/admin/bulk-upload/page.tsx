@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { UploadCloud, X, Loader2, Check, Package, ChevronDown } from "lucide-react";
+import { UploadCloud, X, Loader2, Check, Package, ChevronDown, Image as LibImage } from "lucide-react";
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToast } from "@/lib/adminToast";
 import { Card } from "@/components/ui/card";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
+import { MediaPicker } from "@/components/media/MediaPicker";
 
 interface BulkItem {
   id: string;
@@ -34,6 +35,7 @@ export default function AdminBulkUploadPage() {
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [bulkPickerOpen, setBulkPickerOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,8 +69,8 @@ export default function AdminBulkUploadPage() {
         const uploaded: BulkItem[] = [];
         for (const file of files) {
           const compressed = await compressImage(file);
-          const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
-          const file_url = res?.file_url || res?.url || res?.path;
+          const media = await api.media.upload(compressed);
+          const file_url = media.url;
           if (!file_url) throw new Error("آپلود پاسخ معتبری نداد");
           uploaded.push({
             id: Math.random().toString(36).slice(2),
@@ -237,6 +239,14 @@ export default function AdminBulkUploadPage() {
               disabled={uploading}
               onChange={(e) => e.target.files && handleFiles(e.target.files)}
             />
+            <button
+              type="button"
+              onClick={() => setBulkPickerOpen(true)}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-secondary/60 bg-secondary/5 px-4 py-2 font-body text-xs text-muted-foreground hover:border-primary/60 hover:text-primary"
+              disabled={uploading}
+            >
+              <LibImage className="h-4 w-4" /> انتخاب از کتابخانه رسانه
+            </button>
           </div>
         </Card>
 
@@ -346,6 +356,25 @@ export default function AdminBulkUploadPage() {
           </Card>
         )}
       </div>
+
+      <MediaPicker
+        open={bulkPickerOpen}
+        onOpenChange={setBulkPickerOpen}
+        mode="multi"
+        onSelect={(selected) => {
+          const mediaList = Array.isArray(selected) ? selected : [selected];
+          const newItems = mediaList.map((media) => ({
+            id: Math.random().toString(36).slice(2),
+            image: media.url,
+            code: "",
+            name: "",
+            color: "",
+            color_code: "",
+          }));
+          setItems((prev) => [...prev, ...newItems]);
+        }}
+        title="انتخاب تصاویر از کتابخانه برای بارگذاری گروهی"
+      />
     </div>
   );
 }

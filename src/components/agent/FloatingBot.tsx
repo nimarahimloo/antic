@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import MessageBubble, { TypingIndicator } from "@/components/agent/MessageBubble";
 import { api } from "@/api/client";
-import { compressImage } from "@/lib/compressImage";
 import {
   playSendSound,
   playReceiveSound,
@@ -203,9 +202,8 @@ export default function FloatingBot({
     setUploading(true);
     setErrorBanner("");
     try {
-      const compressed = await compressImage(file);
-      const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
-      const url = res?.file_url || res?.url;
+      const media = await api.media.upload(file);
+      const url = media.url;
       if (url) setPendingImage(url);
       else setErrorBanner("آپلود نشد.");
     } catch {

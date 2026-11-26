@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Loader2, Upload, X, Image as ImageIcon, Image as LibImage } from "lucide-react";
 import { api } from "@/api/client";
-import { compressImage } from "@/lib/compressImage";
 import { refreshRenderTemplates } from "@/hooks/useRenderTemplates";
 import { filterInstallCategories } from "@/lib/installCategories";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToast } from "@/lib/adminToast";
 import { OptimizedImage } from "@/components/ui/image";
+import { MediaPicker } from "@/components/media/MediaPicker";
 
 interface CurtainCategoryItem {
   id?: string;
@@ -31,6 +31,7 @@ export function InstallReferenceManager() {
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pickerSlug, setPickerSlug] = useState<string | null>(null);
 
   const installCats = useMemo(
     () => filterInstallCategories(categories),
@@ -64,9 +65,8 @@ export function InstallReferenceManager() {
     setError("");
     try {
       for (const file of files) {
-        const compressed = await compressImage(file);
-        const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
-        const url = res?.file_url || res?.url || res?.path;
+        const media = await api.media.upload(file);
+        const url = media.url;
         if (!url) throw new Error("آپلود ناموفق");
         await api.entities.InstallReference.create({
           style: slug,
@@ -146,30 +146,40 @@ export function InstallReferenceManager() {
                       {cat.mechanism ? ` · ${cat.mechanism}` : ""}
                     </p>
                   </div>
-                  <label
-                    htmlFor={`install-ref-upload-${slug}`}
-                    className="flex cursor-pointer items-center gap-1 rounded-lg border border-primary/50 px-2 py-1 text-[10px] text-primary"
-                  >
-                    {busy === slug ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Upload className="h-3 w-3" />
-                    )}
-                    {mine.length ? "افزودن عکس" : "آپلود مرجع"}
-                    <input
-                      type="file"
-                      id={`install-ref-upload-${slug}`}
-                      accept="image/*"
-                      multiple
-                      className="hidden"
+                  <div className="flex gap-1">
+                    <label
+                      htmlFor={`install-ref-upload-${slug}`}
+                      className="flex cursor-pointer items-center gap-1 rounded-lg border border-primary/50 px-2 py-1 text-[10px] text-primary"
+                    >
+                      {busy === slug ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Upload className="h-3 w-3" />
+                      )}
+                      {mine.length ? "افزودن عکس" : "آپلود مرجع"}
+                      <input
+                        type="file"
+                        id={`install-ref-upload-${slug}`}
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        disabled={busy === slug}
+                        onChange={(e) => {
+                          const list = [...(e.target.files || [])];
+                          e.target.value = "";
+                          if (list.length) void upload(slug, list);
+                        }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setPickerSlug(slug)}
+                      className="cursor-pointer items-center gap-1 rounded-lg border border-secondary/60 bg-secondary/5 px-2 py-1 text-[10px] text-muted-foreground hover:border-primary/60 hover:text-primary"
                       disabled={busy === slug}
-                      onChange={(e) => {
-                        const list = [...(e.target.files || [])];
-                        e.target.value = "";
-                        if (list.length) void upload(slug, list);
-                      }}
-                    />
-                  </label>
+                    >
+                      <LibImage className="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {mine.length ? (
@@ -200,6 +210,42 @@ export function InstallReferenceManager() {
             );
           })}
         </div>
+      )}
+
+      {pickerSlug && (
+        <MediaPicker
+          open={Boolean(pickerSlug)}
+          onOpenChange={(o) => {
+            if (!o) setPickerSlug(null);
+          }}
+          mode="multi"
+          onSelect={(selected) => {
+            const mediaList = Array.isArray(selected) ? selected : [selected];
+            if (mediaList.length && pickerSlug) {
+              const files = mediaList.map((m) => ({
+                url: m.url,
+                name: m.originalName,
+              }));
+              // Create install references for each selected media
+              const promises = mediaList.map((m) =>
+                api.entities.InstallReference.create({
+                  style: pickerSlug!,
+                  image: m.url,
+                  note: "real-install-library",
+                })
+              );
+              Promise.all(promises)
+                .then(() => {
+                  refreshRenderTemplates();
+                  return load();
+                })
+                .then(() => adminToast("create", "نمونه نصب واقعی", pickerSlug))
+                .catch((e) => setError(apiErrorMessage(e)));
+            }
+            setPickerSlug(null);
+          }}
+          title="انتخاب عکس نصب از کتابخانه"
+        />
       )}
     </section>
   );

@@ -1,11 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { useCurtainCategories, allCategorySelectOptions } from "@/hooks/useCurtainCategories";
+import { api } from "@/api/client";
 
 /** نمونه‌های اجرا — گالری چندتصویری (تا ۲۰ تصویر) مثل کاور */
 export default function AdminProjectsPage() {
   const { categories } = useCurtainCategories();
+  const [collectionOptions, setCollectionOptions] = useState<Array<{ value: string; label: string }>>([]);
+
+  useEffect(() => {
+    api.entities.Collection.list("order", 500)
+      .then((data) => setCollectionOptions(
+        (data as Array<{ id: string; title: string }> || []).map((c) => ({ value: c.id, label: c.title }))
+      ))
+      .catch(console.error);
+  }, []);
 
   const fields = [
     { key: "title", label: "عنوان", required: true },
@@ -22,6 +33,13 @@ export default function AdminProjectsPage() {
       label: "گالری (اختیاری)",
       type: "gallery",
       help: "مانند کاور — تا ۲۰ تصویر، انتخاب چندتایی از دستگاه",
+    },
+    {
+      key: "collectionIds",
+      label: "مجموعه‌ها",
+      type: "multiselect",
+      placeholder: "مجموعه‌ها را انتخاب کنید",
+      options: collectionOptions,
     },
   ];
 
@@ -53,7 +71,10 @@ export default function AdminProjectsPage() {
       entity="Project"
       fields={fields}
       columns={columns}
-      options={{ category_slug: allCategorySelectOptions(categories) }}
+      options={{ 
+        category_slug: allCategorySelectOptions(categories),
+        collectionIds: collectionOptions,
+      }}
     />
   );
 }

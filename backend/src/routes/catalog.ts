@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { sendError, HttpError } from "../lib/errors.js";
 import { routeParam } from "../lib/routeParams.js";
 import { requireAdmin, type AuthedRequest } from "../middleware/auth.js";
+import { syncMediaUsage } from "../lib/mediaSync.js";
 
 const router = Router();
 
@@ -42,6 +43,7 @@ function toStoreProduct(row: {
   variantsJson: string | null;
   createdAt: Date;
   updatedAt: Date;
+  collectionIds?: string[];
 }) {
   const gallery = parseJson<string[]>(row.gallery, []);
   const options = parseJson<unknown[]>(row.optionsJson, []);
@@ -57,6 +59,7 @@ function toStoreProduct(row: {
     productType: "PHYSICAL",
     mainCategoryId: row.categoryId || undefined,
     plainDescription: row.description || "",
+    collectionIds: row.collectionIds || [],
     media: {
       main: row.image
         ? { image: { url: row.image, altText: row.name } }
@@ -106,6 +109,34 @@ function toStoreProduct(row: {
     createdDate: row.createdAt.toISOString(),
     updatedDate: row.updatedAt.toISOString(),
   };
+}
+
+async function getProductCollectionIds(productId: string): Promise<string[]> {
+  const rels = await prisma.collectionProduct.findMany({
+    where: { productId },
+    select: { collectionId: true },
+  });
+  return rels.map((r) => r.collectionId);
+}
+
+async function validateCollectionsExist(collectionIds: string[]): Promise<void> {
+  if (!collectionIds.length) return;
+  const existing = await prisma.collection.findMany({
+    where: { id: { in: collectionIds } },
+    select: { id: true },
+  });
+  if (existing.length !== collectionIds.length) {
+    throw new HttpError(400, "One or more collection IDs do not exist");
+  }
+}
+
+async function writeProductCollectionRelations(productId: string, collectionIds: string[]): Promise<void> {
+  await prisma.collectionProduct.deleteMany({ where: { productId } });
+  for (const collectionId of collectionIds) {
+    await prisma.collectionProduct.create({
+      data: { collectionId, productId },
+    });
+  }
 }
 
 function toStoreCategory(row: {
@@ -238,27 +269,55 @@ router.post("/admin/products", requireAdmin, async (req: AuthedRequest, res) => 
   try {
     const b = req.body || {};
     if (!b.name) throw new HttpError(400, "name is required");
-    const row = await prisma.product.create({
-      data: {
-        name: b.name,
-        slug: b.slug || String(b.name || "").replace(/\s+/g, "-").toLowerCase(),
-        description: b.description || null,
-        price: Number(b.price) || 0,
-        compareAtPrice: b.compareAtPrice != null ? Number(b.compareAtPrice) : null,
-        currency: b.currency || "IRR",
-        image: b.image || null,
-        gallery: b.gallery ? JSON.stringify(b.gallery) : null,
-        categoryId: b.categoryId || null,
-        visible: b.visible !== false,
-        inStock: b.inStock !== false,
-        stock: Number(b.stock) || 100,
-        ribbon: b.ribbon || null,
-        optionsJson: b.options ? JSON.stringify(b.options) : null,
-        variantsJson: b.variants ? JSON.stringify(b.variants) : null,
-        sortOrder: Number(b.sortOrder) || 0,
-      },
+    const hasCollectionIds = "collectionIds" in b;
+    const collectionIds = hasCollectionIds && Array.isArray(b.collectionIds) ? b.collectionIds : null;
+
+    const row = await prisma.$transaction(async (tx) => {
+      const created = await tx.product.create({
+        data: {
+          name: b.name,
+          slug: b.slug || String(b.name || "").replace(/\s+/g, "-").toLowerCase(),
+          description: b.description || null,
+          price: Number(b.price) || 0,
+          compareAtPrice: b.compareAtPrice != null ? Number(b.compareAtPrice) : null,
+          currency: b.currency || "IRR",
+          image: b.image || null,
+          gallery: b.gallery ? JSON.stringify(b.gallery) : null,
+          categoryId: b.categoryId || null,
+          visible: b.visible !== false,
+          inStock: b.inStock !== false,
+          stock: Number(b.stock) || 100,
+          ribbon: b.ribbon || null,
+          optionsJson: b.options ? JSON.stringify(b.options) : null,
+          variantsJson: b.variants ? JSON.stringify(b.variants) : null,
+          sortOrder: Number(b.sortOrder) || 0,
+        },
+      });
+
+      if (hasCollectionIds) {
+        if (collectionIds!.length > 0) {
+          await validateCollectionsExist(collectionIds!);
+        }
+        await writeProductCollectionRelations(created.id, collectionIds!);
+      }
+
+      return created;
     });
-    res.status(201).json(toStoreProduct(row));
+
+    // Sync MediaUsage for product image/gallery fields
+    try {
+      await syncMediaUsage("Product", row.id, {
+        image: b.image ? [String(b.image)] : [],
+        gallery: Array.isArray(b.gallery)
+          ? (b.gallery as unknown[]).filter((v): v is string => typeof v === "string" && v.trim() !== "")
+          : [],
+      });
+    } catch {
+      /* sync failures must not fail product creation */
+    }
+
+    const ids = hasCollectionIds ? collectionIds! : await getProductCollectionIds(row.id);
+    res.status(201).json({ ...toStoreProduct(row), collectionIds: ids });
   } catch (err) {
     sendError(res, err);
   }
@@ -267,6 +326,8 @@ router.post("/admin/products", requireAdmin, async (req: AuthedRequest, res) => 
 router.put("/admin/products/:id", requireAdmin, async (req: AuthedRequest, res) => {
   try {
     const b = req.body || {};
+    const hasCollectionIds = "collectionIds" in b;
+    const collectionIds = hasCollectionIds && Array.isArray(b.collectionIds) ? b.collectionIds : null;
     const data: Record<string, unknown> = {};
     for (const k of ["name", "slug", "description", "image", "categoryId", "ribbon", "currency"] as const) {
       if (b[k] !== undefined) data[k] = b[k];
@@ -282,8 +343,35 @@ router.put("/admin/products/:id", requireAdmin, async (req: AuthedRequest, res) 
     if (b.variants !== undefined) data.variantsJson = JSON.stringify(b.variants);
     if (b.sortOrder !== undefined) data.sortOrder = Number(b.sortOrder);
 
-    const row = await prisma.product.update({ where: { id: routeParam(req, "id") }, data });
-    res.json(toStoreProduct(row));
+    const row = await prisma.$transaction(async (tx) => {
+      const updated = await tx.product.update({ where: { id: routeParam(req, "id") }, data });
+
+      // Only touch collection relations when the caller explicitly sent collectionIds
+      if (hasCollectionIds) {
+        if (collectionIds!.length > 0) {
+          await validateCollectionsExist(collectionIds!);
+        }
+        await writeProductCollectionRelations(updated.id, collectionIds!);
+      }
+      // If collectionIds was not in the body, preserve existing assignments (no-op)
+
+      return updated;
+    });
+
+    // Sync MediaUsage for product image/gallery fields
+    try {
+      await syncMediaUsage("Product", row.id, {
+        image: b.image ? [String(b.image)] : [],
+        gallery: Array.isArray(b.gallery)
+          ? (b.gallery as unknown[]).filter((v): v is string => typeof v === "string" && v.trim() !== "")
+          : [],
+      });
+    } catch {
+      /* sync failures must not fail product update */
+    }
+
+    const ids = hasCollectionIds ? collectionIds! : await getProductCollectionIds(row.id);
+    res.json({ ...toStoreProduct(row), collectionIds: ids });
   } catch (err) {
     sendError(res, err);
   }
@@ -291,6 +379,14 @@ router.put("/admin/products/:id", requireAdmin, async (req: AuthedRequest, res) 
 
 router.delete("/admin/products/:id", requireAdmin, async (req: AuthedRequest, res) => {
   try {
+    // Clean up MediaUsage rows referencing this product
+    try {
+      await prisma.mediaUsage.deleteMany({
+        where: { entityType: "Product", entityId: routeParam(req, "id") },
+      });
+    } catch {
+      /* sync cleanup failures must not fail product deletion */
+    }
     await prisma.product.delete({ where: { id: routeParam(req, "id") } });
     res.json({ id: routeParam(req, "id") });
   } catch (err) {
@@ -380,6 +476,16 @@ router.post("/admin/categories", requireAdmin, async (req: AuthedRequest, res) =
         order: Number(b.order) || 0,
       },
     });
+
+    // Sync MediaUsage for shop category image field
+    try {
+      await syncMediaUsage("ShopCategory", row.id, {
+        image: b.image ? [String(b.image)] : [],
+      });
+    } catch {
+      /* sync failures must not fail category creation */
+    }
+
     res.status(201).json(toStoreCategory(row));
   } catch (err) {
     sendError(res, err);
@@ -421,6 +527,60 @@ router.get("/products/:id/related-projects", async (req, res) => {
     }));
 
     res.json({ projects });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// Admin: Get collections for a product
+router.get("/admin/products/:id/collections", requireAdmin, async (req: AuthedRequest, res) => {
+  try {
+    const productId = routeParam(req, "id");
+    const relations = await prisma.collectionProduct.findMany({
+      where: { productId },
+      include: { collection: true },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ collections: relations.map((r) => r.collection) });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// Admin: Add collection to product
+router.post("/admin/products/:id/collections", requireAdmin, async (req: AuthedRequest, res) => {
+  try {
+    const productId = routeParam(req, "id");
+    const { collectionId } = req.body;
+    if (!collectionId) throw new HttpError(400, "collectionId is required");
+
+    await prisma.collectionProduct.create({
+      data: { collectionId, productId },
+    });
+
+    const relations = await prisma.collectionProduct.findMany({
+      where: { productId },
+      include: { collection: true },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ collections: relations.map((r) => r.collection) });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// Admin: Remove collection from product
+router.delete("/admin/products/:id/collections/:collectionId", requireAdmin, async (req: AuthedRequest, res) => {
+  try {
+    const productId = routeParam(req, "id");
+    const collectionId = routeParam(req, "collectionId");
+    await prisma.collectionProduct.delete({ where: { collectionId_productId: { collectionId, productId } } });
+    const relations = await prisma.collectionProduct.findMany({
+      where: { productId },
+      include: { collection: true },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ collections: relations.map((r) => r.collection) });
   } catch (err) {
     sendError(res, err);
   }

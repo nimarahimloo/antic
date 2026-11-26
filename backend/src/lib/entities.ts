@@ -21,6 +21,11 @@ export const ENTITY_MAP = {
     publicRead: true,
     publicCreate: false,
   },
+  Collection: {
+    model: prisma.collection,
+    publicRead: true,
+    publicCreate: false,
+  },
   ConsultationRequest: {
     model: prisma.consultationRequest,
     publicRead: false,

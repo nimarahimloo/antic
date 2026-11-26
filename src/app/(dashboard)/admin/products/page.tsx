@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, X, Loader2, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Loader2, Upload, Image as LibImage } from "lucide-react";
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
+import { MediaPicker } from "@/components/media/MediaPicker";
 
 const GALLERY_MAX = 20;
 const ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
@@ -51,6 +52,11 @@ interface Category {
   name: string;
 }
 
+interface Collection {
+  id: string;
+  title: string;
+}
+
 function authHeaders() {
   if (typeof window === "undefined") return { "Content-Type": "application/json" };
   const t = localStorage.getItem("antic_access_token");
@@ -77,12 +83,8 @@ async function uploadOne(file: File) {
   } catch {
     toSend = file;
   }
-  const uploader = api?.integrations?.Core?.UploadPublicFile;
-  if (typeof uploader !== "function") {
-    throw new Error("سرویس آپلود در دسترس نیست");
-  }
-  const res = await uploader({ file: toSend });
-  const url = res?.file_url || res?.url || res?.path;
+  const media = await api.media.upload(toSend);
+  const url = media.url;
   if (!url) throw new Error("آپلود پاسخ معتبری نداد");
   return url;
 }
@@ -95,6 +97,7 @@ const empty = {
   image: "",
   gallery: [] as string[],
   categoryId: "",
+  collectionIds: [] as string[],
   visible: true,
   inStock: true,
 };
@@ -102,6 +105,7 @@ const empty = {
 export default function AdminProductsPage() {
   const [rows, setRows] = useState<Product[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<typeof empty>(empty);
@@ -110,6 +114,8 @@ export default function AdminProductsPage() {
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [error, setError] = useState("");
   const [hint, setHint] = useState("");
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [galleryPickerOpen, setGalleryPickerOpen] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -124,10 +130,17 @@ export default function AdminProductsPage() {
           return r.json() as Promise<{ categories: Category[] }>;
         })
         .then((data) => data?.categories ?? []),
+      fetch(`${process.env.NEXT_PUBLIC_API_BASE || "/api"}/entities/Collection?sort_by=order&limit=500`, { headers: authHeaders() })
+        .then((r) => {
+          if (!r.ok) throw new Error("load collections");
+          return r.json() as Promise<Collection[]>;
+        })
+        .catch(() => []),
     ])
-      .then(([products, categories]) => {
+      .then(([products, categories, collectionsData]) => {
         setRows(Array.isArray(products) ? products : []);
         setCats(Array.isArray(categories) ? categories : []);
+        setCollections(Array.isArray(collectionsData) ? collectionsData : []);
       })
       .catch((err) => {
         console.error("Failed to load products:", err);
@@ -149,6 +162,8 @@ export default function AdminProductsPage() {
 
   function openEdit(p: Product) {
     const price = p.actualPriceRange?.minValue?.amount;
+    
+    // Set initial form without collections, then fetch collections
     setForm({
       name: p.name || "",
       description: (String(p.plainDescription || "")).replace(/<[^>]+>/g, ""),
@@ -162,10 +177,22 @@ export default function AdminProductsPage() {
       categoryId: p.mainCategoryId || "",
       visible: p.visible !== false,
       inStock: p.inventory?.availabilityStatus === "IN_STOCK",
+      collectionIds: [],
     });
     setEditing(p);
     setError("");
     setHint("");
+
+    // Fetch collections from the new CollectionProduct relation
+    fetch(`${process.env.NEXT_PUBLIC_API_BASE || "/api"}/catalog/admin/products/${p.id}/collections`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(data => {
+        if (data?.collections) {
+          const collectionIds = data.collections.map((c: Collection) => c.id);
+          setForm((f) => ({ ...f, collectionIds }));
+        }
+      })
+      .catch(() => {});
   }
 
   function closeModal() {
@@ -244,6 +271,7 @@ export default function AdminProductsPage() {
       categoryId: form.categoryId || null,
       visible: form.visible,
       inStock: form.inStock,
+      collectionIds: Array.isArray(form.collectionIds) ? form.collectionIds : [],
     };
     try {
       const API = process.env.NEXT_PUBLIC_API_BASE || "/api";
@@ -281,8 +309,8 @@ export default function AdminProductsPage() {
     }
   }
 
-  const input =
-    "w-full rounded-xl border border-secondary bg-background px-3 py-2 font-body text-sm text-foreground outline-none focus:border-primary";
+  const inputCls =
+    "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
   const busy = uploadingCover || uploadingGallery || saving;
 
   return (
@@ -373,37 +401,46 @@ export default function AdminProductsPage() {
 
       {editing !== null && (
         <div
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4"
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4 lg:p-6"
           onClick={closeModal}
         >
           <form
             onSubmit={save}
             onClick={(e) => e.stopPropagation()}
-            className="mx-auto my-8 w-full max-w-lg rounded-3xl border border-secondary/60 bg-card p-6"
+            className="mx-auto my-8 w-full max-w-lg lg:max-w-2xl rounded-2xl border border-secondary/60 bg-card p-6 lg:p-8"
             noValidate
           >
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="font-display text-lg font-black">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="font-display text-lg font-black text-foreground">
                 {editing?.id ? "ویرایش محصول" : "افزودن محصول"}
               </h3>
-              <button type="button" onClick={closeModal} className="text-muted-foreground" aria-label="بستن">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-secondary/70 text-muted-foreground hover:border-primary hover:text-primary"
+                aria-label="بستن"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">نام *</label>
+                <label className="mb-1.5 block font-body text-xs text-muted-foreground">
+                  نام *
+                </label>
                 <input
-                  className={input}
+                  className={inputCls}
                   value={String(form.name)}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1 block text-xs text-muted-foreground">قیمت (تومان) — اختیاری</label>
+                  <label className="mb-1.5 block font-body text-xs text-muted-foreground">
+                    قیمت (تومان) — اختیاری
+                  </label>
                   <input
-                    className={input}
+                    className={inputCls}
                     type="number"
                     min="0"
                     placeholder="خالی = تماس بگیرید"
@@ -412,29 +449,32 @@ export default function AdminProductsPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-muted-foreground">قیمت قبل</label>
+                  <label className="mb-1.5 block font-body text-xs text-muted-foreground">
+                    قیمت قبل
+                  </label>
                   <input
-                    className={input}
+                    className={inputCls}
                     type="number"
                     value={String(form.compareAtPrice)}
                     onChange={(e) => setForm((f) => ({ ...f, compareAtPrice: e.target.value }))}
                   />
                 </div>
               </div>
-
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">تصویر کاور</label>
+                <label className="mb-1.5 block font-body text-xs text-muted-foreground">
+                  تصویر کاور
+                </label>
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
+                  <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
                     {form.image ? (
                       <img src={String(form.image)} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <Upload className="h-4 w-4 text-muted-foreground" />
+                      <Upload className="h-5 w-5 text-muted-foreground" />
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <label
-                      className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-3 py-2 text-xs font-bold text-primary"
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-3 py-2.5 font-body text-xs font-bold text-primary"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {uploadingCover ? (
@@ -455,11 +495,19 @@ export default function AdminProductsPage() {
                         }}
                       />
                     </label>
+                    <button
+                      type="button"
+                      onClick={() => setCoverPickerOpen(true)}
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-secondary/60 bg-secondary/5 px-3 py-2.5 font-body text-xs text-muted-foreground hover:border-primary/60 hover:text-primary"
+                      disabled={uploadingCover}
+                    >
+                      <LibImage className="h-3.5 w-3.5" />
+                    </button>
                     {form.image && (
                       <button
                         type="button"
                         onClick={() => setForm((f) => ({ ...f, image: "" }))}
-                        className="rounded-xl border border-secondary/70 px-3 py-2 text-xs text-muted-foreground hover:border-destructive hover:text-destructive"
+                        className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive"
                       >
                         حذف
                       </button>
@@ -467,16 +515,15 @@ export default function AdminProductsPage() {
                   </div>
                 </div>
               </div>
-
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">
+                <label className="mb-1.5 block font-body text-xs text-muted-foreground">
                   گالری (تا {GALLERY_MAX} تصویر)
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {(form.gallery || []).map((url, idx) => (
                     <div
                       key={`${url}-${idx}`}
-                      className="relative h-16 w-16 overflow-hidden rounded-xl border border-secondary/60"
+                      className="relative h-20 w-20 overflow-hidden rounded-xl border border-secondary/60"
                     >
                       <img src={String(url)} alt="" className="h-full w-full object-cover" />
                       <button
@@ -487,7 +534,7 @@ export default function AdminProductsPage() {
                             gallery: (f.gallery || []).filter((_, i) => i !== idx),
                           }))
                         }
-                        className="absolute left-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background/90 text-destructive"
+                        className="absolute inset-0 bg-black/50 text-[10px] text-white opacity-0 hover:opacity-100"
                         aria-label="حذف"
                       >
                         <X className="h-3 w-3" />
@@ -495,42 +542,104 @@ export default function AdminProductsPage() {
                     </div>
                   ))}
                   {(form.gallery || []).length < GALLERY_MAX && (
-                    <label
-                      className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 text-primary"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {uploadingGallery ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Upload className="h-4 w-4" />
-                          <span className="text-[9px] font-bold">افزودن</span>
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept={ACCEPT}
-                        multiple
-                        className="hidden"
+                    <div className="flex gap-1">
+                      <label
+                        className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 text-primary"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {uploadingGallery ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4" />
+                            <span className="text-[9px] font-bold">افزودن</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept={ACCEPT}
+                          multiple
+                          className="hidden"
+                          disabled={uploadingGallery}
+                          onChange={(e) => {
+                            const list = e.target.files ? Array.from(e.target.files) : [];
+                            e.target.value = "";
+                            if (list.length) uploadGalleryFiles(list);
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setGalleryPickerOpen(true)}
+                        className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border border-secondary/60 bg-secondary/5 text-primary"
                         disabled={uploadingGallery}
-                        onChange={(e) => {
-                          const list = e.target.files ? Array.from(e.target.files) : [];
-                          e.target.value = "";
-                          if (list.length) uploadGalleryFiles(list);
-                        }}
-                      />
-                    </label>
+                      >
+                        <LibImage className="h-4 w-4" />
+                        <span className="text-[9px] font-bold">کتابخانه</span>
+                      </button>
+                    </div>
                   )}
                 </div>
                 <p className="mt-1 text-[10px] text-muted-foreground">
                   {(form.gallery || []).length}/{GALLERY_MAX} — JPG/PNG/WebP — در صفحه محصول زیر تصویر اصلی
                 </p>
               </div>
-
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">دسته</label>
+                <label className="mb-1.5 block font-body text-xs text-muted-foreground">
+                  مجموعه‌ها
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {(form.collectionIds || []).map((cid: string, i: number) => {
+                    const col = collections.find((c) => c.id === cid);
+                    return (
+                      <div key={`${cid}-${i}`} className="inline-flex items-center gap-1.5 rounded-lg border border-primary/50 bg-primary/5 px-3 py-1.5">
+                        <span className="font-body text-xs text-primary">{col?.title || cid}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              collectionIds: (f.collectionIds || []).filter((id: string) => id !== cid),
+                            }))
+                          }
+                          className="flex h-4 w-4 items-center justify-center text-primary hover:bg-primary/20 rounded"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
                 <select
-                  className={input}
+                  value=""
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    setForm((f) => {
+                      const current = Array.isArray(f.collectionIds) ? f.collectionIds : [];
+                      if (current.includes(val)) return f;
+                      return { ...f, collectionIds: [...current, val] };
+                    });
+                    e.target.value = "";
+                  }}
+                  className={inputCls}
+                >
+                  <option value="" disabled selected>
+                    جستجو و انتخاب مجموعه…
+                  </option>
+                  {collections.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block font-body text-xs text-muted-foreground">
+                  دسته
+                </label>
+                <select
+                  className={inputCls}
                   value={String(form.categoryId)}
                   onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
                 >
@@ -543,9 +652,11 @@ export default function AdminProductsPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">توضیح</label>
+                <label className="mb-1.5 block font-body text-xs text-muted-foreground">
+                  توضیح
+                </label>
                 <textarea
-                  className={`${input} resize-none`}
+                  className={`${inputCls} resize-none`}
                   rows={2}
                   value={String(form.description)}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -557,6 +668,8 @@ export default function AdminProductsPage() {
                     type="checkbox"
                     checked={Boolean(form.visible)}
                     onChange={(e) => setForm((f) => ({ ...f, visible: e.target.checked }))}
+                    className="h-4 w-4"
+                    style={{ accentColor: "#C9A227" }}
                   />
                   نمایش در فروشگاه
                 </label>
@@ -565,24 +678,54 @@ export default function AdminProductsPage() {
                     type="checkbox"
                     checked={Boolean(form.inStock)}
                     onChange={(e) => setForm((f) => ({ ...f, inStock: e.target.checked }))}
+                    className="h-4 w-4"
+                    style={{ accentColor: "#C9A227" }}
                   />
                   موجود
                 </label>
               </div>
-              {error && <p className="text-xs text-destructive">{error}</p>}
-              {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-              <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={busy} className="btn-gold flex-1 justify-center">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
-                </button>
-                <button type="button" onClick={closeModal} className="btn-ghost-gold">
+              {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+              {hint && <p className="mt-2 text-xs text-muted-foreground">{hint}</p>}
+              <div className="mt-6 flex gap-3">
+                <button type="button" onClick={closeModal} className="btn-ghost-gold flex-1">
                   انصراف
+                </button>
+                <button type="submit" disabled={busy} className="btn-gold flex-1">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {editing?.id ? "ذخیره تغییرات" : "ثبت"}
                 </button>
               </div>
             </div>
           </form>
         </div>
       )}
+
+      <MediaPicker
+        open={coverPickerOpen}
+        onOpenChange={setCoverPickerOpen}
+        mode="single"
+        onSelect={(selected) => {
+          const media = Array.isArray(selected) ? selected[0] : selected;
+          if (media) setForm((f) => ({ ...f, image: media.url }));
+        }}
+        title="انتخاب تصویر کاور از کتابخانه"
+      />
+
+      <MediaPicker
+        open={galleryPickerOpen}
+        onOpenChange={setGalleryPickerOpen}
+        mode="multi"
+        max={GALLERY_MAX}
+        onSelect={(selected) => {
+          const mediaList = Array.isArray(selected) ? selected : [selected];
+          setForm((f) => {
+            const cur = Array.isArray(f.gallery) ? f.gallery : [];
+            const next = [...cur, ...mediaList.map((m) => m.url)].slice(0, GALLERY_MAX);
+            return { ...f, gallery: next };
+          });
+        }}
+        title="انتخاب تصاویر گالری از کتابخانه"
+      />
     </div>
   );
 }

@@ -1,10 +1,21 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { useCurtainCategories, allCategorySelectOptions } from "@/hooks/useCurtainCategories";
+import { api } from "@/api/client";
 
 export default function AdminCategoriesPage() {
   const { categories } = useCurtainCategories();
+  const [collectionOptions, setCollectionOptions] = useState<Array<{ value: string; label: string }>>([]);
+
+  useEffect(() => {
+    api.entities.Collection.list("order", 500)
+      .then((data) => setCollectionOptions(
+        (data as Array<{ id: string; title: string }> || []).map((c) => ({ value: c.id, label: c.title }))
+      ))
+      .catch(console.error);
+  }, []);
 
   const fields = [
     { key: "name", label: "نام دسته", required: true, placeholder: "مثلاً: شید" },
@@ -28,6 +39,13 @@ export default function AdminCategoriesPage() {
     },
     { key: "image", label: "کاور", type: "image" },
     { key: "description", label: "توضیح کوتاه", type: "textarea" },
+    {
+      key: "collectionIds",
+      label: "مجموعه‌ها",
+      type: "multiselect",
+      placeholder: "مجموعه‌ها را انتخاب کنید",
+      options: collectionOptions,
+    },
   ];
 
   const columns = [
@@ -74,6 +92,7 @@ export default function AdminCategoriesPage() {
       sortBy="order"
       options={{
         mechanism: allCategorySelectOptions(categories),
+        collectionIds: collectionOptions,
       }}
     />
   );

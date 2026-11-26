@@ -5,8 +5,9 @@ import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
 import { api } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToast } from "@/lib/adminToast";
-import { Upload, Loader2, Image as ImageIcon, X, Trash2, Palette } from "lucide-react";
+import { Upload, Loader2, Image as ImageIcon, X, Trash2, Palette, Image as LibImage } from "lucide-react";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
+import { MediaPicker } from "@/components/media/MediaPicker";
 
 const HARMONY_SLUGS = ["cotton", "silk", "sheer", "velvet"];
 
@@ -27,6 +28,7 @@ export default function AdminFabricLibraryPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hints, setHints] = useState<Record<string, string>>({});
+  const [pickerSlug, setPickerSlug] = useState<string | null>(null);
 
   // local state for form values
   const [formData, setFormData] = useState<Record<string, { backgroundImage: string; backgroundGradient: string }>>({});
@@ -53,8 +55,8 @@ export default function AdminFabricLibraryPage() {
     setUploading(slug);
     setErrors((prev) => ({ ...prev, [slug]: "" }));
     try {
-      const res = await api.integrations.Core.UploadPublicFile({ file });
-      const url = res?.file_url || res?.url || res?.path;
+      const media = await api.media.upload(file);
+      const url = media.url;
       if (!url) throw new Error("آپلود پاسخ معتبری نداد");
       updateField(slug, "backgroundImage", url);
       setHints((prev) => ({ ...prev, [slug]: "تصویر آپلود شد. برای ذخیره دکمه ذخیره را بزنید." }));
@@ -135,17 +137,27 @@ export default function AdminFabricLibraryPage() {
                       )}
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-3 py-2 font-body text-xs font-bold text-primary">
-                        {uploading === slug ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                        {uploading === slug ? "آپلود…" : hasImage ? "تعویض" : "انتخاب"}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
+                      <div className="flex gap-1">
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-3 py-2 font-body text-xs font-bold text-primary">
+                          {uploading === slug ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                          {uploading === slug ? "آپلود…" : hasImage ? "تعویض" : "انتخاب"}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={uploading === slug}
+                            onChange={(e) => { const f = e.target.files?.[0] || null; e.target.value = ""; if (f) handleImageUpload(slug, f); }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setPickerSlug(slug)}
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-secondary/60 bg-secondary/5 px-2 py-2 font-body text-[10px] text-muted-foreground hover:border-primary/60 hover:text-primary"
                           disabled={uploading === slug}
-                          onChange={(e) => { const f = e.target.files?.[0] || null; e.target.value = ""; if (f) handleImageUpload(slug, f); }}
-                        />
-                      </label>
+                        >
+                          <LibImage className="h-3 w-3" />
+                        </button>
+                      </div>
                       {hasImage && (
                         <button type="button" onClick={() => removeImage(slug)} className="rounded-xl border border-secondary/70 px-3 py-2 text-xs text-muted-foreground hover:border-destructive hover:text-destructive">حذف تصویر</button>
                       )}
@@ -207,6 +219,25 @@ export default function AdminFabricLibraryPage() {
             );
           })}
         </div>
+      )}
+
+      {pickerSlug && (
+        <MediaPicker
+          open={Boolean(pickerSlug)}
+          onOpenChange={(o) => {
+            if (!o) setPickerSlug(null);
+          }}
+          mode="single"
+          onSelect={(selected) => {
+            const media = Array.isArray(selected) ? selected[0] : selected;
+            if (media && pickerSlug) {
+              updateField(pickerSlug, "backgroundImage", media.url);
+              setHints((prev) => ({ ...prev, [pickerSlug]: "تصویر از کتابخانه انتخاب شد. برای ذخیره دکمه ذخیره را بزنید." }));
+            }
+            setPickerSlug(null);
+          }}
+          title="انتخاب تصویر پس‌زمینه از کتابخانه"
+        />
       )}
     </div>
   );

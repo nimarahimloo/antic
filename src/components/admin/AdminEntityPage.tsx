@@ -2,28 +2,34 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/api/client";
-import { Plus, Pencil, Trash2, X, Loader2, Upload, Sparkles } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Loader2, Upload, Sparkles, Image } from "lucide-react";
 import { compressImage } from "@/lib/compressImage";
 import { analyzeFabric } from "@/components/catalog/photo/fabricAnalyzer";
 import { adminToast } from "@/lib/adminToast";
 import { apiErrorMessage } from "@/lib/apiError";
 import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
+import { MediaPicker } from "@/components/media/MediaPicker";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
 const labelCls = "mb-1.5 block font-body text-xs text-muted-foreground";
-const WIDE_TYPES = ["textarea", "list", "sublist", "image", "gallery"];
+const WIDE_TYPES = ["textarea", "list", "sublist", "image", "gallery", "multiselect"];
 const GALLERY_MAX = 20;
 
 interface FieldConfig {
   key: string;
   label: string;
   required?: boolean;
-  type?: "text" | "number" | "select" | "textarea" | "boolean" | "image" | "gallery" | "list" | "sublist" | string;
+  type?: "text" | "number" | "select" | "textarea" | "boolean" | "image" | "gallery" | "list" | "sublist" | "multiselect" | string;
   placeholder?: string;
   default?: unknown;
   getOptions?: (form: Record<string, unknown>, options: Record<string, unknown>) => Array<{ value: string; label: string }>;
   clearFields?: string[];
+  // For multiselect: fetch options from an API endpoint
+  optionsApi?: string;
+  // Display field for selected items
+  optionLabel?: string;
+  optionValue?: string;
 }
 
 interface ColumnConfig {
@@ -59,6 +65,9 @@ export default function AdminEntityPage({
   const [saving, setSaving] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerMode, setPickerMode] = useState<"single" | "multi">("single");
+  const [pickerFieldKey, setPickerFieldKey] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [tableError, setTableError] = useState("");
   const [hint, setHint] = useState("");
@@ -105,6 +114,8 @@ export default function AdminEntityPage({
             initial[f.key] = v.split(",").map((s) => s.trim()).filter(Boolean).slice(0, GALLERY_MAX);
           }
         } else initial[f.key] = [];
+      } else if (f.type === "multiselect") {
+        initial[f.key] = Array.isArray(v) ? v : [];
       } else if (f.type === "list") initial[f.key] = Array.isArray(v) ? v.join(", ") : "";
       else if (f.type === "sublist")
         initial[f.key] = (Array.isArray(v) ? v : [])
@@ -125,6 +136,256 @@ export default function AdminEntityPage({
     setUploadingField(null);
   }
 
+  function renderFieldInput(f: FieldConfig) {
+    const fieldOptions = typeof f.getOptions === "function" ? f.getOptions(form, options) : options[f.key] || [];
+    
+    if (f.type === "select") {
+      return (
+        <select
+          value={String(form[f.key] ?? "")}
+          onChange={(e) => {
+            const val = e.target.value;
+            setForm((s) => {
+              const next = { ...s, [f.key]: val };
+              if (f.clearFields?.length) for (const k of f.clearFields) next[k] = "";
+              return next;
+            });
+          }}
+          className={inputCls}
+        >
+          <option value="">انتخاب کنید…</option>
+          {fieldOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      );
+    }
+    if (f.type === "textarea") {
+      return (
+        <textarea
+          rows={3}
+          value={String(form[f.key] ?? "")}
+          onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
+          placeholder={f.placeholder}
+          className={`${inputCls} resize-none`}
+        />
+      );
+    }
+    if (f.type === "boolean") {
+      return (
+        <label className="flex cursor-pointer items-center gap-2.5 py-2">
+          <input
+            type="checkbox"
+            checked={!!form[f.key]}
+            onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.checked }))}
+            className="h-4 w-4"
+            style={{ accentColor: "#C9A227" }}
+          />
+          <span className="font-body text-xs text-foreground">{f.placeholder || "فعال"}</span>
+        </label>
+      );
+    }
+    if (f.type === "image") {
+      return (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
+            {form[f.key] ? (
+              <OptimizedImage src={String(form[f.key])} alt="" fill className="object-cover" sizes="80px" />
+            ) : (
+              <Upload className="h-5 w-5 text-muted-foreground" />
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-2">
+              <label
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary"
+              >
+                {uploadingField === f.key || (f.key === "image" && analyzing) ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {uploadingField === f.key
+                  ? "آپلود…"
+                  : analyzing && f.key === "image"
+                  ? "تحلیل…"
+                  : form[f.key]
+                  ? "تعویض"
+                  : "انتخاب تصویر"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={uploadingField === f.key || analyzing}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    e.target.value = "";
+                    if (file) uploadImage(f.key, file);
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setPickerFieldKey(f.key);
+                  setPickerMode("single");
+                  setPickerOpen(true);
+                }}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-secondary/60 bg-secondary/5 px-4 py-2.5 font-body text-xs text-muted-foreground hover:border-primary/60 hover:text-primary"
+                disabled={uploadingField === f.key || analyzing}
+              >
+                <Image className="h-4 w-4" /> کتابخانه
+              </button>
+              {form[f.key] != null && String(form[f.key]).trim() !== "" && (
+                <button
+                  type="button"
+                  onClick={() => setForm((s) => ({ ...s, [f.key]: "" }))}
+                  className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive"
+                >
+                  حذف
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (f.type === "gallery") {
+      return (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <label
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary"
+            >
+              {uploadingField === f.key ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              {uploadingField === f.key ? "آپلود…" : "افزودن تصاویر"}
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                disabled={uploadingField === f.key}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  e.target.value = "";
+                  if (files.length) uploadGallery(f.key, files);
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setPickerFieldKey(f.key);
+                setPickerMode("multi");
+                setPickerOpen(true);
+              }}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-secondary/60 bg-secondary/5 px-4 py-2.5 font-body text-xs text-muted-foreground hover:border-primary/60 hover:text-primary"
+              disabled={uploadingField === f.key}
+            >
+              <Image className="h-4 w-4" /> کتابخانه
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(Array.isArray(form[f.key]) ? (form[f.key] as unknown[]) : []).map((url, i) => (
+              <div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg border border-secondary/60">
+                <ThumbnailImage src={String(url)} alt="" size={64} className="object-cover" />
+                <button
+                  type="button"
+                  className="absolute inset-0 bg-black/50 text-[10px] text-white opacity-0 hover:opacity-100"
+                  onClick={() =>
+                    setForm((s) => ({
+                      ...s,
+                      [f.key]: ((s[f.key] as unknown[]) || []).filter((_: unknown, j: number) => j !== i),
+                    }))
+                  }
+                >
+                  حذف
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    if (f.type === "multiselect") {
+      return (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {(Array.isArray(form[f.key]) ? (form[f.key] as unknown[]) : []).map((val, i) => {
+              const opt = fieldOptions.find((o) => o.value === String(val));
+              return (
+                <div key={`${val}-${i}`} className="inline-flex items-center gap-1.5 rounded-lg border border-primary/50 bg-primary/5 px-3 py-1.5">
+                  <span className="font-body text-xs text-primary">{opt?.label || String(val)}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((s) => ({
+                        ...s,
+                        [f.key]: ((s[f.key] as unknown[]) || []).filter((v: unknown) => String(v) !== String(val)),
+                      }))
+                    }
+                    className="flex h-4 w-4 items-center justify-center text-primary hover:bg-primary/20 rounded"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <select
+            value=""
+            onChange={(e) => {
+              const val = e.target.value;
+              if (!val) return;
+              setForm((s) => {
+                const current = Array.isArray(s[f.key]) ? (s[f.key] as unknown[]) : [];
+                if (current.some((v) => String(v) === val)) return s;
+                return { ...s, [f.key]: [...current, val] };
+              });
+              e.target.value = "";
+            }}
+            className={inputCls}
+          >
+            <option value="" disabled selected>
+              جستجو و انتخاب مجموعه…
+            </option>
+            {fieldOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      );
+    }
+    if (f.type === "list" || f.type === "sublist") {
+      return (
+        <input
+          type="text"
+          value={String(form[f.key] ?? "")}
+          onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
+          placeholder={f.placeholder || "با ویرگول جدا کنید"}
+          className={inputCls}
+        />
+      );
+    }
+    return (
+      <input
+        type={f.type === "number" ? "number" : "text"}
+        value={String(form[f.key] ?? "")}
+        onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
+        placeholder={f.placeholder}
+        className={inputCls}
+      />
+    );
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const missing = fields.filter((f) => {
@@ -141,6 +402,8 @@ export default function AdminEntityPage({
       const v = form[f.key] as unknown;
       if (f.type === "gallery") {
         payload[f.key] = (Array.isArray(v) ? v : []).filter(Boolean).slice(0, GALLERY_MAX);
+      } else if (f.type === "multiselect") {
+        payload[f.key] = Array.isArray(v) ? v.filter(Boolean) : [];
       } else if (f.type === "list") {
         payload[f.key] = String(v || "")
           .split(",")
@@ -240,8 +503,8 @@ export default function AdminEntityPage({
     setHint("");
     try {
       const compressed = await compressImage(file);
-      const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
-      const url = res?.file_url || res?.url;
+      const media = await api.media.upload(compressed);
+      const url = media.url;
       if (!url) throw new Error("آپلود پاسخ معتبری نداد");
       setForm((f) => ({ ...f, [fieldKey]: url }));
       if (fieldKey === "image" && autoAnalyzeFabric) await applyFabricAnalysis(url);
@@ -267,10 +530,8 @@ export default function AdminEntityPage({
       const urls: string[] = [];
       for (const file of files) {
         const compressed = await compressImage(file);
-        const uploader = api?.integrations?.Core?.UploadPublicFile;
-        if (typeof uploader !== "function") throw new Error("سرویس آپلود در دسترس نیست");
-        const res = await uploader({ file: compressed });
-        const url = res?.file_url || res?.url || res?.path;
+        const media = await api.media.upload(compressed);
+        const url = media.url;
         if (url) urls.push(url);
       }
       if (!urls.length) throw new Error("آپلود پاسخ معتبری نداد");
@@ -409,154 +670,7 @@ export default function AdminEntityPage({
                     {f.label}
                     {f.required && <span className="text-primary"> *</span>}
                   </label>
-                  {f.type === "select" ? (
-                    <select
-                      value={String(form[f.key] ?? "")}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setForm((s) => {
-                          const next = { ...s, [f.key]: val };
-                          if (f.clearFields?.length) for (const k of f.clearFields) next[k] = "";
-                          return next;
-                        });
-                      }}
-                      className={inputCls}
-                    >
-                      <option value="">انتخاب کنید…</option>
-                      {(typeof f.getOptions === "function" ? f.getOptions(form, options) : options[f.key] || []).map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : f.type === "textarea" ? (
-                    <textarea
-                      rows={3}
-                      value={String(form[f.key] ?? "")}
-                      onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
-                      placeholder={f.placeholder}
-                      className={`${inputCls} resize-none`}
-                    />
-                  ) : f.type === "boolean" ? (
-                    <label className="flex cursor-pointer items-center gap-2.5 py-2">
-                      <input
-                        type="checkbox"
-                        checked={!!form[f.key]}
-                        onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.checked }))}
-                        className="h-4 w-4"
-                        style={{ accentColor: "#C9A227" }}
-                      />
-                      <span className="font-body text-xs text-foreground">{f.placeholder || "فعال"}</span>
-                    </label>
-                  ) : f.type === "image" ? (
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
-                        {form[f.key] ? (
-                          <OptimizedImage src={String(form[f.key])} alt="" fill className="object-cover" sizes="80px" />
-                        ) : (
-                          <Upload className="h-5 w-5 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <label
-                          className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary"
-                        >
-                          {uploadingField === f.key || (f.key === "image" && analyzing) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Upload className="h-4 w-4" />
-                          )}
-                          {uploadingField === f.key
-                            ? "آپلود…"
-                            : analyzing && f.key === "image"
-                            ? "تحلیل…"
-                            : form[f.key]
-                            ? "تعویض"
-                            : "انتخاب تصویر"}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp,image/gif"
-                            className="hidden"
-                            disabled={uploadingField === f.key || analyzing}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || null;
-                              e.target.value = "";
-                              if (file) uploadImage(f.key, file);
-                            }}
-                          />
-                        </label>
-                        {form[f.key] != null && String(form[f.key]).trim() !== "" && (
-                          <button
-                            type="button"
-                            onClick={() => setForm((s) => ({ ...s, [f.key]: "" }))}
-                            className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive"
-                          >
-                            حذف
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ) : f.type === "gallery" ? (
-                    <div className="space-y-3">
-                      <label
-                        className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary"
-                      >
-                        {uploadingField === f.key ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Upload className="h-4 w-4" />
-                        )}
-                        {uploadingField === f.key ? "آپلود…" : "افزودن تصاویر"}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          disabled={uploadingField === f.key}
-                          onChange={(e) => {
-                            const files = Array.from(e.target.files || []);
-                            e.target.value = "";
-                            if (files.length) uploadGallery(f.key, files);
-                          }}
-                        />
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {(Array.isArray(form[f.key]) ? (form[f.key] as unknown[]) : []).map((url, i) => (
-                          <div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg border border-secondary/60">
-                            <ThumbnailImage src={String(url)} alt="" size={64} className="object-cover" />
-                            <button
-                              type="button"
-                              className="absolute inset-0 bg-black/50 text-[10px] text-white opacity-0 hover:opacity-100"
-                              onClick={() =>
-                                setForm((s) => ({
-                                  ...s,
-                                  [f.key]: ((s[f.key] as unknown[]) || []).filter((_: unknown, j: number) => j !== i),
-                                }))
-                              }
-                            >
-                              حذف
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : f.type === "list" || f.type === "sublist" ? (
-                    <input
-                      type="text"
-                      value={String(form[f.key] ?? "")}
-                      onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
-                      placeholder={f.placeholder || "با ویرگول جدا کنید"}
-                      className={inputCls}
-                    />
-                  ) : (
-                    <input
-                      type={f.type === "number" ? "number" : "text"}
-                      value={String(form[f.key] ?? "")}
-                      onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
-                      placeholder={f.placeholder}
-                      className={inputCls}
-                    />
-                  )}
+                  {renderFieldInput(f)}
                 </div>
               ))}
             </div>
@@ -580,6 +694,32 @@ export default function AdminEntityPage({
           </form>
         </div>
       )}
+
+      <MediaPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        mode={pickerMode}
+        onSelect={(selected) => {
+          const mediaList = Array.isArray(selected) ? selected : [selected];
+          if (!pickerFieldKey) {
+            setPickerOpen(false);
+            return;
+          }
+          const fieldType = fields.find((f) => f.key === pickerFieldKey)?.type;
+          if (fieldType === "gallery") {
+            setForm((f) => {
+              const cur = Array.isArray(f[pickerFieldKey]) ? f[pickerFieldKey] : [];
+              const next = [...cur, ...mediaList.map((m) => m.url)].slice(0, GALLERY_MAX);
+              return { ...f, [pickerFieldKey]: next };
+            });
+          } else {
+            setForm((f) => ({ ...f, [pickerFieldKey]: mediaList[0].url }));
+          }
+          setPickerFieldKey(null);
+          setPickerOpen(false);
+        }}
+        title="انتخاب تصویر از کتابخانه"
+      />
     </div>
   );
 }

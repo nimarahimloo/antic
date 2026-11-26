@@ -23,6 +23,7 @@ model User {
   aiFiles         AIFile[]
   aiUsage         AIUsage[]
   aiMemories      AIMemory[]
+  media           Media[]
 }
 
 /// یک‌بارمصرف و زمان‌دار — برای بازیابی رمز عبور
@@ -78,6 +79,19 @@ model CurtainModel {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  /// SEO
+  seoTitle         String?
+  seoDescription   String?
+  seoCanonicalUrl  String?
+  seoRobots        String?
+  seoOgTitle       String?
+  seoOgDescription String?
+  seoOgImage       String?
+  seoTwitterCard   String?
+  seoTwitterTitle  String?
+  seoTwitterDescription String?
+  seoTwitterImage  String?
+
   relatedProjects Project[] @relation("CurtainModelRelatedProjects")
 
   @@index([categorySlug])
@@ -99,6 +113,21 @@ model CurtainCategory {
   // هارمونی بافت و رنگ - پس‌زمینه کارت‌ها در سکشن فابریک لایبرری
   backgroundImage String?
   backgroundGradient String?
+
+  /// SEO
+  seoTitle         String?
+  seoDescription   String?
+  seoCanonicalUrl  String?
+  seoRobots        String?
+  seoOgTitle       String?
+  seoOgDescription String?
+  seoOgImage       String?
+  seoTwitterCard   String?
+  seoTwitterTitle  String?
+  seoTwitterDescription String?
+  seoTwitterImage  String?
+
+  collections     CollectionCategory[]
 }
 
 model PortfolioCategory {
@@ -110,7 +139,20 @@ model PortfolioCategory {
   order         Int      @default(0)
   subcategories String?
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  updatedAt   DateTime @updatedAt
+
+  /// SEO
+  seoTitle         String?
+  seoDescription   String?
+  seoCanonicalUrl  String?
+  seoRobots        String?
+  seoOgTitle       String?
+  seoOgDescription String?
+  seoOgImage       String?
+  seoTwitterCard   String?
+  seoTwitterTitle  String?
+  seoTwitterDescription String?
+  seoTwitterImage  String?
 }
 
 model Project {
@@ -123,8 +165,22 @@ model Project {
   subcategory  String?
   relatedProducts Product[] @relation("ProductRelatedProjects")
   relatedCurtainModels CurtainModel[] @relation("CurtainModelRelatedProjects")
+  collections    CollectionProject[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  /// SEO
+  seoTitle         String?
+  seoDescription   String?
+  seoCanonicalUrl  String?
+  seoRobots        String?
+  seoOgTitle       String?
+  seoOgDescription String?
+  seoOgImage       String?
+  seoTwitterCard   String?
+  seoTwitterTitle  String?
+  seoTwitterDescription String?
+  seoTwitterImage  String?
 
   @@index([categorySlug])
 }
@@ -179,6 +235,81 @@ model SavedDesign {
   updatedAt        DateTime @updatedAt
 }
 
+/// Collection (مجموعه) — first-class entity for grouping products, categories, and projects
+model Collection {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  coverImage  String?
+  order       Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  /// SEO
+  seoTitle         String?
+  seoDescription   String?
+  seoCanonicalUrl  String?
+  seoRobots        String?
+  seoOgTitle       String?
+  seoOgDescription String?
+  seoOgImage       String?
+  seoTwitterCard   String?
+  seoTwitterTitle  String?
+  seoTwitterDescription String?
+  seoTwitterImage  String?
+
+  products    CollectionProduct[]
+  categories  CollectionCategory[]
+  projects    CollectionProject[]
+
+  @@index([active, order])
+  @@index([slug])
+}
+
+/// Many-to-many: Collection <-> Product
+model CollectionProduct {
+  id            String      @id @default(cuid())
+  collectionId  String
+  collection    Collection  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+
+  @@unique([collectionId, productId])
+  @@index([collectionId])
+  @@index([productId])
+}
+
+/// Many-to-many: Collection <-> CurtainCategory (catalog categories)
+model CollectionCategory {
+  id            String         @id @default(cuid())
+  collectionId  String
+  collection    Collection     @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      CurtainCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt     DateTime       @default(now())
+
+  @@unique([collectionId, categoryId])
+  @@index([collectionId])
+  @@index([categoryId])
+}
+
+/// Many-to-many: Collection <-> Project (portfolio projects)
+model CollectionProject {
+  id            String   @id @default(cuid())
+  collectionId  String
+  collection    Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@unique([collectionId, projectId])
+  @@index([collectionId])
+  @@index([projectId])
+}
+
 model VirtualWindowSetting {
   id         String   @id @default(cuid())
   wallColor  String?
@@ -189,14 +320,33 @@ model VirtualWindowSetting {
   updatedAt  DateTime @updatedAt
 }
 
+/// Site-wide settings including SEO configuration.
 model SiteSetting {
   id         String   @id @default(cuid())
   key        String   @unique @default("main")
   logoUrl    String?
   heroSlides String?
   pageHeroes String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  /// SEO
+  seoTitle       String?
+  seoDescription   String?
+  seoKeywords      String?
+  canonicalUrl     String?
+  robotsPolicy     String?   // e.g. "index, follow" or "noindex, nofollow"
+  ogTitle          String?
+  ogDescription    String?
+  ogImage          String?
+  twitterCard      String?   // e.g. "summary_large_image"
+  twitterTitle     String?
+  twitterDescription String?
+  twitterImage     String?
+  organizationName String?
+  organizationLogo String?
+  sitemapEnabled   Boolean   @default(true)
+  verificationGoogle String?
+  verificationBing   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model Product {
@@ -220,7 +370,21 @@ model Product {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  relatedProjects Project[] @relation("ProductRelatedProjects")
+  /// SEO
+  seoTitle         String?
+  seoDescription   String?
+  seoCanonicalUrl  String?
+  seoRobots        String?   // e.g. "index, follow" or "noindex, nofollow"
+  seoOgTitle       String?
+  seoOgDescription String?
+  seoOgImage       String?
+  seoTwitterCard   String?   // e.g. "summary_large_image"
+  seoTwitterTitle  String?
+  seoTwitterDescription String?
+  seoTwitterImage  String?
+
+  relatedProjects   Project[]             @relation("ProductRelatedProjects")
+  collections       CollectionProduct[]
 
   @@index([categoryId])
   @@index([visible])
@@ -236,6 +400,19 @@ model ShopCategory {
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  /// SEO
+  seoTitle         String?
+  seoDescription   String?
+  seoCanonicalUrl  String?
+  seoRobots        String?
+  seoOgTitle       String?
+  seoOgDescription String?
+  seoOgImage       String?
+  seoTwitterCard   String?
+  seoTwitterTitle  String?
+  seoTwitterDescription String?
+  seoTwitterImage  String?
 }
 
 model Order {
@@ -362,4 +539,66 @@ model AIMemory {
   @@index([userId, importance])
   @@index([userId, createdAt])
   @@index([conversationId])
+}
+
+/// Central media library — one canonical record per uploaded image.
+/// Every image field across entities can reference Media via MediaUsage.
+model Media {
+  id          String   @id @default(cuid())
+  /// Stored filename on disk (under uploads/media/...)
+  filename    String
+  originalName String
+  mimeType    String   // image/jpeg | image/png | image/webp | image/gif | image/svg+xml | image/bmp | image/tiff | image/vnd.microsoft.icon
+  size        Int      // bytes (original file size)
+  width       Int?
+  height      Int?
+  /// Relative path under the upload dir, e.g. media/2026/11/abcd1234.jpg
+  storagePath String
+  /// Public URL served by /uploads static middleware, e.g. /uploads/media/.../abcd1234.jpg
+  url         String
+  /// Public URL of WebP derivative (for raster images) or WebP derivative of SVG
+  webpUrl     String?
+  /// Size of WebP derivative in bytes
+  webpSize    Int?
+  /// Original file size before WebP conversion (same as size for non-WebP uploads)
+  originalSize Int?
+  /// Original MIME type before conversion (e.g. image/jpeg for a WebP derivative)
+  originalMimeType String?
+  sha256      String?   @unique // content hash for deduplication
+  alt         String?
+  caption     String?
+  title       String?
+  uploadedById String?
+  uploadedBy  User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  usages      MediaUsage[]
+
+  @@index([uploadedById])
+  @@index([sha256])
+  @@index([mimeType])
+  @@index([createdAt])
+  @@index([url])
+  @@index([webpUrl])
+}
+
+/// Join-like usage log: which entity field references which media.
+/// Used for the "delete with usage check" guard and for back-filling alt/caption.
+model MediaUsage {
+  id        String   @id @default(cuid())
+  mediaId   String
+  media     Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  /// e.g. "CurtainCategory" | "CurtainModel" | "Product" | "PortfolioCategory" |
+  ///      "Project" | "RenderTemplate" | "InstallReference" | "SavedDesign" |
+  ///      "Collection" | "VirtualWindowSetting" | "SiteSetting" | "ShopCategory"
+  entityType String
+  entityId  String
+  /// e.g. "image" | "gallery" | "backgroundImage" | "coverImage" | "viewImage" | "logoUrl" | "heroSlides" | "pageHeroes"
+  fieldName String
+  createdAt DateTime @default(now())
+
+  @@index([mediaId])
+  @@index([entityType, entityId])
+  @@index([entityType, entityId, fieldName])
+  @@unique([mediaId, entityType, entityId, fieldName])
 }

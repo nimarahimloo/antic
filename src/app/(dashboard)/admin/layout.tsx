@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, FileText, Settings, LogOut, ChevronLeft, ChevronRight, Sparkles, UploadCloud, Palette } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, FileText, Settings, LogOut, ChevronLeft, ChevronRight, Sparkles, UploadCloud, Palette, FolderOpen, Image } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ const ADMIN_NAV = [
   { label: "داشبورد", href: "/admin", icon: LayoutDashboard },
   { label: "فضای کاری هوش مصنوعی", href: "/admin/workspace", icon: Sparkles },
   { label: "درخواست‌ها", href: "/admin/requests", icon: FileText },
+  { label: "مجموعه‌ها", href: "/admin/collections", icon: FolderOpen },
   { label: "مدل‌ها", href: "/admin/models", icon: Package },
   { label: "پروژه‌ها", href: "/admin/projects", icon: FileText },
   { label: "دسته‌بندی‌ها", href: "/admin/categories", icon: Package },
@@ -21,6 +22,7 @@ const ADMIN_NAV = [
   { label: "بارگذاری گروهی", href: "/admin/bulk-upload", icon: UploadCloud },
   { label: "تنظیمات پنجره", href: "/admin/window", icon: Settings },
   { label: "تنظیمات", href: "/admin/settings", icon: Settings },
+  { label: "کتابخانه رسانه", href: "/admin/media", icon: Image },
 ];
 
 export default function AdminLayout({
@@ -43,7 +45,10 @@ export default function AdminLayout({
   if (!isAdmin) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <p className="font-body text-sm text-muted-foreground">دسترسی به پنل مدیریت نیاز به احراز هویت دارد</p>
+        </div>
       </div>
     );
   }
@@ -54,11 +59,11 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background overflow-x-hidden">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
@@ -67,7 +72,7 @@ export default function AdminLayout({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 flex flex-col border-r border-secondary/60 bg-background transition-transform duration-300 lg:relative lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-72 flex flex-col border-r border-secondary/60 bg-background transition-transform duration-300 lg:relative lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
         aria-label="منوی مدیریت"
@@ -79,7 +84,7 @@ export default function AdminLayout({
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-2 rounded-lg text-muted-foreground hover:bg-secondary/50"
+            className="lg:hidden p-2.5 rounded-xl text-muted-foreground hover:bg-secondary/50"
             aria-label="بستن منو"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -123,12 +128,12 @@ export default function AdminLayout({
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 lg:ml-0 min-w-0">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-secondary/60 bg-background/85 backdrop-blur-xl px-4 lg:px-6">
+      <div className="flex-1 min-w-0">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-secondary/60 bg-background/90 backdrop-blur-md px-4 lg:px-6">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 rounded-lg text-muted-foreground hover:bg-secondary/50"
+            className="lg:hidden p-2.5 rounded-lg text-muted-foreground hover:bg-secondary/50"
             aria-label="باز کردن منو"
           >
             <ChevronRight className="h-5 w-5" />
@@ -138,7 +143,7 @@ export default function AdminLayout({
             <span className="hidden font-body text-sm text-muted-foreground lg:block">
               {user?.full_name || user?.email}
             </span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
               {user?.full_name?.charAt(0) || "ا"}
             </div>
           </div>

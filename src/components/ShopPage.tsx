@@ -19,7 +19,7 @@ export default function ShopPage() {
         description="محصولات فروشگاه — از یراق و اکسسوری تا مدل‌های آماده."
       />
 
-      <section className="sticky top-20 z-30 border-b border-secondary/50 bg-background/90 backdrop-blur-xl">
+      <section className="sticky top-16 md:top-20 z-30 border-b border-secondary/50 bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-3 lg:px-10">
           <div className="flex gap-3 overflow-x-auto no-scrollbar pb-0.5">
             <button

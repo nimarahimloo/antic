@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Key, Globe, Sparkles, AlertCircle, Upload, Loader2, Plus, Trash2, Image as ImageIcon } from "lucide-react";
+import { Key, Globe, Sparkles, AlertCircle, Upload, Loader2, Plus, Trash2, Image as ImageIcon, Image as LibImage } from "lucide-react";
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
@@ -13,6 +13,7 @@ import AdminPageHeroes, {
   serializePageHeroes,
 } from "@/components/admin/AdminPageHeroes";
 import { OptimizedImage, ThumbnailImage } from "@/components/ui/image";
+import { MediaPicker } from "@/components/media/MediaPicker";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -27,6 +28,24 @@ interface SiteSetting {
   heroSlides?: Array<{ space?: string; title?: string; subtitle?: string; image?: string }>;
   page_heroes?: Record<string, unknown>;
   pageHeroes?: Record<string, unknown>;
+  // SEO fields
+  seoTitle?: string;
+  seoDescription?: string;
+  seoKeywords?: string;
+  canonicalUrl?: string;
+  robotsPolicy?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
+  twitterCard?: string;
+  twitterTitle?: string;
+  twitterDescription?: string;
+  twitterImage?: string;
+  organizationName?: string;
+  organizationLogo?: string;
+  sitemapEnabled?: boolean;
+  verificationGoogle?: string;
+  verificationBing?: string;
 }
 
 const DEFAULT_SLIDES = [
@@ -53,6 +72,26 @@ export default function AdminSettingsPage() {
   const [uploadingSlide, setUploadingSlide] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [hint, setHint] = useState("");
+  const [logoPickerOpen, setLogoPickerOpen] = useState(false);
+  const [slidePickerOpen, setSlidePickerOpen] = useState<{ open: boolean; idx: number } | null>(null);
+  // SEO fields
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
+  const [canonicalUrl, setCanonicalUrl] = useState("");
+  const [robotsPolicy, setRobotsPolicy] = useState("index, follow");
+  const [ogTitle, setOgTitle] = useState("");
+  const [ogDescription, setOgDescription] = useState("");
+  const [ogImage, setOgImage] = useState("");
+  const [twitterCard, setTwitterCard] = useState("summary_large_image");
+  const [twitterTitle, setTwitterTitle] = useState("");
+  const [twitterDescription, setTwitterDescription] = useState("");
+  const [twitterImage, setTwitterImage] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
+  const [organizationLogo, setOrganizationLogo] = useState("");
+  const [sitemapEnabled, setSitemapEnabled] = useState(true);
+  const [verificationGoogle, setVerificationGoogle] = useState("");
+  const [verificationBing, setVerificationBing] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +108,23 @@ export default function AdminSettingsPage() {
         if (main) {
           setSettingId(String(main.id));
           setLogoUrl(String(main.logo_url || main.logoUrl || ""));
+          setSeoTitle(String(main.seoTitle || ""));
+          setSeoDescription(String(main.seoDescription || ""));
+          setSeoKeywords(String(main.seoKeywords || ""));
+          setCanonicalUrl(String(main.canonicalUrl || ""));
+          setRobotsPolicy(String(main.robotsPolicy || "index, follow"));
+          setOgTitle(String(main.ogTitle || ""));
+          setOgDescription(String(main.ogDescription || ""));
+          setOgImage(String(main.ogImage || ""));
+          setTwitterCard(String(main.twitterCard || "summary_large_image"));
+          setTwitterTitle(String(main.twitterTitle || ""));
+          setTwitterDescription(String(main.twitterDescription || ""));
+          setTwitterImage(String(main.twitterImage || ""));
+          setOrganizationName(String(main.organizationName || ""));
+          setOrganizationLogo(String(main.organizationLogo || ""));
+          setSitemapEnabled(Boolean(main.sitemapEnabled !== false));
+          setVerificationGoogle(String(main.verificationGoogle || ""));
+          setVerificationBing(String(main.verificationBing || ""));
           const hs = main.hero_slides || main.heroSlides;
           if (Array.isArray(hs) && hs.length) {
             setSlides(
@@ -98,8 +154,8 @@ export default function AdminSettingsPage() {
 
   async function uploadImage(file: File) {
     const compressed = await compressImage(file);
-    const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
-    const url = res?.file_url || res?.url || res?.path;
+    const media = await api.media.upload(compressed);
+    const url = media.url;
     if (!url) throw new Error("آپلود پاسخ معتبری نداد");
     return url;
   }
@@ -162,7 +218,25 @@ export default function AdminSettingsPage() {
           image: (s.image || "").trim(),
         })),
       page_heroes: serializePageHeroes(pageHeroes),
-    };
+      // SEO fields
+      seoTitle: seoTitle || undefined,
+      seoDescription: seoDescription || undefined,
+      seoKeywords: seoKeywords || undefined,
+      canonicalUrl: canonicalUrl || undefined,
+      robotsPolicy: robotsPolicy || undefined,
+      ogTitle: ogTitle || undefined,
+      ogDescription: ogDescription || undefined,
+      ogImage: ogImage || undefined,
+      twitterCard: twitterCard || undefined,
+      twitterTitle: twitterTitle || undefined,
+      twitterDescription: twitterDescription || undefined,
+      twitterImage: twitterImage || undefined,
+      organizationName: organizationName || undefined,
+      organizationLogo: organizationLogo || undefined,
+      sitemapEnabled: sitemapEnabled,
+      verificationGoogle: verificationGoogle || undefined,
+      verificationBing: verificationBing || undefined,
+    }
     try {
       if (settingId) {
         await api.entities.SiteSetting.update(settingId, payload);
@@ -218,6 +292,14 @@ export default function AdminSettingsPage() {
                   {uploadingLogo ? "آپلود…" : logoUrl ? "تعویض لوگو" : "آپلود لوگو"}
                   <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml" className="hidden" disabled={uploadingLogo} onChange={(e) => { const f = e.target.files?.[0] || null; e.target.value = ""; if (f) onLogoFile(f); }} />
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setLogoPickerOpen(true)}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-secondary/60 bg-secondary/5 px-3 py-2.5 font-body text-xs text-muted-foreground hover:border-primary/60 hover:text-primary"
+                  disabled={uploadingLogo}
+                >
+                  <LibImage className="h-3.5 w-3.5" /> کتابخانه
+                </button>
                 {logoUrl && (
                   <button type="button" onClick={() => setLogoUrl("")} className="rounded-xl border border-secondary/70 px-3 py-2.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive">بازگشت به پیش‌فرض</button>
                 )}
@@ -270,11 +352,21 @@ export default function AdminSettingsPage() {
                         <div className="relative flex h-16 w-24 items-center justify-center overflow-hidden rounded-lg border border-secondary/60 bg-background">
                           {s.image ? <OptimizedImage src={s.image} alt="" fill className="object-cover" sizes="96px" /> : <Upload className="h-4 w-4 text-muted-foreground" />}
                         </div>
+                        <div className="flex gap-1">
                         <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-3 py-2 font-body text-xs font-bold text-primary">
                           {uploadingSlide === idx ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                           {uploadingSlide === idx ? "آپلود…" : s.image ? "تعویض" : "انتخاب"}
                           <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" disabled={uploadingSlide === idx} onChange={(e) => { const f = e.target.files?.[0] || null; e.target.value = ""; if (f) onSlideImage(idx, f); }} />
                         </label>
+                        <button
+                          type="button"
+                          onClick={() => setSlidePickerOpen({ open: true, idx })}
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-secondary/60 bg-secondary/5 px-2 py-2 font-body text-[10px] text-muted-foreground hover:border-primary/60 hover:text-primary"
+                          disabled={uploadingSlide === idx}
+                        >
+                          <LibImage className="h-3 w-3" />
+                        </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -330,6 +422,35 @@ export default function AdminSettingsPage() {
           </ul>
         </div>
       </div>
+
+      <MediaPicker
+        open={logoPickerOpen}
+        onOpenChange={setLogoPickerOpen}
+        mode="single"
+        onSelect={(selected) => {
+          const media = Array.isArray(selected) ? selected[0] : selected;
+          if (media) setLogoUrl(media.url);
+        }}
+        title="انتخاب لوگو از کتابخانه"
+      />
+
+      {slidePickerOpen && (
+        <MediaPicker
+          open={slidePickerOpen.open}
+          onOpenChange={(o) => setSlidePickerOpen(o ? { open: true, idx: slidePickerOpen.idx } : null)}
+          mode="single"
+          onSelect={(selected) => {
+            const media = Array.isArray(selected) ? selected[0] : selected;
+            if (media && slidePickerOpen) {
+              setSlides((prev) =>
+                prev.map((s, i) => (i === slidePickerOpen.idx ? { ...s, image: media.url } : s))
+              );
+            }
+            setSlidePickerOpen(null);
+          }}
+          title="انتخاب تصویر اسلاید از کتابخانه"
+        />
+      )}
     </div>
   );
 }

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, Loader2, Image as ImageIcon } from "lucide-react";
-import { compressImage } from "@/lib/compressImage";
+import { Upload, Loader2, Image as ImageIcon, Image as LibImage } from "lucide-react";
 import { api } from "@/api/client";
 import { apiErrorMessage } from "@/lib/apiError";
 import { OptimizedImage } from "@/components/ui/image";
+import { MediaPicker } from "@/components/media/MediaPicker";
 
 const inputCls =
   "w-full rounded-xl border border-secondary bg-background px-4 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary";
@@ -81,6 +81,7 @@ export default function AdminPageHeroes({
 }) {
   const [uploadingPage, setUploadingPage] = useState<string | null>(null);
   const [localError, setLocalError] = useState("");
+  const [heroPickerKey, setHeroPickerKey] = useState<string | null>(null);
 
   function update(key: string, field: string, v: string) {
     onChange({ ...value, [key]: { ...value[key], [field]: v } });
@@ -91,9 +92,8 @@ export default function AdminPageHeroes({
     setUploadingPage(key);
     setLocalError("");
     try {
-      const compressed = await compressImage(file);
-      const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
-      const url = res?.file_url || res?.url || res?.path;
+      const media = await api.media.upload(file);
+      const url = media.url;
       if (!url) throw new Error("آپلود پاسخ معتبری نداد");
       update(key, "image", url);
     } catch (e) {
@@ -152,21 +152,31 @@ export default function AdminPageHeroes({
                           <Upload className="h-4 w-4 text-muted-foreground" />
                         )}
                       </div>
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-3 py-2 font-body text-xs font-bold text-primary">
-                        {uploadingPage === d.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                        {uploadingPage === d.key ? "آپلود…" : h.image ? "تعویض تصویر" : "بارگذاری تصویر"}
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,image/gif"
-                          className="hidden"
+                      <div className="flex gap-1">
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-3 py-2 font-body text-xs font-bold text-primary">
+                          {uploadingPage === d.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                          {uploadingPage === d.key ? "آپلود…" : h.image ? "تعویض تصویر" : "بارگذاری تصویر"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="hidden"
+                            disabled={uploadingPage === d.key}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0] || null;
+                              e.target.value = "";
+                              if (f) onImage(d.key, f);
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setHeroPickerKey(d.key)}
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-secondary/60 bg-secondary/5 px-2 py-2 font-body text-[10px] text-muted-foreground hover:border-primary/60 hover:text-primary"
                           disabled={uploadingPage === d.key}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0] || null;
-                            e.target.value = "";
-                            if (f) onImage(d.key, f);
-                          }}
-                        />
-                      </label>
+                        >
+                          <LibImage className="h-3 w-3" />
+                        </button>
+                      </div>
                       {h.image ? (
                         <button type="button" onClick={() => update(d.key, "image", "")} className="text-xs text-muted-foreground hover:text-destructive">
                           حذف تصویر
@@ -179,6 +189,24 @@ export default function AdminPageHeroes({
             );
           })}
         </div>
+      )}
+
+      {heroPickerKey && (
+        <MediaPicker
+          open={Boolean(heroPickerKey)}
+          onOpenChange={(o) => {
+            if (!o) setHeroPickerKey(null);
+          }}
+          mode="single"
+          onSelect={(selected) => {
+            const media = Array.isArray(selected) ? selected[0] : selected;
+            if (media && heroPickerKey) {
+              update(heroPickerKey, "image", media.url);
+            }
+            setHeroPickerKey(null);
+          }}
+          title="انتخاب تصویر هیرو از کتابخانه"
+        />
       )}
     </div>
   );

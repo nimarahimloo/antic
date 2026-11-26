@@ -7,6 +7,7 @@ import FabricLibrary from "@/components/sections/FabricLibrary";
 import ProductSlider from "@/components/sections/ProductSlider";
 import CatalogTeaser from "@/components/sections/CatalogTeaser";
 import ContactCTA from "@/components/sections/ContactCTA";
+import CollectionsSection from "@/components/sections/CollectionsSection";
 import {
   HeroSliderSkeleton,
   CategoryCarouselSkeleton,
@@ -16,8 +17,17 @@ import {
   CatalogTeaserSkeleton,
   ContactCTASkeleton,
 } from "@/components/Skeletons";
+import { getCollections } from "@/lib/server-data";
 
-export default function HomePage() {
+export default async function HomePage() {
+  let collections: Array<{ id: string; title: string; slug: string; description: string; coverImage: string | null; order: number; active: boolean }> = [];
+
+  try {
+    collections = await getCollections(true);
+  } catch {
+    collections = [];
+  }
+
   return (
     <Layout>
       <div className="bg-background">
@@ -42,6 +52,7 @@ export default function HomePage() {
         <Suspense fallback={<ContactCTASkeleton />}>
           <ContactCTA />
         </Suspense>
+        <CollectionsSection collections={collections} />
       </div>
     </Layout>
   );

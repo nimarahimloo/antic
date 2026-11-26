@@ -18,11 +18,16 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
   );
 
   const images = useMemo(
-    () => (d.product ? productGallery(d.product).map((img) => ({ url: storeImage(img.url), altText: img.altText })).filter((img): img is { url: string; altText: string } => img.url !== null) : []),
+    () =>
+      d.product
+        ? productGallery(d.product)
+            .map((img) => ({ url: storeImage(img.url), altText: img.altText }))
+            .filter((img): img is { url: string; altText: string } => img.url !== null)
+        : [],
     [d.product]
   );
   const focusUrl = d.focusMediaUrl ? (storeImage(d.focusMediaUrl) ?? "") : "";
-  
+
   const handleContact = () => {
     window.location.href = SITE_PHONE_HREF;
   };
@@ -30,23 +35,34 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
   if (d.error) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-24 text-center">
-        <p className="font-body text-sm text-muted-foreground">{d.error}</p>
-        <button onClick={d.retry} className="btn-ghost-gold mt-5">تلاش دوباره</button>
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+            <svg className="h-6 w-6 text-destructive" fill="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+          </div>
+          <p className="font-body text-sm text-muted-foreground">{d.error}</p>
+          <button onClick={d.retry} className="btn-ghost-gold">تلاش دوباره</button>
+        </div>
       </div>
     );
   }
   if (d.notFound) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-24 text-center">
-        <h1 className="font-display text-2xl font-black text-foreground">محصول پیدا نشد</h1>
-        <Link href="/shop" className="btn-gold mt-6">بازگشت به فروشگاه</Link>
+        <div className="flex flex-col items-center gap-4">
+          <h1 className="font-display text-2xl font-black text-foreground">محصول پیدا نشد</h1>
+          <p className="font-body text-sm text-muted-foreground">محصول مورد نظر در دسترس نیست.</p>
+          <Link href="/shop" className="btn-gold">بازگشت به فروشگاه</Link>
+        </div>
       </div>
     );
   }
   if (!d.product) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+          <p className="font-body text-xs text-muted-foreground">در حال بارگذاری...</p>
+        </div>
       </div>
     );
   }
@@ -69,37 +85,42 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
 
   return (
     <div className="bg-background pb-24">
-      <div className="mx-auto max-w-7xl px-5 pt-8 lg:px-10">
+      <div className="mx-auto max-w-7xl px-5 pt-8 lg:px-10 lg:pt-12">
         <nav className="flex items-center gap-2 font-body text-xs text-muted-foreground">
-          <Link href="/" className="transition-colors hover:text-primary">خانه</Link>
+          <Link href="/" className="transition-colors hover:text-primary">
+            خانه
+          </Link>
           <ArrowRight className="h-3 w-3" />
-          <Link href="/shop" className="transition-colors hover:text-primary">فروشگاه</Link>
+          <Link href="/shop" className="transition-colors hover:text-primary">
+            فروشگاه
+          </Link>
           <ArrowRight className="h-3 w-3" />
           <span className="text-foreground">{d.product.name}</span>
         </nav>
       </div>
 
       <div className="mx-auto max-w-7xl px-5 py-8 lg:px-10 lg:py-12">
-        <div className="grid gap-10 lg:grid-cols-5 lg:gap-14">
-          {/* RTL: Gallery on RIGHT (col-span-2), Details on LEFT (col-span-3) */}
-          <div className="lg:col-span-3 lg:sticky lg:top-28 lg:self-start order-2 lg:order-1">
+        <div className="grid gap-8 lg:grid-cols-12">
+          {/* Gallery - RTL: right side on desktop, top on mobile */}
+          <div className="lg:col-span-5 lg:order-2">
             <ProductGallery images={images} focusUrl={focusUrl} productName={d.product?.name ?? ""} />
           </div>
 
-          <div className="lg:col-span-2 order-1 lg:order-2">
-            <div className="rounded-3xl border border-secondary/60 bg-card p-6 lg:p-8">
-              <div className="flex items-center gap-2">
+          {/* Details - RTL: left side on desktop, bottom on mobile */}
+          <div className="lg:col-span-7 lg:order-1">
+            <div className="rounded-2xl border border-secondary/60 bg-card p-6 lg:p-8">
+              <div className="flex items-center gap-2 mb-4">
                 <Store className="h-4 w-4 text-primary" />
                 <span className="font-display text-xs font-bold text-primary">فروشگاه رسمی پرده آنتیک</span>
                 <BadgeCheck className="h-4 w-4 text-primary" />
               </div>
-              <h1 className="mt-3 font-display text-2xl font-black leading-snug text-foreground lg:text-3xl">
+              <h1 className="font-display text-2xl font-black leading-snug text-foreground lg:text-3xl">
                 {d.product.name}
               </h1>
 
-              <div className="mt-6 rounded-2xl border border-secondary/60 bg-background p-5">
-                <span className="font-body text-xs text-muted-foreground">قیمت</span>
-                <button type="button" onClick={handleContact} className="btn-gold mt-1 inline-flex items-center gap-2 w-full">
+              <div className="mt-6 rounded-xl border border-secondary/60 bg-background p-5">
+                <span className="font-body text-xs text-muted-foreground block mb-1">قیمت</span>
+                <button type="button" onClick={handleContact} className="btn-gold w-full justify-center">
                   <Phone className="h-4 w-4" />
                   تماس بگیرید
                 </button>
@@ -107,13 +128,13 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
 
               {d.product.plainDescription && (
                 <div
-                  className="mt-6 font-body text-sm leading-8 text-muted-foreground"
+                  className="mt-7 font-body text-sm leading-8 text-muted-foreground"
                   dangerouslySetInnerHTML={{ __html: d.product.plainDescription }}
                 />
               )}
 
               {optionGroups.map((group) => (
-                <div key={group.id} className="mt-7">
+                <div key={group.id} className="mt-8">
                   <h3 className="mb-3 font-display text-sm font-bold text-foreground">{group.name}</h3>
                   <div className="flex flex-wrap gap-3">
                     {group.choices.map((choice) => (
@@ -141,7 +162,7 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
               ))}
 
               {modifierGroups.map((m) => (
-                <div key={m.key} className="mt-7">
+                <div key={m.key} className="mt-8">
                   <h3 className="mb-3 font-display text-sm font-bold text-foreground">
                     {m.name}{m.mandatory && <span className="text-primary"> *</span>}
                   </h3>
@@ -171,7 +192,7 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
               ))}
 
               {d.options.length > 0 && !d.variant && (
-                <p className="mt-5 font-body text-xs text-primary">برای ادامه، گزینه‌ها را انتخاب کنید.</p>
+                <p className="mt-6 font-body text-xs text-primary">برای ادامه، گزینه‌ها را انتخاب کنید.</p>
               )}
 
               <button
@@ -185,7 +206,7 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
               </button>
 
               {d.inStock && d.variant && (
-                <p className="mt-4 flex items-center gap-2 font-body text-xs text-muted-foreground">
+                <p className="mt-5 flex items-center gap-2 font-body text-xs text-muted-foreground">
                   <svg className="h-4 w-4 text-primary" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
                   موجود و آماده ارسال
                 </p>
@@ -200,20 +221,22 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
           </div>
         </div>
 
-        <div className="mt-14 grid gap-8 lg:grid-cols-3">
-          <div className="rounded-3xl border border-secondary/60 bg-card p-6 lg:col-span-2 lg:p-8">
-            <h2 className="font-display text-lg font-black text-foreground">معرفی محصول</h2>
-            <div className="gold-rule my-5 w-16" />
-            {d.product.plainDescription ? (
-              <div
-                className="font-body text-sm leading-8 text-muted-foreground"
-                dangerouslySetInnerHTML={{ __html: d.product.plainDescription }}
-              />
-            ) : (
-              <p className="font-body text-sm text-muted-foreground">معرفی این محصول به‌زودی تکمیل می‌شود.</p>
-            )}
+        <div className="mt-14 grid gap-8 lg:grid-cols-12">
+          <div className="lg:col-span-8">
+            <div className="rounded-2xl border border-secondary/60 bg-card p-6 lg:p-8">
+              <h2 className="font-display text-lg font-black text-foreground mb-4">معرفی محصول</h2>
+              <div className="gold-rule my-5 w-16" />
+              {d.product.plainDescription ? (
+                <div
+                  className="font-body text-sm leading-8 text-muted-foreground"
+                  dangerouslySetInnerHTML={{ __html: d.product.plainDescription }}
+                />
+              ) : (
+                <p className="font-body text-sm text-muted-foreground">معرفی این محصول به‌زودی تکمیل می‌شود.</p>
+              )}
+            </div>
           </div>
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-4">
             <ProductSpecs rows={specRows} />
           </div>
         </div>
@@ -225,7 +248,6 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
         productCategorySlug={d.product?.categoryId ? undefined : undefined}
         limit={6}
       />
-
     </div>
   );
 }
@@ -233,7 +255,7 @@ export default function ProductDetailPage({ slug }: { slug: string }) {
 function Trust({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
     <div className="flex flex-col items-center gap-2 text-center">
-      <span className="flex h-11 w-11 items-center justify-center rounded-full border border-primary/40 text-primary">{icon}</span>
+      <span className="flex h-12 w-12 items-center justify-center rounded-full border border-primary/40 text-primary">{icon}</span>
       <span className="font-display text-[11px] font-bold text-foreground">{title}</span>
     </div>
   );

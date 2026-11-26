@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Upload, Trash2 } from "lucide-react";
+import { Loader2, Upload, Trash2, Image as LibImage } from "lucide-react";
 import { api } from "@/api/client";
-import { compressImage } from "@/lib/compressImage";
 import { refreshRenderTemplates } from "@/hooks/useRenderTemplates";
 import { resolveStyle, MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
 import { filterInstallCategories } from "@/lib/installCategories";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToast } from "@/lib/adminToast";
 import { OptimizedImage } from "@/components/ui/image";
+import { MediaPicker } from "@/components/media/MediaPicker";
 
 interface CurtainCategoryItem {
   id?: string;
@@ -31,6 +31,7 @@ export function RenderTemplateManager() {
   const [error, setError] = useState("");
   const [okMsg, setOkMsg] = useState("");
   const [loading, setLoading] = useState(true);
+  const [pickerSlug, setPickerSlug] = useState<string | null>(null);
 
   const installCats = useMemo(
     () => filterInstallCategories(categories),
@@ -93,9 +94,8 @@ export function RenderTemplateManager() {
   }
 
   const uploadSingle = async (cat: CurtainCategoryItem, file: File) => {
-    const compressed = await compressImage(file);
-    const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
-    const url = res?.file_url || res?.url || res?.path;
+    const media = await api.media.upload(file);
+    const url = media.url;
     if (!url) throw new Error("آپلود ناموفق");
 
     const existing = rowOf(cat.slug);
@@ -241,6 +241,14 @@ export function RenderTemplateManager() {
                       {hasImg ? "تعویض عکس" : "آپلود قالب سبز"}
                     </label>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setPickerSlug(cat.slug)}
+                    className="cursor-pointer items-center justify-center gap-1 rounded-lg border border-secondary/60 bg-secondary/5 px-2 py-1 text-[10px] text-muted-foreground hover:border-primary/60 hover:text-primary"
+                    disabled={busy === cat.slug}
+                  >
+                    <LibImage className="h-3 w-3" />
+                  </button>
                   {hasImg && (
                     <button
                       type="button"
@@ -257,6 +265,51 @@ export function RenderTemplateManager() {
             );
           })}
         </div>
+      )}
+
+      {pickerSlug && (
+        <MediaPicker
+          open={Boolean(pickerSlug)}
+          onOpenChange={(o) => {
+            if (!o) setPickerSlug(null);
+          }}
+          mode="single"
+          onSelect={(selected) => {
+            const media = Array.isArray(selected) ? selected[0] : selected;
+            if (media && pickerSlug) {
+              const cat = categories.find((c) => c.slug === pickerSlug);
+              if (cat) {
+                const url = media.url;
+                const existing = rowOf(cat.slug);
+                if (existing) {
+                  void api.entities.RenderTemplate.update(existing.id, {
+                    style: cat.slug,
+                    image: url,
+                  });
+                } else {
+                  void api.entities.RenderTemplate.create({ style: cat.slug, image: url });
+                }
+                // Mirror on mechanism
+                const mechanism = cat.mechanism || resolveStyle({ category_slug: cat.slug });
+                if (mechanism && mechanism !== cat.slug) {
+                  const mechRow = templates.find(
+                    (r) => String(r.style || "").toLowerCase() === String(mechanism).toLowerCase()
+                  );
+                  if (mechRow) {
+                    void api.entities.RenderTemplate.update(mechRow.id, { image: url });
+                  } else {
+                    void api.entities.RenderTemplate.create({ style: mechanism, image: url });
+                  }
+                }
+                void refreshRenderTemplates();
+                void reload();
+                setOkMsg("ذخیره شد.");
+              }
+            }
+            setPickerSlug(null);
+          }}
+          title="انتخاب قالب سبز از کتابخانه"
+        />
       )}
     </div>
   );

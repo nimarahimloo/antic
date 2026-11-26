@@ -58,13 +58,13 @@ export default function Header() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 transition-all duration-500",
+        "sticky top-0 z-40 transition-all duration-300",
         scrolled
-          ? "bg-background/85 backdrop-blur-xl border-b border-secondary/60 shadow-sm"
+          ? "bg-background/90 backdrop-blur-md border-b border-secondary/60 shadow-sm"
           : "bg-transparent border-b border-transparent"
       )}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:h-20 sm:px-5 lg:px-10">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:h-20 sm:px-5 lg:px-10">
         <Link href="/" className="group flex shrink-0 items-center gap-2.5 sm:gap-3">
           <img
             src={logoSrc}
@@ -79,7 +79,7 @@ export default function Header() {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-7 lg:flex" aria-label="منوی اصلی">
+        <nav className="hidden items-center gap-6 lg:flex" aria-label="منوی اصلی">
           {NAV.map((item) => {
             const active = isActivePath(pathname, item.to);
             return (
@@ -87,10 +87,10 @@ export default function Header() {
                 key={item.label}
                 href={item.to}
                 className={cn(
-                  "font-body text-sm transition-colors",
+                  "font-body text-sm font-medium transition-colors px-2 py-1.5 rounded-lg",
                   active
-                    ? "font-semibold text-primary"
-                    : "text-foreground/75 hover:text-primary"
+                    ? "bg-primary/10 text-primary"
+                    : "text-foreground/75 hover:text-primary hover:bg-secondary/50"
                 )}
               >
                 {item.label}
@@ -100,11 +100,11 @@ export default function Header() {
         </nav>
 
         <div className="flex flex-1 items-center justify-end gap-2 sm:gap-2.5">
-          <GlobalSearch compact className="hidden max-w-[min(100%,18rem)] flex-1 sm:block sm:flex-none" />
+          <GlobalSearch compact className="hidden max-w-[min(100%,20rem)] flex-1 sm:block sm:flex-none" />
           {isAdmin && (
             <Link
               href="/admin"
-              className="hidden items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground md:inline-flex"
+              className="hidden items-center gap-1.5 rounded-xl border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground md:inline-flex"
             >
               <LayoutDashboard className="h-3.5 w-3.5" />
               پنل مدیریت
@@ -113,7 +113,7 @@ export default function Header() {
           {isUser && (
             <Link
               href="/account"
-              className="hidden items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground sm:inline-flex"
+              className="hidden items-center gap-1.5 rounded-xl border border-primary/50 bg-primary/10 px-3 py-1.5 font-display text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground sm:inline-flex"
             >
               <User className="h-3.5 w-3.5" />
               حساب من
@@ -122,16 +122,16 @@ export default function Header() {
           {!isAuthenticated && (
             <Link
               href="/login"
-              className="hidden items-center gap-1.5 rounded-full border border-secondary px-3 py-1.5 font-body text-xs text-foreground/80 transition-colors hover:border-primary hover:text-primary sm:inline-flex"
+              className="hidden items-center gap-1.5 rounded-xl border border-secondary px-3 py-1.5 font-body text-xs text-foreground/80 transition-colors hover:border-primary hover:text-primary sm:inline-flex"
             >
               <LogIn className="h-3.5 w-3.5" />
               ورود
             </Link>
           )}
 
-          <a 
+          <a
             href="/contact"
-            className="flex h-10 items-center justify-center gap-2 rounded-full border border-primary/50 bg-primary/10 px-4 text-primary transition-colors hover:bg-primary hover:text-primary-foreground lg:px-5"
+            className="flex h-10 items-center justify-center gap-2 rounded-xl border border-primary/50 bg-primary/10 px-4 text-primary transition-colors hover:bg-primary hover:text-primary-foreground lg:px-5"
             aria-label="تماس با ما"
           >
             <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35-.03.74-.25 1.02l-2.2 2.2z"/></svg>
@@ -143,7 +143,7 @@ export default function Header() {
           <button
             type="button"
             className={cn(
-              "relative flex h-10 w-10 items-center justify-center rounded-full border transition-colors lg:hidden",
+              "relative flex h-10 w-10 items-center justify-center rounded-xl border transition-colors lg:hidden",
               open
                 ? "border-primary/60 bg-primary/10 text-primary"
                 : "border-secondary text-foreground hover:border-primary/50 hover:text-primary"
@@ -161,14 +161,14 @@ export default function Header() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           id="mobile-nav-drawer"
-          className="flex w-[min(100vw-3rem,20rem)] flex-col gap-0 border-l border-secondary/50 bg-background p-0 sm:max-w-sm [&>button]:hidden fixed right-0 top-0 h-full z-50"
+          className="flex w-[min(100vw-3rem,22rem)] flex-col gap-0 border-l border-secondary/50 bg-background p-0 sm:max-w-md fixed right-0 top-0 h-full z-50"
         >
           <SheetHeader className="space-y-0 border-b border-secondary/50 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] text-right">
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-secondary text-foreground/80 transition-colors hover:border-primary hover:text-primary"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-secondary text-foreground/80 transition-colors hover:border-primary hover:text-primary"
                 aria-label="بستن منو"
               >
                 <X className="h-4 w-4" />
@@ -210,7 +210,7 @@ export default function Header() {
                       href={item.to}
                       onClick={() => setOpen(false)}
                       className={cn(
-                        "flex items-center justify-between gap-2 rounded-xl px-3 py-3 font-body text-[15px] transition-colors",
+                        "flex items-center justify-between gap-2 rounded-xl px-3 py-3 font-body text-sm transition-colors",
                         active
                           ? "bg-primary/12 font-semibold text-primary"
                           : "text-foreground/90 hover:bg-secondary/40 hover:text-foreground"
@@ -235,7 +235,7 @@ export default function Header() {
               <li>
                 <a
                   href="/contact"
-                  className="flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-3 font-display text-[15px] font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                  className="flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-3 font-display text-sm font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
                 >
                   <Phone className="h-4 w-4 shrink-0" />
                   تماس با ما
@@ -246,7 +246,7 @@ export default function Header() {
                   <Link
                     href="/admin"
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-2.5 rounded-xl px-3 py-3 font-display text-[15px] font-bold text-primary transition-colors hover:bg-primary/10"
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-3 font-display text-sm font-bold text-primary transition-colors hover:bg-primary/10"
                   >
                     <LayoutDashboard className="h-4 w-4 shrink-0" />
                     پنل مدیریت
@@ -258,7 +258,7 @@ export default function Header() {
                   <Link
                     href="/account"
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-2.5 rounded-xl px-3 py-3 font-display text-[15px] font-bold text-primary transition-colors hover:bg-primary/10"
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-3 font-display text-sm font-bold text-primary transition-colors hover:bg-primary/10"
                   >
                     <User className="h-4 w-4 shrink-0" />
                     حساب کاربری
@@ -270,7 +270,7 @@ export default function Header() {
                   <Link
                     href="/login"
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-3 font-body text-[15px] font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                    className="flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-3 font-body text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
                   >
                     <LogIn className="h-4 w-4 shrink-0" />
                     ورود / ثبت‌نام

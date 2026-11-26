@@ -164,7 +164,7 @@ function CheckoutPageContent() {
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 rows={3}
                 className="w-full rounded-xl border border-secondary bg-background px-4 py-3 font-body text-sm outline-none focus:border-primary resize-none"
-                placeholder="توضیحات خاص برای ارسال، واحد پلاک،층..."
+                placeholder="توضیحات خاص برای ارسال، واحد پلاک، کد پستی..."
               />
             </div>
 

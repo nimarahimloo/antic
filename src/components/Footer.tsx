@@ -20,7 +20,7 @@ export default function Footer() {
 
   return (
     <footer className="border-t border-secondary/60 bg-background">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:px-10">
+      <div className="mx-auto max-w-7xl px-5 py-16 lg:px-10 lg:py-24">
         <div className="grid gap-12 md:grid-cols-4">
           <div className="md:col-span-1">
             <div className="flex items-center gap-3">
@@ -105,7 +105,7 @@ export default function Footer() {
 
         <div className="gold-rule my-12" />
 
-        <div className="flex flex-col items-center gap-4 md:flex-row md:justify-between">
+        <div className="flex flex-col items-center gap-4 md:flex-row md:justify-between text-center md:text-right">
           <p className="font-body text-xs text-muted-foreground">© ۱۴۰۵ پرده آنتیک — تمامی حقوق محفوظ است.</p>
           <p className="font-body text-xs text-primary">ANTIQUE DRAPERY</p>
         </div>

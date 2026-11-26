@@ -6,6 +6,7 @@ import { getQueueState, renderOneModel, runBatch, listCategoryTemplateCoverage }
 import { prisma } from "../lib/prisma.js";
 import { ALL_STYLE_KEYS, STYLE_META, resolveStyle, guessMaterial, type CurtainStyleKey } from "../lib/curtainStyles.js";
 import { generateChromaTemplate } from "../services/templateGenerator.js";
+import { syncMediaUsage } from "../lib/mediaSync.js";
 import path from "path";
 
 const router = Router();
@@ -191,6 +192,15 @@ router.post("/template/from-category", requireAdmin, async (req: AuthedRequest, 
       });
     }
 
+    // Sync MediaUsage for category render template
+    try {
+      await syncMediaUsage("RenderTemplate", row.id, {
+        image: gen.publicPath ? [gen.publicPath] : [],
+      });
+    } catch {
+      /* sync failures must not fail template generation */
+    }
+
     const mechExisting = await prisma.renderTemplate.findFirst({
       where: { style: mechanism },
       orderBy: { updatedAt: "desc" },
@@ -200,10 +210,26 @@ router.post("/template/from-category", requireAdmin, async (req: AuthedRequest, 
         where: { id: mechExisting.id },
         data: { image: gen.publicPath },
       });
+      // Sync MediaUsage for mechanism render template
+      try {
+        await syncMediaUsage("RenderTemplate", mechExisting.id, {
+          image: gen.publicPath ? [gen.publicPath] : [],
+        });
+      } catch {
+        /* sync failures must not fail template generation */
+      }
     } else {
-      await prisma.renderTemplate.create({
+      const mechRow = await prisma.renderTemplate.create({
         data: { style: mechanism, image: gen.publicPath },
       });
+      // Sync MediaUsage for mechanism render template
+      try {
+        await syncMediaUsage("RenderTemplate", mechRow.id, {
+          image: gen.publicPath ? [gen.publicPath] : [],
+        });
+      } catch {
+        /* sync failures must not fail template generation */
+      }
     }
 
     res.json({
@@ -236,10 +262,24 @@ router.post("/template/all-categories", requireAdmin, async (_req: AuthedRequest
           where: { id: existing.id },
           data: { image: gen.publicPath },
         });
+        try {
+          await syncMediaUsage("RenderTemplate", existing.id, {
+            image: gen.publicPath ? [gen.publicPath] : [],
+          });
+        } catch {
+          /* sync failures must not fail template generation */
+        }
       } else {
-        await prisma.renderTemplate.create({
+        const created = await prisma.renderTemplate.create({
           data: { style: cat.slug, image: gen.publicPath },
         });
+        try {
+          await syncMediaUsage("RenderTemplate", created.id, {
+            image: gen.publicPath ? [gen.publicPath] : [],
+          });
+        } catch {
+          /* sync failures must not fail template generation */
+        }
       }
 
       // همچنین تمپلیت با کلید مکانیزم ذخیره شود تا رندرینگ پیدا کند
@@ -252,10 +292,24 @@ router.post("/template/all-categories", requireAdmin, async (_req: AuthedRequest
           where: { id: mechExisting.id },
           data: { image: gen.publicPath },
         });
+        try {
+          await syncMediaUsage("RenderTemplate", mechExisting.id, {
+            image: gen.publicPath ? [gen.publicPath] : [],
+          });
+        } catch {
+          /* sync failures must not fail template generation */
+        }
       } else {
-        await prisma.renderTemplate.create({
+        const mechCreated = await prisma.renderTemplate.create({
           data: { style: mechanism, image: gen.publicPath },
         });
+        try {
+          await syncMediaUsage("RenderTemplate", mechCreated.id, {
+            image: gen.publicPath ? [gen.publicPath] : [],
+          });
+        } catch {
+          /* sync failures must not fail template generation */
+        }
       }
 
       results.push({ slug: cat.slug, name: cat.name, mechanism, path: gen.publicPath });

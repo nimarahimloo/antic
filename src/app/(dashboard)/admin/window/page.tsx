@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Palette, Image as ImageIcon, Save, Upload, Loader2 } from "lucide-react";
+import { Palette, Image as ImageIcon, Save, Upload, Loader2, Image as LibImage } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { api } from "@/api/client";
 import { compressImage } from "@/lib/compressImage";
@@ -11,6 +11,7 @@ import { OptimizedImage } from "@/components/ui/image";
 import { RenderTemplateManager } from "@/components/admin/RenderTemplateManager";
 import { InstallReferenceManager } from "@/components/admin/InstallReferenceManager";
 import { InstallReviewManager } from "@/components/admin/InstallReviewManager";
+import { MediaPicker } from "@/components/media/MediaPicker";
 
 interface VirtualWindowSetting {
   id: string;
@@ -103,12 +104,14 @@ function ViewImagePanel({
   onUpdate: (value: string) => void;
   uploading: boolean;
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   const handleUpload = async (file: File) => {
     if (!file) return;
     try {
       const compressed = await compressImage(file);
-      const res = await api.integrations.Core.UploadPublicFile({ file: compressed });
-      const url = res?.file_url || res?.url || res?.path;
+      const media = await api.media.upload(compressed);
+      const url = media.url;
       if (!url) throw new Error("آپلود پاسخ معتبری نداد");
       onUpdate(url);
     } catch (e) {
@@ -150,21 +153,31 @@ function ViewImagePanel({
             )}
           </div>
           <div className="flex flex-col items-center gap-2">
-            <label
-              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary hover:bg-primary/10 transition-colors ${
-                uploading ? "disabled:opacity-50 disabled:cursor-not-allowed" : ""
-              }`}
-            >
-              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              {uploading ? "آپلود…" : viewImage ? "تعویض تصویر" : "انتخاب تصویر"}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
+            <div className="flex gap-1">
+              <label
+                className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-4 py-2.5 font-body text-xs font-bold text-primary hover:bg-primary/10 transition-colors ${
+                  uploading ? "disabled:opacity-50 disabled:cursor-not-allowed" : ""
+                }`}
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {uploading ? "آپلود…" : viewImage ? "تعویض تصویر" : "انتخاب تصویر"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={onFileChange}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-secondary/60 bg-secondary/5 px-2 py-2.5 font-body text-[10px] text-muted-foreground hover:border-primary/60 hover:text-primary"
                 disabled={uploading}
-                onChange={onFileChange}
-              />
-            </label>
+              >
+                <LibImage className="h-3 w-3" />
+              </button>
+            </div>
             {viewImage && (
               <button
                 type="button"
@@ -177,6 +190,17 @@ function ViewImagePanel({
           </div>
         </div>
       </div>
+
+      <MediaPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        mode="single"
+        onSelect={(selected) => {
+          const media = Array.isArray(selected) ? selected[0] : selected;
+          if (media) onUpdate(media.url);
+        }}
+        title="انتخاب تصویر نمای از کتابخانه"
+      />
     </Card>
   );
 }

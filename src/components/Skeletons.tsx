@@ -788,3 +788,73 @@ export function AuthPageSkeleton({ title = "ورود" }: { title?: string }) {
     </motion.div>
   );
 }
+
+/**
+ * Collection Page Skeleton
+ */
+export function CollectionPageSkeleton() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="bg-background pb-20"
+    >
+      <div className="mx-auto max-w-7xl px-5 pt-8 lg:px-10">
+        <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <SkeletonBox className="eyebrow mb-3 block h-4 w-20" />
+            <SkeletonBox className="h-10 w-72 mb-6" style={{ maxWidth: "450px" }} />
+            <SkeletonText lines={2} className="mx-auto max-w-md" />
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="relative aspect-[16/10] rounded-3xl overflow-hidden"
+          >
+            <SkeletonBox className="absolute inset-0" />
+          </motion.div>
+        </div>
+
+        <div className="mt-12">
+          <SkeletonBox className="mb-5 font-display text-lg font-bold text-foreground h-6 w-40" />
+          <div className="flex flex-wrap gap-2">
+            <SkeletonBox className="h-10 w-24 rounded-full border border-secondary/50" />
+            {[...Array(4)].map((_, i) => (
+              <SkeletonBox key={i} className="h-10 w-28 rounded-full border border-secondary/50" />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <SkeletonBox className="h-8 w-20 rounded-full border border-secondary/50" />
+            {[...Array(3)].map((_, i) => (
+              <SkeletonBox key={i} className="h-8 w-24 rounded-full border border-secondary/50" />
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8">
+          <SkeletonBox className="mb-5 font-display text-lg font-bold text-foreground h-6 w-40" />
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 * i }}
+                className="relative aspect-[4/3] animate-pulse rounded-3xl border border-secondary/50 bg-card"
+              >
+                <SkeletonBox className="absolute inset-0" />
+                <div className="relative z-10 p-6">
+                  <SkeletonBox className="h-5 w-20 mb-2" />
+                  <SkeletonBox className="h-6 w-24" />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}

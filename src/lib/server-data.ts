@@ -184,6 +184,55 @@ export const getPublicSettings = cache(async () => {
 });
 
 // ============================================
+// Collections
+// ============================================
+
+export const getCollections = cache(async (activeOnly = true) => {
+  const params = new URLSearchParams({ sort_by: "order", limit: "500" });
+  if (activeOnly) params.set("filter", JSON.stringify({ active: true }));
+  const collections = await fetchEntities("Collection", params);
+  return (collections || []).map((row: unknown) => {
+    const r = row as Record<string, unknown>;
+    return {
+      id: String(r.id),
+      title: String(r.title),
+      slug: String(r.slug),
+      description: r.description ? String(r.description) : "",
+      coverImage: r.coverImage ? String(r.coverImage) : null,
+      order: Number(r.order) || 0,
+      active: !(r.active === false || r.active === 0),
+    };
+  }).sort((a: { order: number }, b: { order: number }) => a.order - b.order);
+});
+
+export const getCollection = cache(async (slug: string) => {
+  const collections = await getCollections(false);
+  return collections.find((c: { slug?: string }) => c.slug === slug) || null;
+});
+
+export const getCollectionProjects = cache(async (collectionSlug: string, categorySlug?: string) => {
+  const params = new URLSearchParams({ limit: "100" });
+  if (categorySlug) params.set("categorySlug", categorySlug);
+  const response = await fetch(`${BACKEND_URL}/api/entities/Collection/${encodeURIComponent(collectionSlug)}/projects?${params}`, {
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) return [];
+  const data = await response.json();
+  return (data?.projects || []) as Record<string, unknown>[];
+});
+
+export const getCollectionCategories = cache(async (collectionSlug: string) => {
+  const response = await fetch(`${BACKEND_URL}/api/entities/Collection/${encodeURIComponent(collectionSlug)}/categories`, {
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) return [];
+  const data = await response.json();
+  return (data?.categories || []) as Record<string, unknown>[];
+});
+
+// ============================================
 // Site Contact Info
 // ============================================
 
