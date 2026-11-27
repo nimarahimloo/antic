@@ -67,7 +67,6 @@ export function useProductDetail(slug: string, initialProduct?: DetailProduct | 
   useEffect(() => {
     if (initialProduct) return; // SSR data already provided, skip client fetch
     let cancelled = false;
-    setProduct(null);
     setNotFound(false);
     setError(null);
     getProductBySlug(slug)

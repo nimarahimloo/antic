@@ -39,7 +39,10 @@ export function useApi<T, Args extends unknown[]>(
 
   const mounted = useRef(true);
   const apiFnRef = useRef(apiFn);
-  apiFnRef.current = apiFn;
+  
+  useEffect(() => {
+    apiFnRef.current = apiFn;
+  }, [apiFn]);
 
   const reset = useCallback(() => {
     setData(null);

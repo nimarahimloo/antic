@@ -32,7 +32,10 @@ export function useQuery<T>(
   const mounted = useRef(true);
   const attemptRef = useRef(0);
   const queryFnRef = useRef(queryFn);
-  queryFnRef.current = queryFn;
+  
+  useEffect(() => {
+    queryFnRef.current = queryFn;
+  }, [queryFn]);
 
   const reset = useCallback(() => {
     setData(null);

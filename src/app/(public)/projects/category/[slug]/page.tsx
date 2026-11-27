@@ -8,7 +8,6 @@ import ProjectCard from "@/components/ProjectCard";
 import { mosaicGridClass, mosaicItemClass } from "@/lib/mosaicLayout";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { api } from "@/api";
-import { apiErrorMessage } from "@/lib/apiError";
 import { ProjectsPageSkeleton } from "@/components/Skeletons";
 import { getCurtainCategory } from "@/lib/server-data";
 

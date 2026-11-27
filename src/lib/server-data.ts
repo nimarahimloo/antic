@@ -10,21 +10,31 @@ import { cache } from "react";
 const BACKEND_URL = (process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001').replace(/\/$/, '');
 
 async function fetchEntities(entity: string, params: URLSearchParams) {
-  const res = await fetch(`${BACKEND_URL}/api/entities/${entity}?${params}`, {
-    cache: "no-store",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/entities/${entity}?${params}`, {
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    // Network error (e.g., backend not running during build) - return empty array
+    return [];
+  }
 }
 
 async function fetchEntity(entity: string, id: string) {
-  const res = await fetch(`${BACKEND_URL}/api/entities/${entity}/${encodeURIComponent(id)}`, {
-    cache: "no-store",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/entities/${entity}/${encodeURIComponent(id)}`, {
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    // Network error (e.g., backend not running during build) - return null
+    return null;
+  }
 }
 
 // ============================================
@@ -145,30 +155,42 @@ export const getProjectsByCategory = cache(async (categorySlug: string) => {
 // ============================================
 
 export const getShopCategories = cache(async () => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "/api"}/catalog/categories?limit=200`, {
-    cache: "no-store",
-  });
-  if (!response.ok) return [];
-  const data = await response.json();
-  return (data?.categories || []) as Record<string, unknown>[];
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "/api"}/catalog/categories?limit=200`, {
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return (data?.categories || []) as Record<string, unknown>[];
+  } catch {
+    return [];
+  }
 });
 
 export const getShopProducts = cache(async (filters: Record<string, unknown> = {}) => {
-  const params = new URLSearchParams(filters as Record<string, string>);
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "/api"}/catalog/products?${params}`, {
-    cache: "no-store",
-  });
-  if (!response.ok) return [];
-  return (await response.json()) as Record<string, unknown>[];
+  try {
+    const params = new URLSearchParams(filters as Record<string, string>);
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "/api"}/catalog/products?${params}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    return (await response.json()) as Record<string, unknown>[];
+  } catch {
+    return [];
+  }
 });
 
 export const getShopProduct = cache(async (slug: string) => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "/api"}/catalog/products?slug=${encodeURIComponent(slug)}&limit=1`, {
-    cache: "no-store",
-  });
-  if (!response.ok) return null;
-  const products = await response.json();
-  return (products?.[0] || null) as Record<string, unknown> | null;
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "/api"}/catalog/products?slug=${encodeURIComponent(slug)}&limit=1`, {
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const products = await response.json();
+    return (products?.[0] || null) as Record<string, unknown> | null;
+  } catch {
+    return null;
+  }
 });
 
 // ============================================
@@ -176,11 +198,15 @@ export const getShopProduct = cache(async (slug: string) => {
 // ============================================
 
 export const getPublicSettings = cache(async () => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "/api"}/app/public-settings`, {
-    cache: "no-store",
-  });
-  if (!response.ok) return { public_settings: {} };
-  return response.json();
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "/api"}/app/public-settings`, {
+      cache: "no-store",
+    });
+    if (!response.ok) return { public_settings: {} };
+    return response.json();
+  } catch {
+    return { public_settings: {} };
+  }
 });
 
 // ============================================

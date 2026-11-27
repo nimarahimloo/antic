@@ -1,5 +1,4 @@
 import PageHero from "@/components/PageHero";
-import { AboutPageSkeleton } from "@/components/Skeletons";
 
 export const revalidate = 86400; // SSG: revalidate once per day
 

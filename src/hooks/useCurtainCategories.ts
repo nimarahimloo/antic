@@ -118,21 +118,22 @@ export function useCurtainCategories({ catalogOnly = false, initialData }: UseCu
   }, [fetchCategories]);
 
   useEffect(() => {
-    let alive = true;
     // Only fetch on mount if there is no module-level cache AND no initial data.
+    // Use the module-level cache directly to avoid setState in effect.
     if (!cache && !initialData) {
+      let alive = true;
       reload(false).then((list) => {
         if (!alive && list) {
           /* unmounted */
         }
       });
+      return () => { alive = false; };
     }
     const onVis = () => {
       if (document.visibilityState === "visible") reload(true);
     };
     document.addEventListener("visibilitychange", onVis);
     return () => {
-      alive = false;
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [reload, initialData]);

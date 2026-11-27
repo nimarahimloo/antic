@@ -6,6 +6,9 @@ import { ApiError } from "@/api/types";
 
 const TOKEN_KEY = "antic_access_token";
 
+// Use absolute backend URL for server-side rendering (build time)
+const SERVER_API_BASE = process.env.BACKEND_INTERNAL_URL || API_BASE;
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const cookieStore = await cookies();
   const token = cookieStore.get(TOKEN_KEY)?.value;
@@ -19,13 +22,23 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body: options.body,
-    credentials: "include",
-    cache: "no-store",
-  });
+  // Use absolute URL for server-side calls to avoid relative URL issues during build
+  const baseUrl = process.env.BACKEND_INTERNAL_URL ? SERVER_API_BASE : API_BASE;
+  
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body: options.body,
+      credentials: "include",
+      cache: "no-store",
+    });
+  } catch (error) {
+    // Network error (e.g., backend not running during build) - return empty data
+    console.warn(`Server action fetch failed for ${path}:`, error);
+    return undefined as T;
+  }
 
   if (res.status === 204) return undefined as T;
 

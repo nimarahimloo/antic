@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import Link from "next/link";
 import { Bot, Check, Copy, ExternalLink, User } from "lucide-react";
@@ -41,11 +42,12 @@ function ModelCards({ items, onNavigate }: { items: Array<{ id: string; href?: s
         >
           <div className="aspect-[4/3] overflow-hidden bg-secondary/30">
             {it.image ? (
-              <img
+              <Image
                 src={it.image}
                 alt=""
-                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                loading="lazy"
+                fill
+                className="object-cover transition duration-300 group-hover:scale-105"
+                sizes="50vw"
               />
             ) : (
               <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">
@@ -204,10 +206,12 @@ export default function MessageBubble({ message, onQuickReply, mode = "customer"
             <div className="flex flex-wrap justify-end gap-1.5">
               {(message.attachments ?? []).map((a, i) =>
                 a.type === "image" ? (
-                  <img
+                  <Image
                     key={i}
                     src={a.url}
                     alt=""
+                    width={176}
+                    height={176}
                     className="max-h-44 max-w-full rounded-2xl rounded-br-md border border-primary/15 object-cover shadow-sm"
                   />
                 ) : null

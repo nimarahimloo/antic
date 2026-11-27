@@ -11,7 +11,7 @@ interface FabricAnalysis {
 }
 
 export function useFabricAnalysis(url: string | undefined | null): FabricAnalysis | null {
-  const [analysis, setAnalysis] = useState<FabricAnalysis | null>(null);
+  const [analysis, setAnalysis] = useState<FabricAnalysis | null>(() => null);
   useEffect(() => {
     if (!url) {
       setAnalysis(null);

@@ -7,10 +7,11 @@ export const revalidate = 3600; // ISR: revalidate catalog every hour
 export default async function CatalogPage({
   searchParams,
 }: {
-  searchParams: { category?: string; [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ category?: string; [key: string]: string | string[] | undefined }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const initialCategory =
-    typeof searchParams.category === "string" ? searchParams.category : undefined;
+    typeof resolvedSearchParams.category === "string" ? resolvedSearchParams.category : undefined;
 
   return (
     <Suspense fallback={<InteractiveCatalogSkeleton />}>
