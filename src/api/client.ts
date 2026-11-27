@@ -474,12 +474,6 @@ export const api = {
     changePassword(body: Record<string, unknown>) {
       return request("/account/password", { method: "POST", body });
     },
-    orders() {
-      return request("/account/orders");
-    },
-    order(id: string) {
-      return request(`/account/orders/${id}`);
-    },
     addresses() {
       return request("/account/addresses");
     },

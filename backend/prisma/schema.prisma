@@ -415,27 +415,6 @@ model ShopCategory {
   seoTwitterImage  String?
 }
 
-model Order {
-  id              String   @id @default(cuid())
-  userId          String?
-  status          String   @default("pending")
-  customerName    String
-  customerPhone   String
-  customerEmail   String?
-  customerAddress String?
-  itemsJson       String
-  amountToman     Int
-  amountRial      Int
-  authority       String?  @unique
-  refId           String?
-  gateway         String   @default("zarinpal")
-  note            String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([status])
-}
-
 /// Persistent admin AI workspace conversation.
 model AIConversation {
   id        String          @id @default(cuid())

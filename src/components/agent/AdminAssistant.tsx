@@ -11,7 +11,6 @@ const STARTERS_BY_PATH: Record<string, string[]> = {
   "/admin/projects": ["لیست نمونه اجرا", "افزودن نمونه اجرا عنوان: پروژه تست دسته: living"],
   "/admin/portfolio-categories": ["لیست دسته نمونه", "افزودن دسته نمونه نام: تست شناسه: test-p"],
   "/admin/products": ["لیست محصول", "افزودن محصول نام: تست شناسه: test-p قیمت: 1000"],
-  "/admin/orders": ["لیست سفارش‌ها"],
   "/admin/requests": ["لیست درخواست‌ها"],
   "/admin/settings": ["خلاصه وضعیت"],
 };
@@ -33,7 +32,6 @@ function labelFor(path: string) {
     "/admin/portfolio-categories": "دسته نمونه‌ها",
     "/admin/projects": "نمونه‌های اجرا",
     "/admin/products": "فروشگاه",
-    "/admin/orders": "سفارش‌ها",
     "/admin/requests": "درخواست‌ها",
     "/admin/settings": "تنظیمات",
   };

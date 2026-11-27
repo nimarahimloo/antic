@@ -77,20 +77,20 @@ test("confirmation cancellation sends zero API requests", async () => {
   }
 
   // Simulate a delete operation that should NOT be called on cancel
-  async function deleteOrder(id: string) {
-    await fetch(`/api/orders/${id}`, { method: "DELETE" });
+  async function deleteRequest(id: string) {
+    await fetch(`/api/requests/${id}`, { method: "DELETE" });
   }
 
-  const orderId = "test-order-123";
+  const orderId = "test-request-123";
   confirmed = await mockConfirm({
-    title: "حذف سفارش",
+    title: "حذف درخواست",
     description: "آیا مطمئن هستید؟",
     confirmLabel: "حذف",
     cancelLabel: "انصراف",
   });
 
   if (confirmed) {
-    await deleteOrder(orderId);
+    await deleteRequest(orderId);
   }
 
   // Verify no API calls were made
@@ -114,8 +114,8 @@ test("confirmation executes exactly once", async () => {
     });
   }
 
-  async function updateOrderStatus(id: string, status: string) {
-    await fetch(`/api/orders/${id}/status`, {
+  async function updateRequestStatus(id: string, status: string) {
+    await fetch(`/api/requests/${id}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
@@ -123,7 +123,7 @@ test("confirmation executes exactly once", async () => {
     apiCallCount++;
   }
 
-  const orderId = "test-order-456";
+  const orderId = "test-request-456";
 
   // Call confirm once
   const confirmed = await mockConfirm({
@@ -132,7 +132,7 @@ test("confirmation executes exactly once", async () => {
   });
 
   if (confirmed) {
-    await updateOrderStatus(orderId, "cancelled");
+    await updateRequestStatus(orderId, "cancelled");
   }
 
   // Verify the API was called exactly once
@@ -146,7 +146,7 @@ test("confirmation executes exactly once", async () => {
   });
 
   if (confirmed2) {
-    await updateOrderStatus(orderId, "cancelled");
+    await updateRequestStatus(orderId, "cancelled");
   }
 
   // Each confirmation should execute once
@@ -178,21 +178,21 @@ test("API failures never generate success notifications", async () => {
     }
   }
 
-  async function updateOrderStatus(id: string, status: string) {
+  async function updateRequestStatus(id: string, status: string) {
     try {
-      await fetch(`/api/orders/${id}/status`, {
+      await fetch(`/api/requests/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      await adminToast("update", "سفارش", status);
+      await adminToast("update", "درخواست", status);
     } catch (e) {
       errorThrown = true;
-      await adminToast("error", "سفارش", e instanceof Error ? e.message : String(e));
+      await adminToast("error", "درخواست", e instanceof Error ? e.message : String(e));
     }
   }
 
-  const orderId = "test-order-789";
+  const orderId = "test-request-789";
 
   const confirmed = await mockConfirm({
     title: "تغییر وضعیت",
@@ -200,7 +200,7 @@ test("API failures never generate success notifications", async () => {
   });
 
   if (confirmed) {
-    await updateOrderStatus(orderId, "cancelled");
+    await updateRequestStatus(orderId, "cancelled");
   }
 
   // Verify error was thrown and no success toast was called
@@ -221,16 +221,16 @@ test("cancellation does not mutate state", async () => {
     });
   }
 
-  async function updateOrderStatus(id: string, status: string) {
+  async function updateRequestStatus(id: string, status: string) {
     state = { ...state, status };
-    await fetch(`/api/orders/${id}/status`, {
+    await fetch(`/api/requests/${id}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
   }
 
-  const orderId = "test-order-999";
+  const orderId = "test-request-999";
   const originalStatus = state.status;
 
   const confirmed = await mockConfirm({
@@ -239,7 +239,7 @@ test("cancellation does not mutate state", async () => {
   });
 
   if (confirmed) {
-    await updateOrderStatus(orderId, "cancelled");
+    await updateRequestStatus(orderId, "cancelled");
   }
 
   // Verify state was not mutated

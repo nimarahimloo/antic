@@ -37,7 +37,6 @@ function entityFromPath(path: string): string | null {
   if (path.includes("/portfolio")) return "دسته نمونه";
   if (path.includes("/projects")) return "نمونه اجرا";
   if (path.includes("/products")) return "محصول";
-  if (path.includes("/orders")) return "سفارش";
   if (path.includes("/requests")) return "درخواست";
   if (path.includes("/window")) return "قالب";
   if (path.includes("/settings")) return null;
@@ -46,7 +45,6 @@ function entityFromPath(path: string): string | null {
 
 function listPhraseForPath(path: string): string {
   if (path.includes("/models")) return "لیست مدل‌ها";
-  if (path.includes("/orders")) return "لیست سفارش‌ها";
   if (path.includes("/requests")) return "لیست درخواست‌ها";
   if (path.includes("/products")) return "لیست محصول";
   if (path.includes("/categories")) return "لیست دسته کاتالوگ";
@@ -82,9 +80,8 @@ function expandVariants(userText: string, history: ChatMessage[], path: string):
   // لیست / نشون بده — هر لحن
   const wantsList =
     /لیست|فهرست|نشون|نشان|بیار|ببینم|چی\s*داریم|چیا|همه|نمایش|show|list|بده\s*ببینم|چی\s*هست/.test(n);
-  if (wantsList || (/مدل.?ها|سفارش.?ها|دسته.?ها|محصول.?ها|درخواست.?ها/.test(n) && !/حذف|ویرایش|افزودن|بساز/.test(n))) {
-    if (/سفارش/.test(n)) variants.add("لیست سفارش‌ها");
-    else if (/درخواست|مشاوره/.test(n)) variants.add("لیست درخواست‌ها");
+  if (wantsList || (/مدل.?ها|دسته.?ها|محصول.?ها|درخواست.?ها/.test(n) && !/حذف|ویرایش|افزودن|بساز/.test(n))) {
+    if (/درخواست|مشاوره/.test(n)) variants.add("لیست درخواست‌ها");
     else if (/محصول/.test(n)) variants.add("لیست محصول");
     else if (/دسته/.test(n)) variants.add("لیست دسته کاتالوگ");
     else if (/نمونه|پروژه/.test(n)) variants.add("لیست نمونه اجرا");
@@ -101,7 +98,6 @@ function expandVariants(userText: string, history: ChatMessage[], path: string):
   // تعداد
   if (/چند\s*تا|تعداد|count|چندتا/.test(n)) {
     if (/مدل/.test(n)) variants.add("تعداد مدل");
-    else if (/سفارش/.test(n)) variants.add("تعداد سفارش");
     else if (/درخواست/.test(n)) variants.add("تعداد درخواست");
     else if (/محصول/.test(n)) variants.add("تعداد محصول");
     else if (/دسته/.test(n)) variants.add("تعداد دسته");
@@ -123,11 +119,10 @@ function expandVariants(userText: string, history: ChatMessage[], path: string):
 }
 
 async function statusSnapshot(): Promise<{ text: string; blocks: RichBlock[] }> {
-  const [modelCount, catCount, reqCount, orderCount, productCount, projectCount] = await Promise.all([
+  const [modelCount, catCount, reqCount, productCount, projectCount] = await Promise.all([
     prisma.curtainModel.count(),
     prisma.curtainCategory.count(),
     prisma.consultationRequest.count(),
-    prisma.order.count(),
     prisma.product.count(),
     prisma.project.count(),
   ]);
@@ -135,7 +130,7 @@ async function statusSnapshot(): Promise<{ text: string; blocks: RichBlock[] }> 
     text:
       `وضعیت فعلی پنل:\n` +
       `• مدل: **${modelCount}** · دسته: **${catCount}** · نمونه اجرا: **${projectCount}**\n` +
-      `• محصول: **${productCount}** · سفارش: **${orderCount}** · درخواست: **${reqCount}**\n\n` +
+      `• محصول: **${productCount}** · درخواست: **${reqCount}**\n\n` +
       `حذف / افزودن / ویرایش فقط بعد از **پیش‌نمایش و تایید** اجرا می‌شود.\n` +
       `هر جوری راحتید دستور بدهید — رسمی یا خودمونی.`,
     blocks: [
@@ -143,7 +138,6 @@ async function statusSnapshot(): Promise<{ text: string; blocks: RichBlock[] }> 
         type: "quick_replies",
         items: [
           { label: "لیست مدل‌ها", message: "مدل‌ها رو نشون بده" },
-          { label: "سفارش‌ها", message: "سفارش‌ها چی داریم" },
           { label: "درخواست‌ها", message: "لیست درخواست‌ها" },
           { label: "تعداد همه", message: "تعداد همه" },
         ],
@@ -240,14 +234,14 @@ export async function buildAdminAssistantReply(
   if (/^(سلام|درود|hi|hello|hey|سلام علیکم|صبح بخیر|عصر بخیر|شب بخیر|خوبی|چطوری)[\s!.؟?]*$/i.test(t)) {
     const snap = await statusSnapshot();
     return pack(
-      `سلام — الان روی **${page}** هستی.\n\nهر جور راحتید بنویسید؛ لازم نیست جمله رسمی باشد.\nمثال‌ها:\n• «مدل‌ها رو بده ببینم»\n• «ZB-001 رو پاک کن»\n• «یه مدل با کد TEST-1 بساز»\n• «چندتا سفارش داریم؟»\n\n${snap.text}`,
+      `سلام — الان روی **${page}** هستی.\n\nهر جور راحتید بنویسید؛ لازم نیست جمله رسمی باشد.\nمثال‌ها:\n• «مدل‌ها رو بده ببینم»\n• «ZB-001 رو پاک کن»\n• «یه مدل با کد TEST-1 بساز»\n\n${snap.text}`,
       snap.blocks
     );
   }
 
   if (/راهنما|دستورات|چطور\s*کار|کمک\s*کن|help/.test(t)) {
     return pack(
-      `دستیار ادمین آزاد است — با هر لحنی دستور بدهید.\n\n**مشاهده:** «لیست مدل‌ها»، «سفارش‌ها چی داریم»، «تعداد»\n**حذف:** «مدل ZB-001 رو پاک کن» → پیش‌نمایش → تایید\n**افزودن:** «یه مدل با کد NEW-1 و نام تست و دسته shade بساز»\n**ویرایش:** «قیمت محصول قلاب بشه 200000»\n\nبدون **تایید اجرا** هیچ حذف/افزودن/ویرایشی اعمال نمی‌شود.`,
+      `دستیار ادمین آزاد است — با هر لحنی دستور بدهید.\n\n**مشاهده:** «لیست مدل‌ها»، «درخواست‌ها چی داریم»، «تعداد»\n**حذف:** «مدل ZB-001 رو پاک کن» → پیش‌نمایش → تایید\n**افزودن:** «یه مدل با کد NEW-1 و نام تست و دسته shade بساز»\n**ویرایش:** «قیمت محصول قلاب بشه 200000»\n\nبدون **تایید اجرا** هیچ حذف/افزودن/ویرایشی اعمال نمی‌شود.`,
       [
         {
           type: "quick_replies",

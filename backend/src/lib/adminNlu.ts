@@ -8,7 +8,6 @@ export type EntityKind =
   | "project"
   | "product"
   | "shop_category"
-  | "order"
   | "request"
   | "template"
   | "install_ref"
@@ -108,7 +107,7 @@ export function parseFields(text: string): Record<string, string> {
 
   if (!out.status) {
     const st = normalize(text).match(
-      /\b(جدید|انجام|بسته|درحال|پرداخت|ارسال|لغو|new|done|closed|processing|pending|paid|shipped|cancelled)\b/
+      /\b(جدید|انجام|بسته|درحال|ارسال|لغو|new|done|closed|processing|pending|shipped|cancelled)\b/
     );
     if (st && /وضعیت|status|بکن|کن|عوض|تغییر|ویرایش/.test(normalize(text))) {
       const map: Record<string, string> = {
@@ -116,7 +115,6 @@ export function parseFields(text: string): Record<string, string> {
         انجام: "done",
         بسته: "closed",
         درحال: "processing",
-        پرداخت: "paid",
         ارسال: "shipped",
         لغو: "cancelled",
       };
@@ -172,8 +170,8 @@ export function detectAction(t: string): { action: Action | null; score: number 
   )
     add("list", 3);
   if (/چی\s*داریم|چه\s*.+هایی|چیا\s*داریم|چی\s*هست|چی\s*داری|اوضاع/.test(t)) add("list", 3);
-  if (/همه\s*(مدل|دسته|محصول|سفارش|درخواست|پروژه|ها)/.test(t)) add("list", 3);
-  if (/مدل.?ها|دسته.?ها|سفارش.?ها|محصول.?ها|درخواست.?ها/.test(t) && !/حذف|ویرایش|افزودن|بساز/.test(t))
+  if (/همه\s*(مدل|دسته|محصول|درخواست|پروژه|ها)/.test(t)) add("list", 3);
+  if (/مدل.?ها|دسته.?ها|محصول.?ها|درخواست.?ها/.test(t) && !/حذف|ویرایش|افزودن|بساز/.test(t))
     add("list", 3);
 
   if (/تعداد|چندتا|چند\s*تا|count|how\s*many/.test(t)) add("count", 3);
@@ -206,7 +204,6 @@ export function detectEntity(t: string, pathHint?: string): { entity: EntityKind
   if (/دسته\s*کاتالوگ|دسته.?بندی|دسته.?ها|categor|کاتالوگ.?دسته/.test(t) && !/فروشگاه/.test(t))
     bump("category", 3);
   if (/دسته/.test(t) && !/فروشگاه/.test(t) && !scores["category"]) bump("category", 2);
-  if (/سفارش|order\b|سفارش.?ها/.test(t)) bump("order", 3);
   if (/درخواست|مشاوره|request\b|درخواست.?ها/.test(t)) bump("request", 3);
   if (/قالب|template|chroma/.test(t)) bump("template", 3);
   if (/مرجع\s*نصب|install\s*ref/.test(t)) bump("install_ref", 3);
@@ -219,7 +216,6 @@ export function detectEntity(t: string, pathHint?: string): { entity: EntityKind
     if (pathHint.includes("portfolio")) bump("category", 2);
     if (pathHint.includes("projects")) bump("project", 3);
     if (pathHint.includes("products")) bump("product", 3);
-    if (pathHint.includes("orders")) bump("order", 3);
     if (pathHint.includes("requests")) bump("request", 3);
     if (pathHint.includes("window")) bump("template", 3);
   }
@@ -255,7 +251,7 @@ export function extractTarget(text: string, fields: Record<string, string>): str
   if (code) return code[1];
 
   const after = text.match(
-    /(?:حذف|پاک|ویرایش|تغییر|عوض|delete|remove|update|edit|جستجو|پیدا)\s+(?:مدل|دسته|محصول|سفارش|درخواست|پروژه|نمونه)?\s*[«"]?([\u0600-\u06FFa-zA-Z0-9_-]{2,})/i
+    /(?:حذف|پاک|ویرایش|تغییر|عوض|delete|remove|update|edit|جستجو|پیدا)\s+(?:مدل|دسته|محصول|درخواست|پروژه|نمونه)?\s*[«"]?([\u0600-\u06FFa-zA-Z0-9_-]{2,})/i
   );
   if (after?.[1] && !STOP.has(normalize(after[1]))) return after[1];
 

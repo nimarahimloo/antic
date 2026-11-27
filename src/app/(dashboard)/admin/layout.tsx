@@ -18,7 +18,6 @@ const ADMIN_NAV = [
   { label: "دسته‌بندی‌ها", href: "/admin/categories", icon: Package },
   { label: "هارمونی بافت و رنگ", href: "/admin/fabric-library", icon: Palette },
   { label: "محصولات", href: "/admin/products", icon: ShoppingBag },
-  { label: "سفارش‌ها", href: "/admin/orders", icon: Package },
   { label: "بارگذاری گروهی", href: "/admin/bulk-upload", icon: UploadCloud },
   { label: "تنظیمات پنجره", href: "/admin/window", icon: Settings },
   { label: "تنظیمات", href: "/admin/settings", icon: Settings },

@@ -134,19 +134,6 @@ async function resolveByIdOrName(
       });
       return r ? { id: r.id, label: r.name } : null;
     }
-    case "order": {
-      const r = await prisma.order.findFirst({
-        where: {
-          OR: [
-            { id: { contains: t } },
-            { customerPhone: { contains: t } },
-            { customerName: { contains: t } },
-            { authority: t },
-          ],
-        },
-      });
-      return r ? { id: r.id, label: r.customerName } : null;
-    }
     case "request": {
       const r = await prisma.consultationRequest.findFirst({
         where: {
@@ -251,7 +238,6 @@ export async function executeAdminCommand(
       project: await prisma.project.count(),
       product: await prisma.product.count(),
       shop_category: await prisma.shopCategory.count(),
-      order: await prisma.order.count(),
       request: await prisma.consultationRequest.count(),
     };
     if (entity && counts[entity] !== undefined) {
@@ -266,7 +252,7 @@ export async function executeAdminCommand(
 
   if (action === "list" || action === "search") {
     if (!entity) {
-      return pack("بگو لیست **چی** را می‌خواهی: مدل، دسته، محصول، سفارش، درخواست، نمونه اجرا…");
+      return pack("بگو لیست **چی** را می‌خواهی: مدل، دسته، محصول، درخواست، نمونه اجرا…");
     }
     return listEntity(entity, target);
   }
@@ -274,7 +260,7 @@ export async function executeAdminCommand(
   if (!entity) {
     if (action) {
       return pack(
-        `متوجه شدم می‌خواهی **${labelAction(action)}** کنی؛ بگو روی چه چیزی (مدل، دسته، محصول، سفارش، …).`
+        `متوجه شدم می‌خواهی **${labelAction(action)}** کنی؛ بگو روی چه چیزی (مدل، دسته، محصول، درخواست، …).`
       );
     }
     return null;
@@ -414,7 +400,6 @@ function labelEntity(e: EntityKind | string) {
     project: "نمونه اجرا",
     product: "محصول",
     shop_category: "دسته فروشگاه",
-    order: "سفارش",
     request: "درخواست مشاوره",
     template: "قالب رندر",
     install_ref: "مرجع نصب",
@@ -431,7 +416,6 @@ function adminLink(e: EntityKind): Array<{ label: string; href: string }> {
     project: { label: "نمونه‌های اجرا", href: "/admin/projects" },
     product: { label: "محصولات", href: "/admin/products" },
     shop_category: { label: "دسته فروشگاه", href: "/admin/products" },
-    order: { label: "سفارش‌ها", href: "/admin/orders" },
     request: { label: "درخواست‌ها", href: "/admin/requests" },
     template: { label: "پنجره مجازی", href: "/admin/window" },
     install_ref: { label: "پنجره مجازی", href: "/admin/window" },
@@ -448,7 +432,6 @@ function createHelp(e: EntityKind) {
     project: "مثال: نمونه اجرا با عنوان ویلا شمال و دسته living-room ثبت کن",
     product: "مثال: محصول قلاب با قیمت 150000 اضافه کن",
     shop_category: "مثال: دسته فروشگاه اکسسوری با شناسه accessories بساز",
-    order: "سفارش را از چت فقط وضعیتش را عوض کن",
     request: "درخواست را با نام یا id پیدا کن و وضعیتش را عوض کن",
     template: "قالب نیاز به style و تصویر دارد",
     install_ref: "مرجع نصب نیاز به style و تصویر دارد",
@@ -530,26 +513,6 @@ async function listEntity(entity: EntityKind, search?: string | null): Promise<A
         [{ type: "link_buttons", items: adminLink("shop_category") }]
       );
     }
-    case "order": {
-      const rows = await prisma.order.findMany({
-        where: q
-          ? {
-              OR: [{ customerName: { contains: q } }, { customerPhone: { contains: q } }],
-            }
-          : undefined,
-        orderBy: { createdAt: "desc" },
-        take: 12,
-      });
-      return pack(
-        rows
-          .map(
-            (r) =>
-              `• **${r.customerName}** — ${r.amountToman.toLocaleString("fa-IR")} — ${r.status} — \`${r.id.slice(0, 8)}\``
-          )
-          .join("\n") || "خالی",
-        [{ type: "link_buttons", items: adminLink("order") }]
-      );
-    }
     case "request": {
       const rows = await prisma.consultationRequest.findMany({
         where: q
@@ -584,8 +547,6 @@ async function deleteEntity(entity: EntityKind, id: string) {
       return prisma.product.delete({ where: { id } });
     case "shop_category":
       return prisma.shopCategory.delete({ where: { id } });
-    case "order":
-      return prisma.order.delete({ where: { id } });
     case "request":
       return prisma.consultationRequest.delete({ where: { id } });
     case "template":
@@ -748,14 +709,6 @@ async function updateEntity(
       if (f.order) data.order = Number(f.order);
       const row = await prisma.shopCategory.update({ where: { id }, data });
       return { id: row.id, label: row.name };
-    }
-    case "order": {
-      const data: Record<string, unknown> = {};
-      if (f.status) data.status = f.status;
-      if (f.note) data.note = f.note;
-      if (Object.keys(data).length === 0) throw new Error("وضعیت یا یادداشت بده");
-      const row = await prisma.order.update({ where: { id }, data });
-      return { id: row.id, label: row.customerName };
     }
     case "request": {
       const data: Record<string, unknown> = {};

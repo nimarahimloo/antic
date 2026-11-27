@@ -56,25 +56,6 @@ export interface ProductVariant {
   [key: string]: unknown;
 }
 
-export interface CartLineItem {
-  id: string;
-  quantityInfo: { confirmedQuantity: number };
-  source: { catalogReference: { catalogItemId: string; options?: { variantId?: string } } };
-  name: { original: string };
-  pricing: {
-    unitPrice: { amount: string; convertedAmount: string };
-    totalPrice: { amount: string; convertedAmount: string };
-    unitFormatted: string;
-  };
-  attributes: {
-    image?: { url: string; altText: string };
-    descriptionLines: string[];
-    modifierChoices?: Record<string, unknown>;
-    customTextFields?: Record<string, unknown>;
-  };
-  status: string;
-}
-
 export interface Media {
   id: string;
   filename: string;

@@ -3,15 +3,12 @@ import cors from "cors";
 import helmet from "helmet";
 import path from "path";
 import crypto from "crypto";
-import { paymentMiddlewareFromConfig } from "@x402/express";
-import { HTTPFacilitatorClient, type RoutesConfig } from "@x402/core/server";
 import authRoutes from "./routes/auth.js";
 import entityRoutes from "./routes/entities.js";
 import uploadRoutes from "./routes/upload.js";
 import mediaRoutes from "./routes/media.js";
 import functionRoutes from "./routes/functions.js";
 import catalogRoutes from "./routes/catalog.js";
-import orderRoutes from "./routes/orders.js";
 import agentRoutes from "./routes/agents.js";
 import mcpRoutes from "./routes/mcp.js";
 import renderRoutes from "./routes/render.js";
@@ -304,73 +301,6 @@ app.use((req, _res, next) => {
   next();
 });
 
-/* ------------------------------------------------------------------ */
-/* x402 Payment Protocol — agent-native HTTP payments                  */
-/* ------------------------------------------------------------------ */
-
-const X402_FACILITATOR_URL = process.env.X402_FACILITATOR_URL || "";
-const X402_WALLET_ADDRESS = process.env.X402_WALLET_ADDRESS || "";
-const X402_NETWORK = (process.env.X402_NETWORK || "eip155:8453") as `eip155:${string}`;
-const X402_SCHEME = "exact";
-const X402_PRICE = process.env.X402_PRICE || "0.01";
-const X402_ASSET = process.env.X402_ASSET || "USDC";
-
-/** Routes protected by x402 payment. Public discovery endpoints
- *  (/.well-known/*, /api/health, /sitemap.xml, /robots.txt, /auth.md)
- *  remain unauthenticated. */
-const X402_ROUTES: RoutesConfig = {
-  "/api/entities/*": {
-    accepts: [
-      {
-        scheme: X402_SCHEME,
-        payTo: X402_WALLET_ADDRESS,
-        price: X402_PRICE,
-        network: X402_NETWORK,
-        extra: { asset: X402_ASSET },
-      },
-    ],
-    resource: "Curtain catalog entities",
-    description: "Access to curtain category and model data",
-    mimeType: "application/json",
-  },
-  "/api/catalog/*": {
-    accepts: [
-      {
-        scheme: X402_SCHEME,
-        payTo: X402_WALLET_ADDRESS,
-        price: X402_PRICE,
-        network: X402_NETWORK,
-        extra: { asset: X402_ASSET },
-      },
-    ],
-    resource: "Shop accessory catalog",
-    description: "Access to shop categories and products",
-    mimeType: "application/json",
-  },
-};
-
-let x402Middleware: ((req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>) | null = null;
-
-if (X402_FACILITATOR_URL && X402_WALLET_ADDRESS) {
-  try {
-    const facilitatorClient = new HTTPFacilitatorClient({ url: X402_FACILITATOR_URL });
-    x402Middleware = paymentMiddlewareFromConfig(X402_ROUTES, facilitatorClient);
-    console.log(
-      `[x402] payment middleware enabled (facilitator=${X402_FACILITATOR_URL}, network=${X402_NETWORK}, wallet=${X402_WALLET_ADDRESS})`
-    );
-  } catch (err) {
-    console.error("[x402] failed to initialize payment middleware:", err);
-  }
-} else {
-  console.log(
-    "[x402] payment middleware disabled (set X402_FACILITATOR_URL and X402_WALLET_ADDRESS to enable)"
-  );
-}
-
-if (x402Middleware) {
-  app.use(x402Middleware);
-}
-
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 app.use("/uploads", express.static(path.resolve(uploadDir)));
 
@@ -470,7 +400,6 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/media", mediaRoutes);
 app.use("/api/functions", functionRoutes);
 app.use("/api/catalog", catalogRoutes);
-app.use("/api/orders", orderRoutes);
 app.use("/api/agents", agentRoutes);
 app.use("/api/mcp", mcpRoutes);
 app.use("/api/render", renderRoutes);

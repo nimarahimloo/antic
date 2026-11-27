@@ -212,26 +212,6 @@ CREATE TABLE "ShopCategory" (
 );
 
 -- CreateTable
-CREATE TABLE "Order" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "userId" TEXT,
-    "status" TEXT NOT NULL DEFAULT 'pending',
-    "customerName" TEXT NOT NULL,
-    "customerPhone" TEXT NOT NULL,
-    "customerEmail" TEXT,
-    "customerAddress" TEXT,
-    "itemsJson" TEXT NOT NULL,
-    "amountToman" INTEGER NOT NULL,
-    "amountRial" INTEGER NOT NULL,
-    "authority" TEXT,
-    "refId" TEXT,
-    "gateway" TEXT NOT NULL DEFAULT 'zarinpal',
-    "note" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
-);
-
--- CreateTable
 CREATE TABLE "AIConversation" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,
@@ -391,12 +371,6 @@ CREATE INDEX "Product_visible_idx" ON "Product"("visible");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ShopCategory_slug_key" ON "ShopCategory"("slug");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Order_authority_key" ON "Order"("authority");
-
--- CreateIndex
-CREATE INDEX "Order_status_idx" ON "Order"("status");
 
 -- CreateIndex
 CREATE INDEX "AIConversation_userId_updatedAt_idx" ON "AIConversation"("userId", "updatedAt");

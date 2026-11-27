@@ -13,42 +13,6 @@ import { emailChangedEmail, passwordChangedEmail } from "../lib/emailTemplates.j
 const router = Router();
 router.use(requireAuth);
 
-function mapOrder(o: {
-  id: string;
-  status: string;
-  customerName: string;
-  customerPhone: string;
-  customerEmail: string | null;
-  customerAddress: string | null;
-  itemsJson: string;
-  amountToman: number;
-  refId: string | null;
-  note: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
-  let items: unknown[] = [];
-  try {
-    items = JSON.parse(o.itemsJson);
-  } catch {
-    items = [];
-  }
-  return {
-    id: o.id,
-    status: o.status,
-    customerName: o.customerName,
-    customerPhone: o.customerPhone,
-    customerEmail: o.customerEmail,
-    customerAddress: o.customerAddress,
-    amountToman: o.amountToman,
-    refId: o.refId,
-    note: o.note,
-    items,
-    createdAt: o.createdAt,
-    updatedAt: o.updatedAt,
-  };
-}
-
 async function loadUser(req: AuthedRequest) {
   const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
   if (!user) throw new HttpError(401, "کاربر یافت نشد");
@@ -61,23 +25,8 @@ router.get("/overview", async (req: AuthedRequest, res) => {
     const phone = user.phone || undefined;
     const email = user.email || undefined;
 
-    const orderWhere = {
-      OR: [
-        { userId: user.id },
-        ...(phone ? [{ customerPhone: phone }] : []),
-        ...(email ? [{ customerEmail: email }] : []),
-      ],
-    };
-
-    const [orderCount, paidCount, addressCount, recentOrders, requests] = await Promise.all([
-      prisma.order.count({ where: orderWhere }),
-      prisma.order.count({ where: { ...orderWhere, status: "paid" } }),
+    const [addressCount, requests] = await Promise.all([
       prisma.address.count({ where: { userId: user.id } }),
-      prisma.order.findMany({
-        where: orderWhere,
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      }),
       phone || email
         ? prisma.consultationRequest.findMany({
             where: {
@@ -95,12 +44,9 @@ router.get("/overview", async (req: AuthedRequest, res) => {
     res.json({
       user: toApi(user),
       stats: {
-        orders: orderCount,
-        paidOrders: paidCount,
         addresses: addressCount,
         requests: requests.length,
       },
-      recentOrders: recentOrders.map(mapOrder),
       recentRequests: requests.map((r) => toApi(r)),
     });
   } catch (err) {
@@ -202,44 +148,6 @@ router.post("/password", async (req: AuthedRequest, res) => {
     res.json({ ok: true });
   } catch (err) {
     sendError(res, err instanceof z.ZodError ? new HttpError(400, err.message) : err);
-  }
-});
-
-router.get("/orders", async (req: AuthedRequest, res) => {
-  try {
-    const user = await loadUser(req);
-    const phone = user.phone || undefined;
-    const email = user.email || undefined;
-    const rows = await prisma.order.findMany({
-      where: {
-        OR: [
-          { userId: user.id },
-          ...(phone ? [{ customerPhone: phone }] : []),
-          ...(email ? [{ customerEmail: email }] : []),
-        ],
-      },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
-    res.json(rows.map(mapOrder));
-  } catch (err) {
-    sendError(res, err);
-  }
-});
-
-router.get("/orders/:id", async (req: AuthedRequest, res) => {
-  try {
-    const user = await loadUser(req);
-    const order = await prisma.order.findUnique({ where: { id: routeParam(req, "id") } });
-    if (!order) throw new HttpError(404, "سفارش پیدا نشد");
-    const owns =
-      order.userId === user.id ||
-      (user.phone && order.customerPhone === user.phone) ||
-      (user.email && order.customerEmail === user.email);
-    if (!owns) throw new HttpError(403, "دسترسی به این سفارش ندارید");
-    res.json(mapOrder(order));
-  } catch (err) {
-    sendError(res, err);
   }
 });
 

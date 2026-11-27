@@ -169,15 +169,7 @@ async function main() {
       : fail("catalog categories", `${r.status}`);
   }
 
-  // 11. Admin orders list
-  if (token) {
-    const r = await req("/api/orders", { token });
-    Array.isArray(r.data)
-      ? ok("admin orders list", `${(r.data as unknown[]).length}`)
-      : fail("admin orders list", `${r.status}`);
-  }
-
-  // 12. Admin product create
+  // 10. Admin product create
   if (token) {
     const slug = "smoke-test-product";
     const r = await req("/api/catalog/admin/products", {
@@ -197,7 +189,7 @@ async function main() {
     }
   }
 
-  // 13. Unknown entity
+  // 11. Unknown entity
   {
     const r = await req("/api/entities/DoesNotExist");
     r.status === 404 ? ok("unknown entity 404") : fail("unknown entity 404", `${r.status}`);

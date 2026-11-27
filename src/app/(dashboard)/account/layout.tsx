@@ -4,12 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User, Package, MapPin, Settings, LogOut, ChevronLeft, FileText } from "lucide-react";
+import { User, MapPin, Settings, LogOut, ChevronLeft, FileText } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
 const ACCOUNT_NAV = [
   { label: "داشبورد", href: "/account", icon: User },
-  { label: "سفارش‌ها", href: "/account/orders", icon: Package },
   { label: "آدرس‌ها", href: "/account/addresses", icon: MapPin },
   { label: "درخواست‌ها", href: "/account/requests", icon: FileText },
   { label: "پروفایل", href: "/account/profile", icon: Settings },
