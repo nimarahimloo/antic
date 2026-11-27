@@ -8,7 +8,7 @@ import { SITE_PHONE_HREF } from "@/lib/siteContact";
 import CurtainDetailClient from "./CurtainDetailClient";
 import { CurtainDetailPageSkeleton } from "@/components/Skeletons";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600; // ISR: revalidate curtain model every hour
 
 interface CurtainDetailPageProps {
   params: Promise<{ id: string }>;

@@ -1,16 +1,26 @@
-"use client";
-
 import { Suspense } from "react";
-import { useParams } from "next/navigation";
+import { notFound } from "next/navigation";
+import { getShopProduct } from "@/lib/server-data";
 import ProductDetailPage from "@/components/ProductDetailPage";
 import { ProductDetailPageSkeleton } from "@/components/Skeletons";
 
-export default function ProductDetailPageWrapper() {
-  const params = useParams();
-  const slug = params.slug as string;
+export const revalidate = 3600; // ISR: revalidate product every hour
+
+export default async function ProductDetailPageWrapper({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const product = await getShopProduct(slug);
+
+  if (!product) {
+    notFound();
+  }
+
   return (
     <Suspense fallback={<ProductDetailPageSkeleton />}>
-      <ProductDetailPage slug={slug} />
+      <ProductDetailPage product={product as Record<string, unknown>} />
     </Suspense>
   );
 }

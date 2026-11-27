@@ -1,8 +1,13 @@
-"use client";
-
-import { Suspense } from "react";
 import PageHero from "@/components/PageHero";
 import { AboutPageSkeleton } from "@/components/Skeletons";
+
+export const revalidate = 86400; // SSG: revalidate once per day
+
+export default async function AboutPage() {
+  return (
+    <AboutPageContent />
+  );
+}
 
 function AboutPageContent() {
   return (
@@ -93,13 +98,5 @@ function AboutPageContent() {
         </div>
       </section>
     </div>
-  );
-}
-
-export default function AboutPage() {
-  return (
-    <Suspense fallback={<AboutPageSkeleton />}>
-      <AboutPageContent />
-    </Suspense>
   );
 }

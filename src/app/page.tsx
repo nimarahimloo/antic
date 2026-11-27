@@ -19,6 +19,8 @@ import {
 } from "@/components/Skeletons";
 import { getCollections } from "@/lib/server-data";
 
+export const revalidate = 3600; // ISR: revalidate collections every hour
+
 export default async function HomePage() {
   let collections: Array<{ id: string; title: string; slug: string; description: string; coverImage: string | null; order: number; active: boolean }> = [];
 

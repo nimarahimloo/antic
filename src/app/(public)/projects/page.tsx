@@ -3,7 +3,7 @@ import { getCurtainCategories } from "@/lib/server-data";
 import { ProjectsPageSkeleton } from "@/components/Skeletons";
 import ProjectsListClientWrapper from "./ProjectsListClientWrapper";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600; // ISR: revalidate projects every hour
 
 export default async function ProjectsPage() {
   let categories: Array<{ id: string; name: string; slug: string; image: string | null; description: string }> = [];

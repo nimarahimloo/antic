@@ -1,7 +1,7 @@
 import Layout from "@/components/Layout";
 import ScrollToTop from "@/components/ScrollToTop";
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
 
 export default function PublicLayout({
   children,

@@ -49,13 +49,23 @@ interface UseShopReturn {
   loadingMore: boolean;
 }
 
-export function useShop({ pageSize = 24 } = {}): UseShopReturn {
-  const [categories, setCategories] = useState<Category[]>([]);
+interface UseShopOptions {
+  pageSize?: number;
+  initialCategories?: Category[];
+  initialProducts?: Product[];
+}
+
+export function useShop({
+  pageSize = 24,
+  initialCategories,
+  initialProducts,
+}: UseShopOptions = {}): UseShopReturn {
+  const [categories, setCategories] = useState<Category[]>(initialCategories || []);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [sort, setSort] = useState("featured");
   const [filters, setFilters] = useState<Record<string, unknown>>({});
   const [attempt, setAttempt] = useState(0);
-  const [page, setPage] = useState<PageState>({ key: null, products: null, cursor: null, error: null, loadingMore: false });
+  const [page, setPage] = useState<PageState>({ key: null, products: initialProducts || null, cursor: null, error: null, loadingMore: false });
   const generation = useRef(0);
   const pendingMore = useRef<{ generation: number; key: string } | null>(null);
   const key = JSON.stringify([

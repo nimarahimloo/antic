@@ -1,9 +1,7 @@
-"use client";
-
 import { Suspense } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { notFound as nextNotFound } from "next/navigation";
 import Link from "next/link";
+import { useMemo } from "react";
 import { ArrowRight } from "lucide-react";
 import CategoryCoverCard from "@/components/CategoryCoverCard";
 import ProjectCard from "@/components/ProjectCard";
@@ -12,48 +10,48 @@ import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { api } from "@/api";
 import { apiErrorMessage } from "@/lib/apiError";
 import { ProjectsPageSkeleton } from "@/components/Skeletons";
+import { getCurtainCategory } from "@/lib/server-data";
 
-function PortfolioCategoryPageContent() {
-  const params = useParams();
-  const slug = params.slug as string;
+export const revalidate = 3600; // ISR: revalidate category projects every hour
+
+interface PortfolioCategoryPageContentProps {
+  params: Promise<{ slug: string }>;
+}
+
+async function getCategoryAndProjects({ params }: PortfolioCategoryPageContentProps) {
+  const { slug } = await params;
+  const category = await getCurtainCategory(slug);
+  if (!category) return null;
+
+  let projects: Array<{ id: string; title: string; cover_image?: string; subcategory?: string }> = [];
+  try {
+    const rows = await api.entities.Project.filter({ category_slug: slug }, { sort: "-created_date", limit: 100 });
+    projects = Array.isArray(rows) ? rows as Array<{ id: string; title: string; cover_image?: string; subcategory?: string }> : [];
+  } catch {
+    projects = [];
+  }
+
+  return { category, projects };
+}
+
+type CategoryType = Awaited<ReturnType<typeof getCurtainCategory>>;
+
+function PortfolioCategoryPageContent({ category, projects }: { category: NonNullable<CategoryType>; projects: Array<{ id: string; title: string; cover_image?: string; subcategory?: string }> }) {
   const { categories, loading: catsLoading } = useCurtainCategories();
-  const category = useMemo(
-    () => categories.find((c) => c.slug === slug) || null,
-    [categories, slug]
+  const categoryFromHook = useMemo(
+    () => categories.find((c) => c.slug === category.slug) || null,
+    [categories, category.slug]
   );
 
-  const [projects, setProjects] = useState<Array<{ id: string; title: string; cover_image?: string; subcategory?: string }>>([]);
-  const [loadedSlug, setLoadedSlug] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!slug) return;
-    let alive = true;
-    api.entities.Project.filter({ category_slug: slug }, { sort: "-created_date", limit: 100 })
-      .then((rows) => {
-        if (!alive) return;
-        setProjects(Array.isArray(rows) ? rows as Array<{ id: string; title: string; cover_image?: string; subcategory?: string }> : []);
-      })
-      .catch((err) => {
-        console.error("Failed to load projects:", apiErrorMessage(err));
-        if (!alive) return;
-        setProjects([]);
-      })
-      .finally(() => {
-        if (alive) setLoadedSlug(slug);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [slug]);
-
-  const loadingProjects = loadedSlug !== slug;
+  // Use server-provided category if hook hasn't loaded yet
+  const effectiveCategory = categoryFromHook || category;
 
   const rootProjects = useMemo(
     () => projects.filter((p) => !p.subcategory),
     [projects]
   );
 
-  if (catsLoading && !category) {
+  if (catsLoading && !effectiveCategory) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
@@ -61,10 +59,10 @@ function PortfolioCategoryPageContent() {
     );
   }
 
-  if (!category) {
+  if (!effectiveCategory) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-24 text-center">
-        <h1 className="font-display text-2xl font-bold">دسته پیدا نشد</h1>
+        <h1 className="font-display text-2xl font-bold text-foreground">دسته پیدا نشد</h1>
         <Link href="/projects" className="btn-gold mt-6">
           بازگشت به نمونه‌های اجرا
         </Link>
@@ -84,7 +82,7 @@ function PortfolioCategoryPageContent() {
             نمونه‌های اجرا شده
           </Link>
           <ArrowRight className="h-3 w-3" />
-          <span className="text-foreground">{category.name}</span>
+          <span className="text-foreground">{effectiveCategory.name}</span>
         </nav>
       </div>
 
@@ -93,35 +91,35 @@ function PortfolioCategoryPageContent() {
           <div>
             <span className="eyebrow mb-3 block">نمونه کار</span>
             <h1 className="font-display text-3xl font-black text-foreground lg:text-4xl">
-              {category.name}
+              {effectiveCategory.name}
             </h1>
-            {category.description ? (
+            {effectiveCategory.description ? (
               <p className="mt-4 font-body text-sm leading-8 text-muted-foreground">
-                {category.description}
+                {effectiveCategory.description}
               </p>
             ) : null}
           </div>
-          {category.image ? (
+          {effectiveCategory.image ? (
             <div className="overflow-hidden rounded-3xl border border-secondary/60">
               <img
-                src={category.image}
-                alt={category.name}
+                src={effectiveCategory.image}
+                alt={effectiveCategory.name}
                 className="aspect-[16/10] w-full object-cover"
               />
             </div>
           ) : null}
         </div>
 
-        {category.subcategories?.length ? (
+        {effectiveCategory.subcategories?.length ? (
           <div className="mt-12">
             <h2 className="mb-5 font-display text-lg font-bold text-foreground">زیردسته‌ها</h2>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {category.subcategories.map((sub) => (
+              {effectiveCategory.subcategories.map((sub: { name: string; slug: string }) => (
                 <CategoryCoverCard
                   key={sub.slug}
                   name={sub.name}
-                  image={category.image ?? undefined}
-                  href={`/projects/category/${category.slug}/${sub.slug}`}
+                  image={effectiveCategory.image ?? undefined}
+                  href={`/projects/category/${effectiveCategory.slug}/${sub.slug}`}
                 />
               ))}
             </div>
@@ -130,38 +128,29 @@ function PortfolioCategoryPageContent() {
 
         <div className="mt-12">
           <h2 className="mb-5 font-display text-lg font-bold text-foreground">نمونه‌ها</h2>
-          {loadingProjects ? (
-            <div className={mosaicGridClass}>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div
-                  key={i}
-                  className={`min-h-[200px] animate-pulse rounded-2xl bg-secondary/30 ${mosaicItemClass(i - 1)}`}
-                />
-              ))}
-            </div>
-          ) : rootProjects.length === 0 ? (
-            <p className="font-body text-sm text-muted-foreground">
-              {category.subcategories?.length
-                ? "نمونه‌های این دسته در زیردسته‌ها قرار دارند."
-                : "هنوز نمونه‌ای در این دسته ثبت نشده است."}
-            </p>
-          ) : (
-            <div className={mosaicGridClass}>
-              {rootProjects.map((p, i) => (
-                <ProjectCard key={p.id} project={p} className={mosaicItemClass(i)} />
-              ))}
-            </div>
-          )}
+          <div className={mosaicGridClass}>
+            {rootProjects.map((p, i) => (
+              <ProjectCard key={p.id} project={p} className={mosaicItemClass(i)} />
+            ))}
+          </div>
         </div>
       </section>
     </div>
   );
 }
 
-export default function PortfolioCategoryPage() {
+export default async function PortfolioCategoryPage({
+  params,
+}: PortfolioCategoryPageContentProps) {
+  const data = await getCategoryAndProjects({ params });
+
+  if (!data) {
+    nextNotFound();
+  }
+
   return (
     <Suspense fallback={<ProjectsPageSkeleton />}>
-      <PortfolioCategoryPageContent />
+      <PortfolioCategoryPageContent category={data.category} projects={data.projects} />
     </Suspense>
   );
 }

@@ -3,7 +3,7 @@
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useProductDetail } from "@/hooks/useProductDetail";
+import { useProductDetail, type DetailProduct } from "@/hooks/useProductDetail";
 import { useVariantOptions } from "@/hooks/useVariantOptions";
 import { productGallery, storeImage } from "@/lib/storeImage";
 import ProductGallery from "@/components/product/ProductGallery";
@@ -13,8 +13,11 @@ import ProductCard from "@/components/ProductCard";
 import { searchProducts } from "@/rest/store-catalog";
 import { ArrowRight, Phone, Truck, ShieldCheck, Headphones, Store, BadgeCheck } from "lucide-react";
 
-export default function ProductDetailPage({ slug }: { slug: string }) {
-  const d = useProductDetail(slug);
+export default function ProductDetailPage({ product }: { product: Record<string, unknown> }) {
+  const d = useProductDetail(
+    String(product.slug || ""),
+    product as unknown as DetailProduct | null
+  );
   const { optionGroups, modifierGroups } = useVariantOptions(
     d.options, d.modifiers, d.selectedOptions, d.modifierValues
   );

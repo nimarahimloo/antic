@@ -7,8 +7,16 @@ import { storeImage } from "@/lib/storeImage";
 import { mediaUrl } from "@/lib/mediaUrl";
 import { ThumbnailImage } from "@/components/ui/image";
 
-export default function ShopPage() {
-  const s = useShop({ pageSize: 24 });
+interface ShopPageProps {
+  initialCategories?: Array<{ id: string; name: string; slug: string; image: string | null; description?: string; visible?: boolean; order?: number }>;
+  initialProducts?: Array<{ id: string; slug: string; name: string; description?: string; price: number; formattedPrice?: string; image?: string; categoryId?: string; visible?: boolean; inStock?: boolean; stock?: number; ribbon?: string; optionsJson?: string; variantsJson?: string; sortOrder?: number; createdAt?: string; updatedAt?: string }>;
+}
+
+export default function ShopPage({
+  initialCategories,
+  initialProducts,
+}: ShopPageProps = {}) {
+  const s = useShop({ pageSize: 24, initialCategories, initialProducts });
 
   return (
     <div className="bg-background">

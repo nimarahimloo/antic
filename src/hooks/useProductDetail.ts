@@ -32,7 +32,7 @@ interface ProductVariant {
   media?: { image?: { url: string }; thumbnail?: { url: string } };
 }
 
-interface DetailProduct {
+export interface DetailProduct {
   id: string;
   categoryId?: string;
   options?: ProductOption[];
@@ -51,8 +51,8 @@ interface Choice {
   image?: string;
 }
 
-export function useProductDetail(slug: string) {
-  const [product, setProduct] = useState<DetailProduct | null>(null);
+export function useProductDetail(slug: string, initialProduct?: DetailProduct | null) {
+  const [product, setProduct] = useState<DetailProduct | null>(initialProduct ?? null);
   const [notFound, setNotFound] = useState(false);
   // A missing product (notFound) and a failed request (error) need different pages: one is a dead
   // link, the other is worth retrying. Without the split, a network blip reads as "product deleted".
@@ -62,7 +62,10 @@ export function useProductDetail(slug: string) {
   const [quantity, setQuantity] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // Only fetch on mount if no initial product was provided (SSR case). Subsequent reloads
+  // triggered by `retry` will still refetch.
   useEffect(() => {
+    if (initialProduct) return; // SSR data already provided, skip client fetch
     let cancelled = false;
     setProduct(null);
     setNotFound(false);
@@ -86,7 +89,7 @@ export function useProductDetail(slug: string) {
     return () => {
       cancelled = true;
     };
-  }, [slug, reloadKey]);
+  }, [slug, initialProduct, reloadKey]);
 
   const options = product?.options || [];
   const modifiers = product?.modifiers || [];
