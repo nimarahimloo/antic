@@ -2,19 +2,16 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import InteractiveCatalog from "@/components/sections/InteractiveCatalog";
+import ServerCatalog from "./ServerCatalog";
 import { InteractiveCatalogSkeleton } from "@/components/sections/InteractiveCatalogSkeletons";
 
-function CatalogContent() {
+export default function CatalogPage() {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("category") || undefined;
-  return <InteractiveCatalog initialCategory={initialCategory} />;
-}
 
-export default function CatalogPage() {
   return (
     <Suspense fallback={<InteractiveCatalogSkeleton />}>
-      <CatalogContent />
+      <ServerCatalog initialCategory={initialCategory} />
     </Suspense>
   );
 }

@@ -3,7 +3,7 @@
  * Import accessories (shop products) from a WooCommerce product CSV export.
  *
  * Usage:
- *   node scripts/import-accessories-csv.mjs /path/to/woocommerce-accessories.csv
+ *   cd backend && npx tsx scripts/import-accessories-csv.ts /path/to/woocommerce-accessories.csv
  *   # or place the file at backend/data/woocommerce-accessories.csv and:
  *   npm run db:import-accessories
  *
@@ -11,18 +11,17 @@
  * rows. Existing products (same slug) are updated, never duplicated.
  *
  * Prices in the export are Toman; the store keeps them as-is in `price`
- * with currency "IRR" (the checkout converts to Rial for Zarinpal).
+ * with currency "IRR" (orders are placed by contacting the admin; no online checkout).
  */
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import { PrismaClient } from "@prisma/client";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(path.resolve());
 const prisma = new PrismaClient();
 
 const csvPath =
-  process.argv[2] || path.join(__dirname, "../data/woocommerce-accessories.csv");
+  process.argv[2] || path.join(__dirname, "data", "woocommerce-accessories.csv");
 
 if (!fs.existsSync(csvPath)) {
   console.error(`CSV not found: ${csvPath}`);
@@ -31,9 +30,9 @@ if (!fs.existsSync(csvPath)) {
 }
 
 /** Minimal RFC-4180 CSV parser. */
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
   let field = "";
   let inQuotes = false;
   const src = text.replace(/^\uFEFF/, "");
@@ -71,7 +70,7 @@ function parseCsv(text) {
   return rows;
 }
 
-function stripHtml(html) {
+function stripHtml(html: string | null | undefined): string {
   return String(html || "")
     .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/g, " ")
@@ -80,7 +79,7 @@ function stripHtml(html) {
     .trim();
 }
 
-function norm(s) {
+function norm(s: string | null | undefined): string {
   return String(s || "")
     .replace(/\u200c/g, " ")
     .replace(/[\s_]+/g, " ")
@@ -89,7 +88,7 @@ function norm(s) {
 }
 
 /** Persian/ASCII slug that keeps the URL readable. */
-function slugify(value, fallback) {
+function slugify(value: string | null | undefined, fallback: string): string {
   const s = String(value || "")
     .trim()
     .toLowerCase()
@@ -100,7 +99,7 @@ function slugify(value, fallback) {
 }
 
 /** Leaf category name of "اکسسوری,اکسسوری > ریل و میل پرده" → "ریل و میل پرده" */
-function leafCategory(raw) {
+function leafCategory(raw: string | null | undefined): string {
   const segments = String(raw || "")
     .split(",")
     .flatMap((g) => g.split(">"))
@@ -109,9 +108,22 @@ function leafCategory(raw) {
   return segments.length ? segments[segments.length - 1] : "اکسسوری";
 }
 
-function parseNumber(raw) {
+function parseNumber(raw: string | null | undefined): number {
   const n = Number(String(raw || "").replace(/[^\d.]/g, ""));
   return Number.isFinite(n) ? n : 0;
+}
+
+interface CsvRow {
+  sku: number;
+  name: number;
+  published: number;
+  short: number;
+  desc: number;
+  price: number;
+  sale: number;
+  cats: number;
+  stock: number;
+  inStock: number;
 }
 
 async function main() {
@@ -121,7 +133,7 @@ async function main() {
     return;
   }
   const headers = rows[0];
-  const idx = {
+  const idx: CsvRow = {
     sku: headers.indexOf("SKU"),
     name: headers.indexOf("Name"),
     published: headers.indexOf("Published"),
@@ -134,7 +146,7 @@ async function main() {
     inStock: headers.indexOf("In stock?"),
   };
 
-  const catIds = new Map();
+  const catIds = new Map<string, string>();
   let createdCats = 0;
   let created = 0;
   let updated = 0;
@@ -157,7 +169,7 @@ async function main() {
 
     const catName = leafCategory(cols[idx.cats]);
     const catKey = norm(catName);
-    let categoryId = catIds.get(catKey);
+    let categoryId: string | undefined = catIds.get(catKey);
     if (!categoryId) {
       const slug = slugify(catName, `category-${order + 1}`);
       const existing = await prisma.shopCategory.findUnique({ where: { slug } });

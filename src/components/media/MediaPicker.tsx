@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Media, MediaListResponse } from "@/api/client";
-import { api } from "@/api/client";
+import type { Media, MediaListResponse } from "@/api";
+import { api } from "@/api";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToast } from "@/lib/adminToast";

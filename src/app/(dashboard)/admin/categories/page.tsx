@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { useCurtainCategories, allCategorySelectOptions } from "@/hooks/useCurtainCategories";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { parseSubs, collectSubSlugs } from "@/lib/categoryTree";
 
 type AdminCategory = {

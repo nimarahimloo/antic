@@ -9,7 +9,7 @@ import CategoryCoverCard from "@/components/CategoryCoverCard";
 import ProjectCard from "@/components/ProjectCard";
 import { mosaicGridClass, mosaicItemClass } from "@/lib/mosaicLayout";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { apiErrorMessage } from "@/lib/apiError";
 import { ProjectsPageSkeleton } from "@/components/Skeletons";
 

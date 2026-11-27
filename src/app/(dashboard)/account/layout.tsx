@@ -81,10 +81,10 @@ export default function AccountLayout({
         <nav className="flex-1 overflow-y-auto p-4 lg:p-6" aria-label="منوی اصلی حساب کاربری">
           <div className="mb-6 flex items-center gap-3 p-3 rounded-xl bg-primary/10">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              {user?.full_name?.charAt(0) || "ا"}
+              {user?.fullName?.charAt(0) || "ا"}
             </div>
             <div className="min-w-0">
-              <p className="font-display text-sm font-bold text-foreground truncate">{user?.full_name}</p>
+              <p className="font-display text-sm font-bold text-foreground truncate">{user?.fullName}</p>
               <p className="font-body text-[11px] text-primary truncate">{user?.email}</p>
             </div>
           </div>
@@ -138,10 +138,10 @@ export default function AccountLayout({
           <div className="flex-1" />
           <div className="flex items-center gap-4">
             <span className="hidden font-body text-sm text-muted-foreground lg:block">
-              {user?.full_name}
+              {user?.fullName}
             </span>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-              {user?.full_name?.charAt(0) || "ا"}
+              {user?.fullName?.charAt(0) || "ا"}
             </div>
           </div>
         </header>

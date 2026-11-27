@@ -34,7 +34,7 @@ import {
   Plus,
   Edit2,
 } from "lucide-react";
-import { api, getAccessToken } from "@/api/client";
+import { api, getAccessToken } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

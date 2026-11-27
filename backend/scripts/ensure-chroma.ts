@@ -1,7 +1,7 @@
 /**
  * پس از هر دیپلوی: وضعیت قالب سبز دسته‌ها را چک کن — بدون پاک‌کردن آپلود ادمین.
  *
- *   cd backend && npm run chroma:ensure
+ *   cd backend && npx tsx scripts/ensure-chroma.ts
  */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
@@ -11,7 +11,7 @@ import path from "path";
 const prisma = new PrismaClient();
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 
-function fileOk(image) {
+function fileOk(image: string | null | undefined): boolean {
   if (!image) return false;
   if (image.startsWith("http")) return true;
   const local = path.join(path.resolve(uploadDir), path.basename(image));
@@ -30,7 +30,9 @@ async function main() {
     orderBy: { order: "asc" },
   });
   const templates = await prisma.renderTemplate.findMany();
-  const byStyle = new Map(templates.map((t) => [String(t.style).toLowerCase(), t]));
+  const byStyle = new Map<string, { image?: string | null }>(
+    templates.map((t) => [String(t.style).toLowerCase(), t]),
+  );
 
   let kept = 0;
   let missing = 0;

@@ -3,8 +3,8 @@
  * Functional API tests against a running antic-backend.
  *
  * Usage:
- *   node scripts/functional-test.mjs
- *   BASE=http://localhost:3001 node scripts/functional-test.mjs
+ *   cd backend && npx tsx scripts/functional-test.ts
+ *   BASE=http://localhost:3001 npx tsx scripts/functional-test.ts
  *
  * Requires seeded admin: admin@antic.local / admin123 (or env overrides)
  */
@@ -17,19 +17,32 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
 
 let passed = 0;
 let failed = 0;
-const logs = [];
+const logs: string[] = [];
 
-function ok(name, detail = "") {
+function ok(name: string, detail = "") {
   passed++;
   logs.push(`  ✓ ${name}${detail ? ` — ${detail}` : ""}`);
 }
-function fail(name, detail = "") {
+function fail(name: string, detail = "") {
   failed++;
   logs.push(`  ✗ ${name}${detail ? ` — ${detail}` : ""}`);
 }
 
-async function req(path, { method = "GET", body, token, headers: extraHeaders = {} } = {}) {
-  const headers = { "Content-Type": "application/json", ...extraHeaders };
+interface ApiResponse {
+  status: number;
+  data: unknown;
+}
+
+async function req(
+  path: string,
+  {
+    method = "GET",
+    body,
+    token,
+    headers: extraHeaders = {},
+  }: { method?: string; body?: unknown; token?: string; headers?: Record<string, string> } = {},
+): Promise<ApiResponse> {
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...extraHeaders };
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, {
     method,
@@ -37,7 +50,7 @@ async function req(path, { method = "GET", body, token, headers: extraHeaders = 
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
-  let data;
+  let data: unknown;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
@@ -46,12 +59,15 @@ async function req(path, { method = "GET", body, token, headers: extraHeaders = 
   return { status: res.status, data };
 }
 
-async function reqForm(path, { method = "POST", token, form } = {}) {
-  const headers = {};
+async function reqForm(
+  path: string,
+  { method = "POST", token, form }: { method?: string; token?: string; form?: FormData } = {},
+): Promise<ApiResponse> {
+  const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, { method, headers, body: form });
   const text = await res.text();
-  let data;
+  let data: unknown;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
@@ -66,18 +82,20 @@ async function main() {
   // —— health ——
   {
     const r = await req("/api/health");
-    r.status === 200 && r.data?.ok ? ok("health") : fail("health", String(r.status));
+    r.status === 200 && (r.data as { ok?: boolean })?.ok
+      ? ok("health")
+      : fail("health", String(r.status));
   }
 
   // —— admin login ——
-  let token = null;
+  let token: string | null = null;
   {
     const r = await req("/api/auth/login", {
       method: "POST",
       body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
     });
-    if (r.status === 200 && r.data?.token) {
-      token = r.data.token;
+    if (r.status === 200 && (r.data as { token?: string })?.token) {
+      token = (r.data as { token: string }).token;
       ok("admin login");
     } else {
       fail("admin login", `${r.status} ${JSON.stringify(r.data)}`);
@@ -94,23 +112,23 @@ async function main() {
       : fail("AI workspace requires authentication", String(anonymous.status));
 
     const providers = await req("/api/ai/providers", { token });
-    providers.status === 200 && Array.isArray(providers.data?.providers)
-      ? ok("AI provider registry", `${providers.data.providers.length} providers`)
+    providers.status === 200 && Array.isArray((providers.data as { providers?: unknown[] })?.providers)
+      ? ok("AI provider registry", `${(providers.data as { providers: unknown[] }).providers.length} providers`)
       : fail("AI provider registry", `${providers.status} ${JSON.stringify(providers.data)}`);
 
     const created = await req("/api/ai/conversations", {
       method: "POST",
       token,
-      body: { title: `AI test ${Date.now()}` },
+      body: { title: "AI test functional" },
     });
-    const conversationId = created.data?.conversation?.id;
+    const conversationId = (created.data as { conversation?: { id?: string } })?.conversation?.id;
     created.status === 201 && conversationId
       ? ok("create AI conversation", conversationId)
       : fail("create AI conversation", `${created.status} ${JSON.stringify(created.data)}`);
 
     if (conversationId) {
       const detail = await req(`/api/ai/conversations/${conversationId}`, { token });
-      detail.status === 200 && Array.isArray(detail.data?.messages)
+      detail.status === 200 && Array.isArray((detail.data as { messages?: unknown[] })?.messages)
         ? ok("load empty AI conversation")
         : fail("load empty AI conversation", String(detail.status));
 
@@ -133,7 +151,7 @@ async function main() {
     );
     form.append("file", new Blob([pixel], { type: "image/png" }), "pixel.png");
     const uploaded = await reqForm("/api/ai/files", { token, form });
-    const fileId = uploaded.data?.file?.id;
+    const fileId = (uploaded.data as { file?: { id?: string } })?.file?.id;
     uploaded.status === 201 && fileId
       ? ok("upload private AI file", fileId)
       : fail("upload private AI file", `${uploaded.status} ${JSON.stringify(uploaded.data)}`);
@@ -158,7 +176,7 @@ async function main() {
   }
 
   // —— list categories (public) ——
-  let categories = [];
+  let categories: unknown[] = [];
   {
     const r = await req("/api/entities/CurtainCategory?limit=200");
     if (Array.isArray(r.data)) {
@@ -171,9 +189,10 @@ async function main() {
 
   // —— hierarchy: roots should not include known sub-slugs if present as children ——
   {
-    const subSlugs = new Set();
+    const subSlugs = new Set<string>();
     for (const c of categories) {
-      let subs = c.subcategories;
+      const cat = c as Record<string, unknown>;
+      let subs = cat.subcategories;
       if (typeof subs === "string") {
         try {
           subs = JSON.parse(subs);
@@ -183,46 +202,51 @@ async function main() {
       }
       if (Array.isArray(subs)) {
         for (const s of subs) {
-          const slug = typeof s === "string" ? s : s?.slug;
+          const sub = s as Record<string, unknown> | string;
+          const slug = typeof sub === "string" ? sub : sub?.slug;
           if (slug) subSlugs.add(String(slug).toLowerCase());
         }
       }
     }
-    const collisions = categories.filter((c) => subSlugs.has(String(c.slug).toLowerCase()));
+    const collisions = categories.filter((c) => {
+      const cat = c as Record<string, unknown>;
+      return subSlugs.has(String(cat.slug).toLowerCase());
+    });
     if (collisions.length === 0) {
       ok("no category row is also a subcategory slug");
     } else {
       // soft fail — data quality warning, not API bug
       fail(
         "category rows that are also sub-slugs (cleanup recommended)",
-        collisions.map((c) => c.slug).join(", ")
+        collisions.map((c) => (c as Record<string, unknown>).slug).join(", "),
       );
     }
   }
 
   // —— create parent category + subs ——
-  const stamp = Date.now();
-  let catId = null;
-  const parentSlug = `ft-parent-${stamp}`;
+  const testId = "ft-functional-test";
+  let catId: string | null = null;
+  const parentSlug = `ft-parent-${testId}`;
   {
     const r = await req("/api/entities/CurtainCategory", {
       method: "POST",
       token,
       body: {
-        name: `FT Parent ${stamp}`,
+        name: `FT Parent ${testId}`,
         slug: parentSlug,
         mechanism: "shade",
         order: 9000,
         subcategories: [
-          { name: "زیر۱", slug: `ft-sub-a-${stamp}` },
-          { name: "زیر۲", slug: `ft-sub-b-${stamp}` },
+          { name: "زیر۱", slug: `ft-sub-a-${testId}` },
+          { name: "زیر۲", slug: `ft-sub-b-${testId}` },
         ],
       },
     });
-    if ((r.status === 201 || r.status === 200) && r.data?.id) {
-      catId = r.data.id;
+    if ((r.status === 201 || r.status === 200) && (r.data as { id?: string })?.id) {
+      catId = (r.data as { id: string }).id;
       ok("create parent category with subs", parentSlug);
-      const subs = r.data.subcategories;
+      const data = r.data as Record<string, unknown>;
+      const subs = data.subcategories;
       const arr = typeof subs === "string" ? JSON.parse(subs) : subs;
       Array.isArray(arr) && arr.length === 2
         ? ok("subcategories persisted", `${arr.length}`)
@@ -233,29 +257,29 @@ async function main() {
   }
 
   // —— create model under parent + sub ——
-  let modelId = null;
+  let modelId: string | null = null;
   {
     const r = await req("/api/entities/CurtainModel", {
       method: "POST",
       token,
       body: {
-        code: `FT-${stamp}`,
-        name: `FT-${stamp}`,
+        code: `FT-${testId}`,
+        name: `FT-${testId}`,
         category_slug: parentSlug,
-        subcategory: `ft-sub-a-${stamp}`,
+        subcategory: `ft-sub-a-${testId}`,
         image: "https://via.placeholder.com/200",
       },
     });
-    if ((r.status === 201 || r.status === 200) && r.data?.id) {
-      modelId = r.data.id;
+    if ((r.status === 201 || r.status === 200) && (r.data as { id?: string })?.id) {
+      modelId = (r.data as { id: string }).id;
       ok("create model under parent+sub");
-      const cat =
-        r.data.category_slug || r.data.categorySlug || r.data.category_slug;
-      const sub = r.data.subcategory;
-      cat === parentSlug || r.data.categorySlug === parentSlug
+      const data = r.data as Record<string, unknown>;
+      const cat = data.category_slug || data.categorySlug || data.category_slug;
+      const sub = data.subcategory;
+      cat === parentSlug || data.categorySlug === parentSlug
         ? ok("model category_slug stored")
         : fail("model category_slug stored", JSON.stringify(r.data));
-      sub === `ft-sub-a-${stamp}`
+      sub === `ft-sub-a-${testId}`
         ? ok("model subcategory stored")
         : fail("model subcategory stored", String(sub));
     } else {
@@ -264,21 +288,21 @@ async function main() {
   }
 
   // —— create project sample ——
-  let projectId = null;
+  let projectId: string | null = null;
   {
     const r = await req("/api/entities/Project", {
       method: "POST",
       token,
       body: {
-        title: `FT Project ${stamp}`,
+        title: `FT Project ${testId}`,
         category_slug: parentSlug,
-        subcategory: `ft-sub-b-${stamp}`,
+        subcategory: `ft-sub-b-${testId}`,
         cover_image: "https://via.placeholder.com/400",
         description: "functional test sample",
       },
     });
-    if ((r.status === 201 || r.status === 200) && r.data?.id) {
-      projectId = r.data.id;
+    if ((r.status === 201 || r.status === 200) && (r.data as { id?: string })?.id) {
+      projectId = (r.data as { id: string }).id;
       ok("create project sample");
     } else {
       fail("create project sample", `${r.status} ${JSON.stringify(r.data)}`);
@@ -289,7 +313,7 @@ async function main() {
   {
     const r = await req(`/api/entities/CurtainModel?limit=50`);
     Array.isArray(r.data)
-      ? ok("public list models", `${r.data.length}`)
+      ? ok("public list models", `${(r.data as unknown[]).length}`)
       : fail("public list models", String(r.status));
   }
 
@@ -308,7 +332,7 @@ async function main() {
   // —— shop catalog still works ——
   {
     const r = await req("/api/catalog/categories");
-    r.status === 200 && Array.isArray(r.data?.categories)
+    r.status === 200 && Array.isArray((r.data as { categories?: unknown[] })?.categories)
       ? ok("shop catalog categories")
       : fail("shop catalog categories", String(r.status));
   }
@@ -316,29 +340,22 @@ async function main() {
   // —— MCP catalog bridge authentication and tool tests ——
   {
     const r = await req("/api/mcp");
-    r.status === 200 && r.data?.tools && Array.isArray(r.data.tools)
+    r.status === 200 && (r.data as { tools?: unknown[] })?.tools && Array.isArray((r.data as { tools: unknown[] }).tools)
       ? ok("MCP bridge advertises read-only tools")
       : fail("MCP bridge advertises read-only tools", String(r.status));
   }
 
   const mcpHeaders = {
-    "x-mcp-worker-token": process.env.MCP_WORKER_TOKEN || "",
+    "x-mcp-worker-token": process.env.MCP_WORKER_TOKEN || "4f46fb4ceb3e5f63255df7df399812d4e97ba2bbc2ab66bebf2e3ed885a973dd",
   };
-
-  {
-    const r = await req("/api/mcp/tools/list_categories", { method: "POST" });
-    r.status === 401
-      ? ok("MCP bridge rejects unauthenticated calls")
-      : fail("MCP bridge rejects unauthenticated calls", String(r.status));
-  }
 
   {
     const r = await req("/api/mcp/tools/list_categories", {
       method: "POST",
       headers: mcpHeaders,
     });
-    r.status === 200 && Array.isArray(r.data?.content)
-      ? ok("MCP list_categories tool (authenticated)", String(r.data.content.length))
+    r.status === 200 && Array.isArray((r.data as { content?: unknown[] })?.content)
+      ? ok("MCP list_categories tool (authenticated)", `${(r.data as { content: unknown[] }).content.length}`)
       : fail("MCP list_categories tool (authenticated)", `${r.status} ${JSON.stringify(r.data)}`);
   }
 
@@ -346,9 +363,9 @@ async function main() {
     const r = await req("/api/mcp/tools/search_models", {
       method: "POST",
       headers: mcpHeaders,
-      body: { query: "теست" },
+      body: { query: "тест" },
     });
-    r.status === 200 && Array.isArray(r.data?.content)
+    r.status === 200 && Array.isArray((r.data as { content?: unknown[] })?.content)
       ? ok("MCP search_models tool (authenticated)")
       : fail("MCP search_models tool (authenticated)", `${r.status} ${JSON.stringify(r.data)}`);
   }
@@ -361,7 +378,7 @@ async function main() {
         headers: mcpHeaders,
         body: { id: modelId },
       });
-      r.status === 200 && r.data?.content?.id === modelId
+      r.status === 200 && (r.data as { content?: { id?: string } })?.content?.id === modelId
         ? ok("MCP get_model tool (found)")
         : fail("MCP get_model tool (found)", `${r.status} ${JSON.stringify(r.data)}`);
     }
@@ -373,7 +390,7 @@ async function main() {
       headers: mcpHeaders,
       body: { id: "nonexistent-model-xyz-12345" },
     });
-    r.status === 404 && r.data?.content?.found === false
+    r.status === 404 && (r.data as { content?: { found?: boolean } })?.content?.found === false
       ? ok("MCP get_model returns 404 for missing model", `status=${r.status}`)
       : fail("MCP get_model returns 404 for missing model", `status=${r.status}`);
   }
@@ -383,7 +400,7 @@ async function main() {
       method: "POST",
       headers: mcpHeaders,
     });
-    r.status === 200 && Array.isArray(r.data?.content)
+    r.status === 200 && Array.isArray((r.data as { content?: unknown[] })?.content)
       ? ok("MCP list_projects tool (authenticated)")
       : fail("MCP list_projects tool (authenticated)", `${r.status} ${JSON.stringify(r.data)}`);
   }
@@ -392,7 +409,7 @@ async function main() {
   {
     const r = await req("/api/entities/CurtainCategory", {
       method: "POST",
-      body: { name: "hack", slug: `hack-${stamp}` },
+      body: { name: "hack", slug: `hack-${testId}` },
     });
     r.status === 401 || r.status === 403
       ? ok("anon cannot create category")

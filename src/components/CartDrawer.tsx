@@ -14,7 +14,7 @@ export function formatToman(amount: number | string | null | undefined): string 
 }
 
 export default function CartDrawer() {
-  const { cart, isOpen, setIsOpen, removeItem, updateQuantity, checkout, loading, error, clearError } =
+  const { cart, isOpen, setIsOpen, removeItem, updateQuantity, loading, error, clearError } =
     useCart();
 
   const lineItems = cart?.lineItems ?? [];
@@ -133,13 +133,6 @@ export default function CartDrawer() {
               <span className="text-muted-foreground">جمع</span>
               <strong className="text-[17px]">{formatToman(subtotal)}</strong>
             </div>
-            <button
-              disabled={loading || unavailable.length > 0}
-              onClick={() => checkout()}
-              className="w-full cursor-pointer rounded-sm border-none bg-primary p-3 text-[15px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading ? "…" : unavailable.length > 0 ? "آیتم ناموجود را حذف کنید" : "ادامه و پرداخت"}
-            </button>
           </footer>
         )}
       </aside>

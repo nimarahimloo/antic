@@ -9,7 +9,7 @@ export const vazirmatn = Vazirmatn({
   weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
   variable: '--font-vazirmatn',
   display: 'swap',
-  preload: true,
+  preload: false,
   fallback: ['system-ui', 'sans-serif'],
 });
 

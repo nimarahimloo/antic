@@ -87,3 +87,8 @@ pnpm-lock.yaml
 # Bun
 bun.lock
 bun.lockb
+
+# Keploy test artifacts (may contain recorded tokens/secrets)
+backend/keploy/
+backend/FILE
+backend/keploy.yml

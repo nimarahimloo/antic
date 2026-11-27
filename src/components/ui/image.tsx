@@ -92,7 +92,7 @@ export function OptimizedImage({
         quality={quality}
         placeholder={placeholder}
         blurDataURL={blurUrl}
-        unoptimized={fill && (width === undefined || height === undefined)}
+        unoptimized={false}
         className={cn("object-cover", className)}
         style={style}
         loading={effectiveLoading}
@@ -115,7 +115,7 @@ export function OptimizedImage({
       quality={quality}
       placeholder={placeholder}
       blurDataURL={blurUrl}
-      unoptimized={fill && (width === undefined || height === undefined)}
+      unoptimized={false}
       className={cn(
         "transition-opacity duration-300",
         isLoading && "opacity-0",

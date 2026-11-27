@@ -8,7 +8,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { getProductBySlug } from "@/rest/store-catalog";
 import { choiceImage, variantImage } from "@/lib/storeImage";
-import { useCart } from "@/context/CartContext";
 
 interface ProductOption {
   id: string;
@@ -53,13 +52,11 @@ interface Choice {
 }
 
 export function useProductDetail(slug: string) {
-  const { addToCart } = useCart();
   const [product, setProduct] = useState<DetailProduct | null>(null);
   const [notFound, setNotFound] = useState(false);
   // A missing product (notFound) and a failed request (error) need different pages: one is a dead
   // link, the other is worth retrying. Without the split, a network blip reads as "product deleted".
   const [error, setError] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [modifierValues, setModifierValues] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState(1);
@@ -146,34 +143,6 @@ export function useProductDetail(slug: string) {
   const setModifier = (key: string, value: string) =>
     setModifierValues((s) => ({ ...s, [key]: value }));
 
-  async function submit() {
-    const modifierChoices: Record<string, string> = {};
-    const customTextFields: Record<string, string> = {};
-    modifiers.forEach((m) => {
-      const k = m.modifierRenderType === "FREE_TEXT" ? m.freeTextSettings?.key : m.key;
-      if (!k || !modifierValues[k]) return;
-      (m.modifierRenderType === "FREE_TEXT" ? customTextFields : modifierChoices)[k] = modifierValues[k];
-    });
-    setAdding(true);
-    try {
-      // addToCart reports its own failures through the cart context (it opens the drawer with the
-      // reason). Preserve its undefined-on-success / null-on-failure result for chained actions.
-      // Coerce the quantity: the shipped stepper lets the field sit empty mid-edit, and a keyboard
-      // submit from that state would otherwise post "" as the quantity.
-      return await addToCart(
-        product!.id,
-        variant?.id || "",
-        Math.max(1, Number(quantity) || 1),
-        {
-          modifierChoices: Object.keys(modifierChoices).length ? modifierChoices : undefined,
-          customTextFields: Object.keys(customTextFields).length ? customTextFields : undefined,
-        }
-      );
-    } finally {
-      setAdding(false);
-    }
-  }
-
   return {
     product,
     notFound,
@@ -190,10 +159,8 @@ export function useProductDetail(slug: string) {
     variant,
     inStock,
     canAdd,
-    adding,
     price,
     compareAtPrice,
-    submit,
     focusMediaUrl,
   };
 }

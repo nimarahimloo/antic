@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { UploadCloud, X, Loader2, Check, Package, Image as LibImage } from "lucide-react";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToast, adminToasts } from "@/lib/adminToast";

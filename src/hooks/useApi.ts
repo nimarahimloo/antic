@@ -14,7 +14,7 @@
  * to render a user-facing string.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isApiError, ApiError } from "@/api/client";
+import { isApiError, ApiError } from "@/api";
 
 interface UseApiOptions<T> {
   immediate?: boolean;
@@ -38,6 +38,8 @@ export function useApi<T, Args extends unknown[]>(
   const [error, setError] = useState<ApiError | Error | null>(null);
 
   const mounted = useRef(true);
+  const apiFnRef = useRef(apiFn);
+  apiFnRef.current = apiFn;
 
   const reset = useCallback(() => {
     setData(null);
@@ -51,7 +53,7 @@ export function useApi<T, Args extends unknown[]>(
       setLoading(true);
       setError(null);
       try {
-        const result = await apiFn(...args);
+        const result = await apiFnRef.current(...args);
         if (!mounted.current) return result;
         setData(result);
         return result;
@@ -65,7 +67,7 @@ export function useApi<T, Args extends unknown[]>(
         if (mounted.current) setLoading(false);
       }
     },
-    [apiFn, onError]
+    [onError]
   );
 
   useEffect(() => {

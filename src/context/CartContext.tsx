@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import {
   getCurrentCart,
   addToCart as apiAdd,
@@ -50,22 +49,12 @@ interface CartContextType {
   addToCart: (id: string, variantId: string, qty?: number, extras?: Record<string, unknown>) => Promise<Cart>;
   removeItem: (lineItemId: string) => Promise<Cart>;
   updateQuantity: (lineItemId: string, qty: number) => Promise<Cart>;
-  checkout: (customer?: {
-    customerName: string;
-    customerPhone: string;
-    customerEmail: string;
-    address: string;
-    city: string;
-    postalCode: string;
-    notes: string;
-  }) => Promise<string>;
   refreshCart: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const [cart, setCart] = useState<Cart | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -126,24 +115,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return newCart;
     });
 
-  const checkout = async (customer?: {
-    customerName: string;
-    customerPhone: string;
-    customerEmail: string;
-    address: string;
-    city: string;
-    postalCode: string;
-    notes: string;
-  }): Promise<string> => {
-    setIsOpen(false);
-    const { checkout: apiCheckout } = await import("@/rest/store-cart");
-    if (customer) {
-      return apiCheckout(customer);
-    }
-    router.push("/checkout");
-    return "/checkout";
-  };
-
   return (
     <CartContext.Provider
       value={{
@@ -157,7 +128,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         addToCart,
         removeItem,
         updateQuantity,
-        checkout,
         refreshCart,
       }}
     >

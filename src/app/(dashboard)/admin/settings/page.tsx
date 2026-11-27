@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Key, Globe, Sparkles, AlertCircle, Upload, Loader2, Plus, Trash2, Image as ImageIcon, Image as LibImage } from "lucide-react";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
 import { useAuth } from "@/lib/AuthContext";
@@ -63,7 +63,7 @@ function emptySlide() {
 
 export default function AdminSettingsPage() {
   const appUrl = useMemo(() => window.location.origin, []);
-  const { checkAppState } = useAuth();
+  const { initializeAuth } = useAuth();
   const [settingId, setSettingId] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState("");
   const [slides, setSlides] = useState(DEFAULT_SLIDES);
@@ -260,8 +260,8 @@ export default function AdminSettingsPage() {
       }
       setHint("ذخیره شد. تغییرات در سایت اعمال می‌شود.");
       adminToasts.settingsSaved("تنظیمات ظاهری");
-      if (typeof checkAppState === "function") {
-        await checkAppState();
+      if (typeof initializeAuth === "function") {
+        await initializeAuth();
       }
     } catch (e) {
       setError(apiErrorMessage(e));
@@ -431,8 +431,6 @@ export default function AdminSettingsPage() {
             <Item label="فروشگاه و سبد محلی" />
             <Item label="پنل ادمین محصولات و سفارش‌ها" />
             <Item label="مدیریت لوگو و بنر هیرو" />
-            <Item label="درگاه زرین‌پال (با Merchant ID)" />
-            <Item warn label="برای پرداخت واقعی ZARINPAL_MERCHANT_ID را در سرور ست کنید" />
           </ul>
         </div>
       </div>

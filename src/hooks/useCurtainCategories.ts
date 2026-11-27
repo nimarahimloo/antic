@@ -1,15 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { api } from "@/api/client";
+import { useCallback, useEffect, useState } from "react";
+import { api, deduplicateRequest } from "@/api";
 
-/**
- * منبع واحد دسته‌های کاتالوگ پرده (غیر از فروشگاه).
- * همهٔ سکشن‌های سایت باید از این hook / helpers استفاده کنند.
- * فروشگاه جداست: ShopCategory via src/rest/store-catalog.ts
- */
-
-interface Category {
+export interface Category {
   id: string;
   name: string;
   slug: string;
@@ -25,9 +19,8 @@ interface Category {
 }
 
 let cache: Category[] | null = null;
-let inflight: Promise<Category[]> | null = null;
 
-function parseSubs(raw: unknown): Array<{ name: string; slug: string }> {
+export function parseSubs(raw: unknown): Array<{ name: string; slug: string }> {
   if (!raw) return [];
   if (Array.isArray(raw)) {
     return raw
@@ -53,6 +46,21 @@ function parseSubs(raw: unknown): Array<{ name: string; slug: string }> {
     }
   }
   return [];
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  image: string | null;
+  description: string;
+  order: number;
+  mechanism: string | null;
+  subcategories: Array<{ name: string; slug: string }>;
+  inCatalog: boolean;
+  in_catalog: boolean;
+  backgroundImage: string | null;
+  backgroundGradient: string | null;
 }
 
 export function normalizeCategory(row: Record<string, unknown>): Category | null {
@@ -81,34 +89,36 @@ export function filterCatalogCategories(categories: Category[]): Category[] {
   return categories.filter((c) => c.inCatalog !== false);
 }
 
-function fetchCategories(force = false): Promise<Category[]> {
-  if (!force && cache) return Promise.resolve(cache);
-  if (!force && inflight) return inflight;
-  inflight = api.entities.CurtainCategory.list("order", 200)
-    .then((rows) => {
+interface UseCurtainCategoriesOptions {
+  catalogOnly?: boolean;
+  initialData?: Array<{ id: string; name: string; slug: string; image: string | null; subcategories: unknown; parent_slug: string | null }>;
+}
+
+export function useCurtainCategories({ catalogOnly = false, initialData }: UseCurtainCategoriesOptions = {}) {
+  const [categories, setCategories] = useState<Category[]>(() => {
+    if (initialData && initialData.length > 0) {
+      return initialData.map((row) => normalizeCategory(row as Record<string, unknown>)).filter((c): c is Category => c !== null);
+    }
+    return cache || [];
+  });
+  const [loading, setLoading] = useState(!cache && !initialData);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCategories = useCallback(async (force = false): Promise<Category[]> => {
+    if (!force && cache) return cache;
+
+    return deduplicateRequest("curtain-categories", async () => {
+      const rows = await api.entities.CurtainCategory.list("order", 200);
       const list = (Array.isArray(rows) ? rows : [])
         .map((row) => normalizeCategory(row as Record<string, unknown>))
         .filter((c): c is Category => c !== null && !!c.slug)
         .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "fa"));
       cache = list;
-      inflight = null;
       return list;
-    })
-    .catch((err) => {
-      inflight = null;
-      throw err;
+    }).then((list) => {
+      return list;
     });
-  return inflight;
-}
-
-/** دسته‌های پرده از /api/entities/CurtainCategory — تنها منبع غیر‌فروشگاه
- *  @param {{ catalogOnly?: boolean }} [opts] اگر catalogOnly=true فقط دسته‌های دارای تیک کاتالوگ
- */
-export function useCurtainCategories(opts: { catalogOnly?: boolean } = {}) {
-  const catalogOnly = Boolean(opts?.catalogOnly);
-  const [categories, setCategories] = useState<Category[]>(cache || []);
-  const [loading, setLoading] = useState(!cache);
-  const [error, setError] = useState<string | null>(null);
+  }, []);
 
   const reload = useCallback((force = false) => {
     setLoading(true);
@@ -120,15 +130,18 @@ export function useCurtainCategories(opts: { catalogOnly?: boolean } = {}) {
       })
       .catch(() => setError("بارگذاری دسته‌ها ناموفق بود"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [fetchCategories]);
 
   useEffect(() => {
     let alive = true;
-    reload(false).then((list) => {
-      if (!alive && list) {
-        /* unmounted */
-      }
-    });
+    // Only fetch on mount if there is no module-level cache AND no initial data.
+    if (!cache && !initialData) {
+      reload(false).then((list) => {
+        if (!alive && list) {
+          /* unmounted */
+        }
+      });
+    }
     const onVis = () => {
       if (document.visibilityState === "visible") reload(true);
     };
@@ -137,7 +150,7 @@ export function useCurtainCategories(opts: { catalogOnly?: boolean } = {}) {
       alive = false;
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [reload]);
+  }, [reload, initialData]);
 
   const visible = catalogOnly ? filterCatalogCategories(categories) : categories;
   return { categories: visible, allCategories: categories, loading, error, reload };
@@ -145,7 +158,6 @@ export function useCurtainCategories(opts: { catalogOnly?: boolean } = {}) {
 
 export function refreshCurtainCategories() {
   cache = null;
-  inflight = null;
 }
 
 export function getCategoryMechanismMap(): Record<string, string> {

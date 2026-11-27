@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { OptimizedImage } from "@/components/ui/image";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToasts } from "@/lib/adminToast";
 import { Upload, Loader2, Image as ImageIcon, Palette, Image as LibImage } from "lucide-react";

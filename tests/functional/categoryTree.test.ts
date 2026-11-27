@@ -1,6 +1,6 @@
 /**
  * Functional tests — category hierarchy helpers
- * Run: node --test tests/functional/categoryTree.test.mjs
+ * Run: node --test tests/functional/categoryTree.test.ts
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -12,7 +12,15 @@ import {
   rootSelectOptions,
 } from "../../src/lib/categoryTree.ts";
 
-const SAMPLE = [
+interface SampleCategory {
+  slug: string;
+  name: string;
+  order: number;
+  mechanism: string | null;
+  subcategories: Array<{ name: string; slug: string }>;
+}
+
+const SAMPLE: SampleCategory[] = [
   {
     slug: "shade",
     name: "شید",
@@ -113,7 +121,7 @@ describe("getSubOptionsForParent", () => {
     assert.equal(opts.length, 2);
     assert.deepEqual(
       opts.map((o) => o.value).sort(),
-      ["shade-blackout", "shade-screen"]
+      ["shade-blackout", "shade-screen"],
     );
   });
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { useCurtainCategories, allCategorySelectOptions } from "@/hooks/useCurtainCategories";
-import { api } from "@/api/client";
+import { api } from "@/api";
 
 /** نمونه‌های اجرا — گالری چندتصویری (تا ۲۰ تصویر) مثل کاور */
 export default function AdminProjectsPage() {

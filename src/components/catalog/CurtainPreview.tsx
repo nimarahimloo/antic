@@ -1,5 +1,6 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import { mediaUrl } from "@/lib/mediaUrl";
 
 function RoomShell({ children }: { children: React.ReactNode }) {
@@ -17,26 +18,31 @@ interface Fabric {
   code?: string;
 }
 
-export default function CurtainPreview({ fabric, publicMode = false }: { fabric: Fabric; publicMode?: boolean }) {
+interface CurtainPreviewProps {
+  fabric: Fabric;
+  publicMode?: boolean;
+}
+
+export default function CurtainPreview({ fabric, publicMode = false }: CurtainPreviewProps) {
   const installSrc = fabric?.install_image ? mediaUrl(fabric.install_image) : null;
   const fabricSrc = fabric?.image ? mediaUrl(fabric.image) : null;
   const src = installSrc || fabricSrc;
   const isInstall = Boolean(installSrc);
+  const label = isInstall ? "نمای نصب" : fabricSrc ? "نمونه پارچه" : "بدون تصویر";
 
   return (
     <div id="curtain-render-preview">
       {!publicMode && (
-        <p className="mb-2 font-display text-xs font-bold text-primary">
-          {isInstall ? "نمای نصب" : fabricSrc ? "نمونه پارچه" : "بدون تصویر"}
-        </p>
+        <p className="mb-2 font-display text-xs font-bold text-primary">{label}</p>
       )}
       <RoomShell>
         {src ? (
-          <div className="aspect-[3/4] sm:aspect-[4/5]">
-            <img
+          <div className="relative aspect-[3/4] sm:aspect-[4/5]">
+            <OptimizedImage
               src={src}
               alt={fabric?.name || fabric?.code || "پرده"}
-              className="h-full w-full object-contain bg-[#d4c4b0]"
+              fill
+              className="object-contain bg-[#d4c4b0]"
             />
           </div>
         ) : (

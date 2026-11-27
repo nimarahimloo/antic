@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, X, Loader2, Upload, Image as LibImage } from "lucide-react";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
 import { MediaPicker } from "@/components/media/MediaPicker";

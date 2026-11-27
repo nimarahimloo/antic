@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Upload, Loader2, Image as ImageIcon, Image as LibImage } from "lucide-react";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { apiErrorMessage } from "@/lib/apiError";
 import { OptimizedImage } from "@/components/ui/image";
 import { MediaPicker } from "@/components/media/MediaPicker";

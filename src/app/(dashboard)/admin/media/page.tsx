@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Trash2, Image as ImageIcon, Upload, Search, Filter, Plus } from "lucide-react";
-import { api, type Media } from "@/api/client";
+import { api, type Media } from "@/api";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToast, adminToasts } from "@/lib/adminToast";
 import { OptimizedImage } from "@/components/ui/image";

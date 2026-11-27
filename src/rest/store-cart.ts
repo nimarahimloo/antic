@@ -1,5 +1,6 @@
 /**
- * Local cart (localStorage) + checkout via /api/orders (Zarinpal).
+ * Local cart (localStorage) — persisted client-side only.
+ * No checkout/payment flow is exposed; orders are placed by contacting the admin.
  */
 
 const CART_KEY = "antic-local-cart";
@@ -202,47 +203,4 @@ export async function removeFromCart(lineItemId: string): Promise<Cart> {
 
 export function clearCart(): Cart {
   return saveCart(emptyCart());
-}
-
-/**
- * Start checkout → /api/orders/checkout (Zarinpal or demo).
- */
-export async function checkout(customer: Record<string, unknown> = {}): Promise<string> {
-  const cart = loadCart();
-  if (!cart.lineItems?.length) throw new Error("سبد خرید خالی است.");
-
-  if (!customer.customerName || !customer.customerPhone) {
-    return "/checkout";
-  }
-
-  // The server resolves product names, images, variant prices and totals from Prisma.
-  // Local cart prices are display-only and are never sent as payment authority.
-  const items = cart.lineItems.map((line) => ({
-    productId: line.source?.catalogReference?.catalogItemId,
-    variantId: line.source?.catalogReference?.options?.variantId,
-    quantity: line.quantityInfo?.confirmedQuantity || 1,
-  }));
-
-  const customerAddress = [
-    customer.address,
-    customer.city,
-    customer.postalCode ? `کد پستی: ${customer.postalCode}` : "",
-  ].filter((value) => typeof value === "string" && value.trim()).join("، ");
-
-  const res = await fetch(`${API}/orders/checkout`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      customerName: customer.customerName,
-      customerPhone: customer.customerPhone,
-      customerEmail: customer.customerEmail,
-      customerAddress,
-      note: customer.notes,
-      items,
-    }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "خطا در ثبت سفارش");
-  if (!data.paymentUrl) throw new Error("آدرس پرداخت دریافت نشد");
-  return data.paymentUrl;
 }

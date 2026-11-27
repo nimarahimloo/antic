@@ -41,15 +41,6 @@ function validateProductionConfig(): void {
     errors.push("Default ADMIN_EMAIL/ADMIN_PASSWORD detected. Must set secure credentials in production.");
   }
 
-  // Payment provider is optional for application startup.
-  // Checkout already rejects real payments with HTTP 503 when unconfigured.
-  if (!process.env.ZARINPAL_MERCHANT_ID) {
-    warnings.push("Zarinpal is not configured. Real checkout is disabled (HTTP 503).");
-  }
-  if (process.env.ZARINPAL_SANDBOX === "true") {
-    warnings.push("ZARINPAL_SANDBOX is enabled in production. Ensure this is intentional.");
-  }
-
   // Email transport must be configured
   const hasEmailTransport =
     (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN) ||
@@ -354,20 +345,6 @@ const X402_ROUTES: RoutesConfig = {
     ],
     resource: "Shop accessory catalog",
     description: "Access to shop categories and products",
-    mimeType: "application/json",
-  },
-  "/api/orders/*": {
-    accepts: [
-      {
-        scheme: X402_SCHEME,
-        payTo: X402_WALLET_ADDRESS,
-        price: X402_PRICE,
-        network: X402_NETWORK,
-        extra: { asset: X402_ASSET },
-      },
-    ],
-    resource: "Order management",
-    description: "Access to order creation and checkout",
     mimeType: "application/json",
   },
 };

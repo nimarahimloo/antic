@@ -13,7 +13,7 @@ const MAIL_ENV_VARS = [
   "CLOUDFLARE_API_TOKEN",
 ];
 
-async function withEnvironment(values, callback) {
+async function withEnvironment(values: Record<string, string>, callback: () => Promise<void>) {
   const previous = new Map(MAIL_ENV_VARS.map((name) => [name, process.env[name]]));
   try {
     for (const name of MAIL_ENV_VARS) {
@@ -31,15 +31,15 @@ async function withEnvironment(values, callback) {
 
 // Mock nodemailer to avoid actual network calls
 const originalCreateTransport = nodemailer.createTransport;
-let mockTransporter = null;
+let mockTransporter: { sendMail: (options: unknown) => Promise<{ messageId: string }>; close: () => Promise<void>; closed: boolean } | null = null;
 
-function setupMockTransporter(sendMailImpl) {
+function setupMockTransporter(sendMailImpl: (options: unknown) => Promise<{ messageId: string }>) {
   mockTransporter = {
     sendMail: sendMailImpl,
-    close: async () => { mockTransporter.closed = true; },
+    close: async () => { mockTransporter!.closed = true; },
     closed: false,
   };
-  nodemailer.createTransport = () => mockTransporter;
+  nodemailer.createTransport = () => mockTransporter as unknown as ReturnType<typeof nodemailer.createTransport>;
 }
 
 function restoreMockTransporter() {
@@ -50,15 +50,15 @@ function restoreMockTransporter() {
 // Mock fetch for Cloudflare API
 const originalFetch = globalThis.fetch;
 
-function setupMockFetch(fetchImpl) {
-  globalThis.fetch = fetchImpl;
+function setupMockFetch(fetchImpl: (url: string, options?: RequestInit) => Promise<Response>) {
+  globalThis.fetch = fetchImpl as typeof globalThis.fetch;
 }
 
 function restoreMockFetch() {
   globalThis.fetch = originalFetch;
 }
 
-async function runWithMocks(testFn) {
+async function runWithMocks(testFn: () => Promise<void>) {
   try {
     await testFn();
   } finally {
@@ -70,13 +70,13 @@ async function runWithMocks(testFn) {
 }
 
 test("sendMail uses Cloudflare SMTP as primary when configured", async () => {
-  let sentVia = null;
-  let sentFrom = null;
+  let sentVia: string | null = null;
+  let sentFrom: string | null = null;
 
   await closeMailTransporters();
   setupMockTransporter(async (options) => {
     sentVia = "smtp";
-    sentFrom = options.from;
+    sentFrom = ((options as { from?: string }).from ?? null);
     return { messageId: "test-id" };
   });
 
@@ -91,30 +91,30 @@ test("sendMail uses Cloudflare SMTP as primary when configured", async () => {
         subject: "Test",
         text: "Body",
       });
-    }
+    },
   );
 
   assert.equal(sentVia, "smtp");
-  assert.ok(sentFrom.includes("sender@example.com"), "From should contain CLOUDFLARE_EMAIL_FROM");
-  assert.ok(!sentFrom.includes("api_token"), "From should NOT be api_token");
+  assert.ok(sentFrom!.includes("sender@example.com"), "From should contain CLOUDFLARE_EMAIL_FROM");
+  assert.ok(!sentFrom!.includes("api_token"), "From should NOT be api_token");
 
   await runWithMocks(async () => {});
 });
 
 test("sendMail falls back to Cloudflare API when SMTP not configured but API is", async () => {
   let apiCalled = false;
-  let apiFrom = null;
+  let apiFrom: string | null = null;
 
   await closeMailTransporters();
   setupMockFetch(async (url, options) => {
     apiCalled = true;
-    const body = JSON.parse(options.body);
+    const body = JSON.parse((options?.body as string) ?? "{}");
     apiFrom = body.from;
     return {
       ok: true,
       json: async () => ({ success: true }),
       text: async () => "",
-    };
+    } as unknown as Response;
   });
 
   await withEnvironment(
@@ -129,7 +129,7 @@ test("sendMail falls back to Cloudflare API when SMTP not configured but API is"
         subject: "Test",
         text: "Body",
       });
-    }
+    },
   );
 
   assert.equal(apiCalled, true);
@@ -142,8 +142,8 @@ test("sendMail uses console transport when NO transport configured", async () =>
   let consoleLogged = false;
 
   const originalLog = console.log;
-  console.log = (msg) => {
-    if (msg.includes("mail:console:sent")) consoleLogged = true;
+  console.log = (msg: unknown) => {
+    if (String(msg).includes("mail:console:sent")) consoleLogged = true;
     originalLog(msg);
   };
 
@@ -185,9 +185,9 @@ test("sendMail throws real error when Cloudflare SMTP is configured but fails", 
           subject: "Test",
           text: "Body",
         }),
-        /SMTP connection refused/
+        /SMTP connection refused/,
       );
-    }
+    },
   );
 
   await runWithMocks(async () => {});
@@ -197,9 +197,9 @@ test("sendMail throws real error when Cloudflare API is configured but fails", a
   const apiError = new Error("Cloudflare Email API HTTP 401: Unauthorized");
 
   await closeMailTransporters();
-  setupMockFetch(async () => {
+  setupMockFetch((async () => {
     throw apiError;
-  });
+  }) as (url: string, options?: RequestInit) => Promise<Response>);
 
   await withEnvironment(
     {
@@ -214,22 +214,22 @@ test("sendMail throws real error when Cloudflare API is configured but fails", a
           subject: "Test",
           text: "Body",
         }),
-        /Cloudflare Email API HTTP 401/
+        /Cloudflare Email API HTTP 401/,
       );
-    }
+    },
   );
 
   await runWithMocks(async () => {});
 });
 
 test("sendMail sanitizes header values (newlines removed)", async () => {
-  let sentSubject = null;
-  let sentTo = null;
+  let sentSubject: string | null = null;
+  let sentTo: string | null = null;
 
   await closeMailTransporters();
   setupMockTransporter(async (options) => {
-    sentSubject = options.subject;
-    sentTo = options.to;
+    sentSubject = ((options as { subject?: string }).subject ?? null);
+    sentTo = ((options as { to?: string }).to ?? null);
     return { messageId: "test-id" };
   });
 
@@ -244,7 +244,7 @@ test("sendMail sanitizes header values (newlines removed)", async () => {
         subject: "Test\r\ninjected",
         text: "Body",
       });
-    }
+    },
   );
 
   assert.equal(sentTo, "recipient@example.com injected");
@@ -271,10 +271,10 @@ test("closeMailTransporters closes SMTP transporter", async () => {
           subject: "Test",
           text: "Body",
         });
-        assert.equal(mockTransporter.closed, false, "Transporter should not be closed before closeMailTransporters");
+        assert.equal(mockTransporter!.closed, false, "Transporter should not be closed before closeMailTransporters");
         await closeMailTransporters();
-        assert.equal(mockTransporter.closed, true, "Transporter should be closed after closeMailTransporters");
-      }
+        assert.equal(mockTransporter!.closed, true, "Transporter should be closed after closeMailTransporters");
+      },
     );
   } finally {
     await runWithMocks(async () => {});
@@ -299,9 +299,9 @@ test("SMTP transport: when CLOUDFLARE_EMAIL_FROM is missing, throws error", asyn
           subject: "Test",
           text: "Body",
         }),
-        /CLOUDFLARE_EMAIL_FROM is required/
+        /CLOUDFLARE_EMAIL_FROM is required/,
       );
-    }
+    },
   );
 
   await runWithMocks(async () => {});
@@ -309,13 +309,13 @@ test("SMTP transport: when CLOUDFLARE_EMAIL_FROM is missing, throws error", asyn
 
 test("Cloudflare API fallback: when CLOUDFLARE_EMAIL_FROM is missing, throws error", async () => {
   await closeMailTransporters();
-  setupMockFetch(async () => {
+  setupMockFetch((async () => {
     return {
       ok: true,
       json: async () => ({ success: true }),
       text: async () => "",
-    };
-  });
+    } as unknown as Response;
+  }) as unknown as (url: string, options?: RequestInit) => Promise<Response>);
 
   await withEnvironment(
     {
@@ -330,9 +330,9 @@ test("Cloudflare API fallback: when CLOUDFLARE_EMAIL_FROM is missing, throws err
           subject: "Test",
           text: "Body",
         }),
-        /CLOUDFLARE_EMAIL_FROM is required/
+        /CLOUDFLARE_EMAIL_FROM is required/,
       );
-    }
+    },
   );
 
   await runWithMocks(async () => {});
@@ -348,14 +348,14 @@ test("Cloudflare API is NOT used when SMTP is configured (priority)", async () =
     return { messageId: "test-id" };
   });
 
-  setupMockFetch(async () => {
+  setupMockFetch((async () => {
     apiCalled = true;
     return {
       ok: true,
       json: async () => ({ success: true }),
       text: async () => "",
     };
-  });
+  }) as (url: string, options?: RequestInit) => Promise<Response>);
 
   await withEnvironment(
     {
@@ -370,7 +370,7 @@ test("Cloudflare API is NOT used when SMTP is configured (priority)", async () =
         subject: "Test",
         text: "Body",
       });
-    }
+    },
   );
 
   assert.equal(smtpCalled, true, "SMTP should be called");

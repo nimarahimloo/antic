@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { Plus, Pencil, Trash2, X, Loader2, Upload, Sparkles, Image } from "lucide-react";
 import { compressImage } from "@/lib/compressImage";
 import { analyzeFabric } from "@/components/catalog/photo/fabricAnalyzer";

@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { toast as sonnerToast } from "sonner";
 import { errorInfo, type ErrorInfo } from "@/lib/apiError";
-import { api } from "@/api/client";
+import { api } from "@/api";
 
 /**
  * Hook for handling API errors consistently across the frontend.

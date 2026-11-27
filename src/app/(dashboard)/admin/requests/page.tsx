@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { apiErrorMessage } from "@/lib/apiError";
 import { Trash2, Loader2 } from "lucide-react";
 import { adminToast, adminToasts } from "@/lib/adminToast";

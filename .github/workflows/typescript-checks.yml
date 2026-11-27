@@ -44,10 +44,6 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm run typecheck
-      - name: Server-authoritative checkout pricing tests
-        run: npm run test:order-pricing
-      - name: Payment callback security tests
-        run: npm run test:payment-security
       - name: AI provider opt-in safety tests
         run: npm run test:ai-provider-gating
 
@@ -80,7 +76,7 @@ jobs:
       - run: npm ci
       - run: npx prisma generate --schema=prisma/schema.prisma
       - run: npx prisma db push --schema=prisma/schema.prisma --skip-generate
-      - run: node --import tsx --test scripts/mcp-integration.test.mjs
+      - run: node --import tsx --test scripts/mcp-integration.test.ts
 
   docker-runtime:
     name: Docker Compose build and runtime smoke tests
@@ -156,13 +152,13 @@ jobs:
       - name: Run backend smoke tests against containers
         env:
           BASE: http://127.0.0.1:3001
-        run: node backend/scripts/smoke-test.mjs
+        run: cd backend && node --import tsx scripts/smoke-test.ts
       - name: Run backend functional tests against containers
         env:
           BASE: http://127.0.0.1:3001
           ADMIN_EMAIL: admin@antic.local
           ADMIN_PASSWORD: ci-only-admin-password-strong
-        run: node backend/scripts/functional-test.mjs
+        run: cd backend && node --import tsx scripts/functional-test.ts
       - name: Collect container logs on failure
         if: failure()
         run: docker compose logs --no-color

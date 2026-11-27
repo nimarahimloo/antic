@@ -145,10 +145,10 @@ export default function AdminLayout({
           <div className="flex-1" />
           <div className="flex items-center gap-4">
             <span className="hidden font-body text-sm text-muted-foreground lg:block">
-              {user?.full_name || user?.email}
+              {user?.fullName || user?.email}
             </span>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-              {user?.full_name?.charAt(0) || "ا"}
+              {user?.fullName?.charAt(0) || "ا"}
             </div>
           </div>
         </header>

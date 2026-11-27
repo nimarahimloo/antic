@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { api } from "@/api/client";
+import { api } from "@/api";
 
 /* ------------------------------------------------------------------ */
 /* WebMCP — expose site tools to AI agents via the browser            */

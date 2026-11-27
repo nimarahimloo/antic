@@ -228,7 +228,7 @@ const ALLOWED: Record<string, Set<string>> = {
     "verificationGoogle",
     "verificationBing",
   ]),
-  User: new Set([]),
+  User: new Set(["id", "email", "phone", "googleId", "fullName", "role", "createdAt", "updatedAt"]),
 };
 
 export function toApi(row: AnyRec | null | undefined): AnyRec | null {

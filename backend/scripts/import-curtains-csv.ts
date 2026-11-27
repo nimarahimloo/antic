@@ -3,7 +3,7 @@
  * Import curtain catalog models from a WooCommerce product CSV export.
  *
  * Usage:
- *   node scripts/import-curtains-csv.mjs /path/to/woocommerce-curtains.csv
+ *   cd backend && npx tsx scripts/import-curtains-csv.ts /path/to/woocommerce-curtains.csv
  *   # or place the file at backend/data/woocommerce-curtains.csv and:
  *   npm run db:import-curtains
  *
@@ -19,14 +19,12 @@
  */
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import { PrismaClient } from "@prisma/client";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prisma = new PrismaClient();
 
 const csvPath =
-  process.argv[2] || path.join(__dirname, "../data/woocommerce-curtains.csv");
+  process.argv[2] || path.join(path.resolve(), "data", "woocommerce-curtains.csv");
 
 if (!fs.existsSync(csvPath)) {
   console.error(`CSV not found: ${csvPath}`);
@@ -35,9 +33,9 @@ if (!fs.existsSync(csvPath)) {
 }
 
 /** Minimal RFC-4180 CSV parser (handles quotes, escaped quotes, embedded newlines). */
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
   let field = "";
   let inQuotes = false;
   const src = text.replace(/^\uFEFF/, "");
@@ -78,7 +76,7 @@ function parseCsv(text) {
   return rows;
 }
 
-function stripHtml(html) {
+function stripHtml(html: string | null | undefined): string {
   return String(html || "")
     .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/g, " ")
@@ -90,12 +88,17 @@ function stripHtml(html) {
 }
 
 /** Normalize Persian text: unify ZWNJ / spaces so names match the seed. */
-function norm(s) {
+function norm(s: string | null | undefined): string {
   return String(s || "")
     .replace(/\u200c/g, " ")
     .replace(/[\s_]+/g, " ")
     .trim()
     .toLowerCase();
+}
+
+interface ParsedCategories {
+  categorySlug: string;
+  subcategory: string | null;
 }
 
 /**
@@ -107,7 +110,7 @@ function norm(s) {
  * element that matches a known category becomes the category; the next one
  * (if any) becomes the subcategory.
  */
-function parseCategories(raw, nameToSlug) {
+function parseCategories(raw: string | null | undefined, nameToSlug: Map<string, string>): ParsedCategories {
   const segments = String(raw || "")
     .split(",")
     .flatMap((group) => group.split(">"))
@@ -127,7 +130,7 @@ function parseCategories(raw, nameToSlug) {
 }
 
 /** Recover the human-readable form of a normalized segment. */
-function originalSegment(raw, normalized) {
+function originalSegment(raw: string | null | undefined, normalized: string): string | null {
   const all = String(raw || "")
     .split(",")
     .flatMap((group) => group.split(">"))
@@ -137,7 +140,11 @@ function originalSegment(raw, normalized) {
   return hit || null;
 }
 
-function attrOf(cols, headers, names) {
+function attrOf(
+  cols: string[],
+  headers: string[],
+  names: string[],
+): string | null {
   for (let i = 0; i < headers.length; i++) {
     const name = String(headers[i] || "").toLowerCase();
     if (names.some((n) => name.includes(n.toLowerCase()))) {
@@ -155,17 +162,9 @@ async function main() {
     return;
   }
   const headers = rows[0];
-  const idx = {
-    sku: headers.indexOf("SKU"),
-    name: headers.indexOf("Name"),
-    published: headers.indexOf("Published"),
-    short: headers.indexOf("Short description"),
-    desc: headers.indexOf("Description"),
-    cats: headers.indexOf("Categories"),
-  };
 
   const known = await prisma.curtainCategory.findMany({ select: { slug: true, name: true } });
-  const nameToSlug = new Map();
+  const nameToSlug = new Map<string, string>();
   for (const c of known) {
     nameToSlug.set(norm(c.name), c.slug);
     nameToSlug.set(norm(c.slug), c.slug);
@@ -183,23 +182,29 @@ async function main() {
     const cols = rows[r];
     if (!cols || cols.length < 2) continue;
 
-    const code = String(cols[idx.sku] || "").trim();
-    const name = String(cols[idx.name] || "").trim();
+    const code = String(cols[headers.indexOf("SKU")] || "").trim();
+    const name = String(cols[headers.indexOf("Name")] || "").trim();
     if (!code || !name) {
       skipped++;
       continue;
     }
-    if (idx.published >= 0 && String(cols[idx.published] || "").trim() === "0") {
+    const publishedIdx = headers.indexOf("Published");
+    if (publishedIdx >= 0 && String(cols[publishedIdx] || "").trim() === "0") {
       skipped++;
       continue;
     }
 
-    const { categorySlug, subcategory } = parseCategories(cols[idx.cats], nameToSlug);
+    const { categorySlug, subcategory } = parseCategories(
+      cols[headers.indexOf("Categories")],
+      nameToSlug,
+    );
     if (!categorySlug) {
       skipped++;
       continue;
     }
 
+    const shortIdx = headers.indexOf("Short description");
+    const descIdx = headers.indexOf("Description");
     const data = {
       code,
       name,
@@ -208,7 +213,7 @@ async function main() {
       fabric: attrOf(cols, headers, ["طرح", "نقش", "fabric"]),
       color: attrOf(cols, headers, ["رنگ", "color"]),
       description:
-        stripHtml(cols[idx.short]) || stripHtml(cols[idx.desc]) || null,
+        stripHtml(cols[shortIdx]) || stripHtml(cols[descIdx]) || null,
     };
 
     const existing = await prisma.curtainModel.findFirst({ where: { code } });

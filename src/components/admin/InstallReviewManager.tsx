@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, Loader2, RefreshCw, X } from "lucide-react";
 import RenderCompareDialog from "@/components/admin/RenderCompareDialog";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToasts } from "@/lib/adminToast";
 import { useConfirmation } from "@/hooks/useConfirmation";

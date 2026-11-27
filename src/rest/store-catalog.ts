@@ -12,7 +12,7 @@ export const CATALOG_SORTS = {
   newest: { label: "جدیدترین" },
 } as const;
 
-interface Product {
+export interface Product {
   id: string;
   slug: string;
   name: string;
@@ -24,6 +24,11 @@ interface Product {
   categoryId?: string;
   inventory?: { availabilityStatus: string };
   variants?: ProductVariant[];
+  install_image?: string;
+  color_code?: string;
+  fabric?: string;
+  color?: string;
+  code?: string;
   [key: string]: unknown;
 }
 
@@ -46,7 +51,7 @@ interface Category {
   [key: string]: unknown;
 }
 
-interface ProductsResponse {
+export interface ProductsResponse {
   products: Product[];
   nextCursor?: string;
   totalCount?: number;

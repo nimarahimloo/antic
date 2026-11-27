@@ -20,17 +20,17 @@ await new Promise((resolve, reject) => {
 
 const address = backendServer.address();
 assert.ok(address && typeof address === "object", "Backend must bind to an ephemeral TCP port");
-const backendBase = "http://127.0.0.1:" + address.port;
+const backendBase = "http://127.0.0.1:" + (address as { port: number }).port;
 const workerEnv = {
   MCP_WORKER_TOKEN: workerToken,
   MCP_BACKEND_URL: backendBase + "/api/mcp/tools",
 };
 
-let category;
-let model;
-let project;
+let category: { id: string; slug: string } | null = null;
+let model: { id: string; code: string; name: string; category_slug: string } | null = null;
+let project: { id: string; title: string; category_slug: string } | null = null;
 
-async function mcpRequest(message, overrides = {}) {
+async function mcpRequest(message: unknown, overrides: Record<string, string> = {}) {
   const response = await worker.fetch(
     new Request("https://mcp.integration.test/mcp", {
       method: "POST",
@@ -46,7 +46,7 @@ async function mcpRequest(message, overrides = {}) {
   return { response, payload };
 }
 
-async function callTool(id, name, args = {}, overrides = {}) {
+async function callTool(id: number, name: string, args: Record<string, unknown> = {}, overrides: Record<string, string> = {}) {
   return mcpRequest(
     {
       jsonrpc: "2.0",
@@ -58,9 +58,11 @@ async function callTool(id, name, args = {}, overrides = {}) {
   );
 }
 
-function decodeToolText(payload) {
-  const text = payload && payload.result && payload.result.content &&
-    payload.result.content[0] && payload.result.content[0].text;
+function decodeToolText(payload: unknown) {
+  const text = (payload as { result?: { content?: Array<{ text?: string }> } })?.result
+    && (payload as { result?: { content?: Array<{ text?: string }> } }).result.content
+    && (payload as { result?: { content?: Array<{ text?: string }> } }).result.content[0]
+    && (payload as { result?: { content?: Array<{ text?: string }> } }).result.content[0].text;
   assert.equal(typeof text, "string", "MCP tool result must include a text content block");
   return JSON.parse(text);
 }
@@ -109,8 +111,8 @@ test("MCP client -> Worker -> authenticated Backend -> Prisma catalog", async (t
 
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("mcp-protocol-version"), "2025-06-18");
-      assert.equal(payload.result.protocolVersion, "2025-06-18");
-      assert.equal(payload.result.serverInfo.name, "pardehantic-catalog-mcp");
+      assert.equal((payload as { result: { protocolVersion: string } }).result.protocolVersion, "2025-06-18");
+      assert.equal((payload as { result: { serverInfo: { name: string } } }).result.serverInfo.name, "pardehantic-catalog-mcp");
     });
 
     await t.test("MCP tools/list returns the tool contract", async () => {
@@ -122,7 +124,7 @@ test("MCP client -> Worker -> authenticated Backend -> Prisma catalog", async (t
 
       assert.equal(response.status, 200);
       assert.deepEqual(
-        payload.result.tools.map((tool) => tool.name),
+        (payload as { result: { tools: Array<{ name: string }> } }).result.tools.map((tool) => tool.name),
         ["list_categories", "search_models", "get_model", "list_projects"],
       );
     });
@@ -130,11 +132,11 @@ test("MCP client -> Worker -> authenticated Backend -> Prisma catalog", async (t
     await t.test("list_categories reads the real Prisma database", async () => {
       const { response, payload } = await callTool(3, "list_categories");
       assert.equal(response.status, 200);
-      assert.equal(payload.result.isError, false);
+      assert.equal((payload as { result: { isError: boolean } }).result.isError, false);
 
       const rows = decodeToolText(payload);
       assert.ok(Array.isArray(rows));
-      assert.ok(rows.some((row) => row.id === category.id && row.slug === category.slug));
+      assert.ok(rows.some((row: { id: string; slug: string }) => row.id === category!.id && row.slug === category!.slug));
     });
 
     await t.test("search_models returns the integration fixture", async () => {
@@ -143,32 +145,32 @@ test("MCP client -> Worker -> authenticated Backend -> Prisma catalog", async (t
         limit: 5,
       });
       assert.equal(response.status, 200);
-      assert.equal(payload.result.isError, false);
+      assert.equal((payload as { result: { isError: boolean } }).result.isError, false);
 
       const rows = decodeToolText(payload);
       assert.ok(Array.isArray(rows));
-      assert.ok(rows.some((row) => row.id === model.id && row.category_slug === category.slug));
+      assert.ok(rows.some((row: { id: string; category_slug: string }) => row.id === model!.id && row.category_slug === category!.slug));
     });
 
     await t.test("get_model returns details from the real database", async () => {
-      const { response, payload } = await callTool(5, "get_model", { id: model.id });
+      const { response, payload } = await callTool(5, "get_model", { id: model!.id });
       assert.equal(response.status, 200);
-      assert.equal(payload.result.isError, false);
+      assert.equal((payload as { result: { isError: boolean } }).result.isError, false);
 
       const result = decodeToolText(payload);
-      assert.equal(result.id, model.id);
-      assert.equal(result.code, model.code);
-      assert.equal(result.name, model.name);
+      assert.equal(result.id, model!.id);
+      assert.equal(result.code, model!.code);
+      assert.equal(result.name, model!.name);
     });
 
     await t.test("list_projects returns the persisted integration fixture", async () => {
       const { response, payload } = await callTool(6, "list_projects", { limit: 50 });
       assert.equal(response.status, 200);
-      assert.equal(payload.result.isError, false);
+      assert.equal((payload as { result: { isError: boolean } }).result.isError, false);
 
       const rows = decodeToolText(payload);
       assert.ok(Array.isArray(rows));
-      assert.ok(rows.some((row) => row.id === project.id && row.title === project.title));
+      assert.ok(rows.some((row: { id: string; title: string }) => row.id === project!.id && row.title === project!.title));
     });
 
     await t.test("Backend rejects a direct unauthenticated bridge request", async () => {
@@ -188,7 +190,7 @@ test("MCP client -> Worker -> authenticated Backend -> Prisma catalog", async (t
         { MCP_WORKER_TOKEN: "wrong-integration-credential" },
       );
       assert.equal(response.status, 200);
-      assert.equal(payload.result.isError, true);
+      assert.equal((payload as { result: { isError: boolean } }).result.isError, true);
 
       const error = decodeToolText(payload);
       assert.equal(error.status, 401);
@@ -199,7 +201,7 @@ test("MCP client -> Worker -> authenticated Backend -> Prisma catalog", async (t
         query: "x".repeat(161),
       });
       assert.equal(response.status, 200);
-      assert.equal(payload.result.isError, true);
+      assert.equal((payload as { result: { isError: boolean } }).result.isError, true);
 
       const error = decodeToolText(payload);
       assert.equal(error.status, 400);
@@ -210,7 +212,7 @@ test("MCP client -> Worker -> authenticated Backend -> Prisma catalog", async (t
         id: "missing-" + marker,
       });
       assert.equal(response.status, 200);
-      assert.equal(payload.result.isError, true);
+      assert.equal((payload as { result: { isError: boolean } }).result.isError, true);
 
       const error = decodeToolText(payload);
       assert.equal(error.status, 404);

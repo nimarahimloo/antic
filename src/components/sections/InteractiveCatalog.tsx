@@ -9,7 +9,7 @@ import CatalogCard from "@/components/catalog/CatalogCard";
 import ProjectCard from "@/components/ProjectCard";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { apiErrorMessage } from "@/lib/apiError";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 import { getRootCategories, parseSubs } from "@/lib/categoryTree";
 import { getCategoryProjects, getCurtainModelRelatedProjects, RelatedProject } from "@/rest/store-catalog";
@@ -41,6 +41,8 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
 
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || "");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
+  // Combined filter state to prevent duplicate fetches when both category and subcategory change
+  const [filterKey, setFilterKey] = useState(0);
   const [gridItems, setGridItems] = useState<Record<string, unknown>[]>([]);
   const [projectFallback, setProjectFallback] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -222,7 +224,7 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
         setProjectFallback([]);
       })
       .finally(() => setLoading(false));
-  }, [selectedCategory, selectedSubcategory, debouncedSearch]);
+  }, [filterKey, debouncedSearch, selectedCategory, selectedSubcategory]);
 
   // Fetch related projects when category or selected model changes
   useEffect(() => {
@@ -262,7 +264,7 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
     return () => {
       cancelled = true;
     };
-  }, [selectedCategory, selectedSubcategory, selectedModel, debouncedSearch]);
+  }, [filterKey, selectedModel, selectedCategory, selectedSubcategory, debouncedSearch]);
 
   // Category counts: deferred + batched to avoid hammering the server on page load
   useEffect(() => {
@@ -370,8 +372,10 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
                     onClick={(e) => {
                       e.stopPropagation();
                       setSearch("");
+                      // Batch state updates to prevent duplicate fetches
                       setSelectedSubcategory(cat.isSub ? "" : "");
                       setSelectedCategory(cat.parentSlug || cat.slug);
+                      setFilterKey((k) => k + 1);
                     }}
                     className={`group relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl border transition-all lg:h-32 lg:w-32 ${
                       active
@@ -412,7 +416,10 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
           <div className="mb-6 flex gap-2 overflow-x-auto no-scrollbar pb-1" dir="rtl">
             <button
               type="button"
-              onClick={() => setSelectedSubcategory("")}
+              onClick={() => {
+                setSelectedSubcategory("");
+                setFilterKey((k) => k + 1);
+              }}
               className={`shrink-0 rounded-full border px-3 py-1.5 font-body text-[11px] ${
                 !selectedSubcategory
                   ? "border-primary bg-primary/10 text-primary"
@@ -425,7 +432,10 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
               <button
                 key={sub.slug}
                 type="button"
-                onClick={() => setSelectedSubcategory(sub.slug)}
+                onClick={() => {
+                  setSelectedSubcategory(sub.slug);
+                  setFilterKey((k) => k + 1);
+                }}
                 className={`shrink-0 rounded-full border px-3 py-1.5 font-body text-[11px] ${
                   selectedSubcategory === sub.slug
                     ? "border-primary bg-primary/10 text-primary"

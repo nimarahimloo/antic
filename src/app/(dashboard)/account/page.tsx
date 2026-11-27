@@ -48,7 +48,7 @@ export default function AccountDashboardPage() {
         pageKey="account-dashboard"
         eyebrow="حساب کاربری"
         title="داشبورد"
-        description={user?.full_name ? `خوش آمدید، ${user.full_name}` : "مدیریت سفارش‌ها و اطلاعات حساب"}
+        description={user?.fullName ? `خوش آمدید، ${user.fullName}` : "مدیریت سفارش‌ها و اطلاعات حساب"}
       />
 
       <section className="mx-auto max-w-7xl px-5 py-8 lg:px-10 lg:py-12">
@@ -57,10 +57,10 @@ export default function AccountDashboardPage() {
           <div className="flex flex-col items-center text-center lg:flex-row lg:items-center lg:justify-between lg:text-right">
             <div className="mb-4 lg:mb-0 lg:mr-8">
               <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground mb-3">
-                {user?.full_name?.charAt(0) || "ا"}
+                {user?.fullName?.charAt(0) || "ا"}
               </div>
               <h2 className="font-display text-xl font-bold text-foreground">
-                {user?.full_name || "کاربر عزیز"}
+                {user?.fullName || "کاربر عزیز"}
               </h2>
               <p className="font-body text-sm text-muted-foreground mt-1">{user?.email}</p>
             </div>
@@ -104,7 +104,7 @@ export default function AccountDashboardPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="font-body text-sm text-muted-foreground">تاریخ عضویت</span>
-                  <span className="font-display font-bold text-foreground">{user?.created_date ? new Date(user.created_date).toLocaleDateString("fa-IR") : "—"}</span>
+                  <span className="font-display font-bold text-foreground">{user?.createdDate ? new Date(user.createdDate).toLocaleDateString("fa-IR") : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="font-body text-sm text-muted-foreground">مجموع خریدها</span>

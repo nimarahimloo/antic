@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Palette, Image as ImageIcon, Save, Upload, Loader2, Image as LibImage } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToast, adminToasts } from "@/lib/adminToast";

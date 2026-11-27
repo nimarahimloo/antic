@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Plus, Trash2, Star } from "lucide-react";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { adminToast, adminToasts } from "@/lib/adminToast";
 import { useConfirmation } from "@/hooks/useConfirmation";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";

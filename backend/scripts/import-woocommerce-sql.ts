@@ -4,7 +4,7 @@
  * into Prisma (ShopCategory + Product).
  *
  * Usage:
- *   node scripts/import-woocommerce-sql.mjs /path/to/pardeha1_antic-new.sql
+ *   cd backend && npx tsx scripts/import-woocommerce-sql.ts /path/to/pardeha1_antic-new.sql
  *   # or place file at backend/data/woocommerce-dump.sql and:
  *   npm run db:import-woo
  *
@@ -16,16 +16,14 @@
 import fs from "fs";
 import path from "path";
 import readline from "readline";
-import { fileURLToPath } from "url";
 import { PrismaClient } from "@prisma/client";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prisma = new PrismaClient();
 
 const sqlPath =
   process.argv[2] ||
-  path.join(__dirname, "../data/woocommerce-dump.sql") ||
-  path.join(__dirname, "../data/pardeha1_antic-new.sql");
+  path.join(path.resolve(), "data", "woocommerce-dump.sql") ||
+  path.join(path.resolve(), "data", "pardeha1_antic-new.sql");
 
 if (!fs.existsSync(sqlPath)) {
   console.error(`SQL file not found: ${sqlPath}`);
@@ -33,7 +31,7 @@ if (!fs.existsSync(sqlPath)) {
   process.exit(1);
 }
 
-function unescapeSqlString(s) {
+function unescapeSqlString(s: string | null | undefined): string {
   if (s == null) return "";
   return String(s)
     .replace(/\\'/g, "'")
@@ -45,8 +43,8 @@ function unescapeSqlString(s) {
 }
 
 /** Parse a single VALUES row of mixed quoted/unquoted fields. */
-function parseValuesRow(row) {
-  const fields = [];
+function parseValuesRow(row: string): (string | null)[] {
+  const fields: (string | null)[] = [];
   let i = 0;
   const s = row.trim();
   while (i < s.length) {
@@ -83,8 +81,8 @@ function parseValuesRow(row) {
 }
 
 /** Split INSERT ... VALUES (...),(...); into row strings */
-function splitInsertRows(valuesChunk) {
-  const rows = [];
+function splitInsertRows(valuesChunk: string): string[] {
+  const rows: string[] = [];
   let depth = 0;
   let inStr = false;
   let strQ = "";
@@ -131,7 +129,7 @@ function splitInsertRows(valuesChunk) {
   return rows;
 }
 
-function slugify(name, fallback) {
+function slugify(name: string | null | undefined, fallback?: string): string {
   const s = String(name || "")
     .trim()
     .toLowerCase()
@@ -142,14 +140,41 @@ function slugify(name, fallback) {
   return s || fallback || "item";
 }
 
-async function streamParse(filePath) {
-  const terms = new Map(); // term_id -> { name, slug }
-  const taxonomies = new Map(); // term_taxonomy_id -> { term_id, taxonomy, parent, count }
-  const products = new Map(); // post_id -> { title, slug, content, status }
-  const postmeta = new Map(); // post_id -> { key: value }
-  const relationships = []; // { object_id, term_taxonomy_id }
+interface Term {
+  name: string | null;
+  slug: string | null;
+}
 
-  let mode = null; // 'terms' | 'taxonomy' | 'posts' | 'postmeta' | 'relationships'
+interface Tax {
+  term_id: string;
+  taxonomy: string;
+  parent: string;
+  count: number;
+}
+
+interface Product {
+  title: string;
+  slug: string;
+  content: string;
+  status: string;
+}
+
+interface ParsedData {
+  terms: Map<string, Term>;
+  taxonomies: Map<string, Tax>;
+  products: Map<string, Product>;
+  postmeta: Map<string, Record<string, string>>;
+  relationships: Array<{ object_id: string; term_taxonomy_id: string }>;
+}
+
+async function streamParse(filePath: string): Promise<ParsedData> {
+  const terms = new Map<string, Term>();
+  const taxonomies = new Map<string, Tax>();
+  const products = new Map<string, Product>();
+  const postmeta = new Map<string, Record<string, string>>();
+  const relationships: Array<{ object_id: string; term_taxonomy_id: string }> = [];
+
+  let mode: "terms" | "taxonomy" | "posts" | "postmeta" | "relationships" | null = null;
   let buffer = "";
 
   const rl = readline.createInterface({
@@ -174,24 +199,21 @@ async function streamParse(filePath) {
       const f = parseValuesRow(row);
       try {
         if (mode === "terms" && f.length >= 3) {
-          // term_id, name, slug, term_group?
-          terms.set(String(f[0]), { name: f[1], slug: f[2] });
+          terms.set(String(f[0]), { name: f[1] ?? null, slug: f[2] ?? null });
         } else if (mode === "taxonomy" && f.length >= 5) {
-          // term_taxonomy_id, term_id, taxonomy, description, parent, count
           taxonomies.set(String(f[0]), {
-            term_id: String(f[1]),
-            taxonomy: f[2],
-            parent: String(f[4] || "0"),
-            count: parseInt(f[5] || "0", 10) || 0,
+            term_id: String(f[1] ?? ""),
+            taxonomy: String(f[2] ?? ""),
+            parent: String(f[4] ?? "0"),
+            count: parseInt(String(f[5] ?? "0"), 10) || 0,
           });
         } else if (mode === "posts" && f.length >= 20) {
-          // ID, author, date, date_gmt, content, title, excerpt, status, ..., post_name (index 11), ..., post_type (index 20)
           const id = String(f[0]);
-          const content = f[4];
-          const title = f[5];
-          const status = f[7];
-          const postName = f[11];
-          const postType = f[20];
+          const content = String(f[4] ?? "");
+          const title = String(f[5] ?? "");
+          const status = String(f[7] ?? "");
+          const postName = String(f[11] ?? "");
+          const postType = String(f[20] ?? "");
           if (postType === "product" && (status === "publish" || status === "private")) {
             products.set(id, {
               title: title || postName || id,
@@ -201,11 +223,9 @@ async function streamParse(filePath) {
             });
           }
         } else if (mode === "postmeta" && f.length >= 4) {
-          // meta_id, post_id, meta_key, meta_value
           const pid = String(f[1]);
-          const key = f[2];
-          const val = f[3];
-          if (!postmeta.has(pid)) postmeta.set(pid, {});
+          const key = String(f[2] ?? "");
+          const val = String(f[3] ?? "");
           if (
             key === "_price" ||
             key === "_regular_price" ||
@@ -215,7 +235,8 @@ async function streamParse(filePath) {
             key === "_sku" ||
             key === "_thumbnail_id"
           ) {
-            postmeta.get(pid)[key] = val;
+            if (!postmeta.has(pid)) postmeta.set(pid, {});
+            postmeta.get(pid)![key] = val;
           }
         } else if (mode === "relationships" && f.length >= 2) {
           relationships.push({
@@ -283,11 +304,18 @@ async function streamParse(filePath) {
   return { terms, taxonomies, products, postmeta, relationships };
 }
 
-async function importData(parsed) {
+async function importData(parsed: ParsedData) {
   const { terms, taxonomies, products, postmeta, relationships } = parsed;
 
   // product_cat only
-  const productCats = [];
+  const productCats: Array<{
+    termTaxonomyId: string;
+    termId: string;
+    parentTermId: string | null;
+    name: string;
+    slug: string;
+    count: number;
+  }> = [];
   for (const [ttId, tax] of taxonomies) {
     if (tax.taxonomy !== "product_cat") continue;
     const term = terms.get(tax.term_id);
@@ -296,8 +324,8 @@ async function importData(parsed) {
       termTaxonomyId: ttId,
       termId: tax.term_id,
       parentTermId: tax.parent === "0" ? null : tax.parent,
-      name: term.name,
-      slug: term.slug || slugify(term.name, tax.term_id),
+      name: term.name ?? "",
+      slug: term.slug ?? slugify(term.name, tax.term_id),
       count: tax.count,
     });
   }
@@ -313,14 +341,11 @@ async function importData(parsed) {
   console.log(`Found ${products.size} published products`);
 
   // Map term_id → ShopCategory id
-  const termToShopCat = new Map();
+  const termToShopCat = new Map<string, string>();
   let order = 0;
   for (const cat of productCats) {
     order++;
-    // encode hierarchy in description for subcats
-    const parentName = cat.parentTermId
-      ? terms.get(cat.parentTermId)?.name || null
-      : null;
+    const parentName = cat.parentTermId ? terms.get(cat.parentTermId)?.name ?? null : null;
     const desc = parentName ? `زیرمجموعه: ${parentName}` : null;
     const slug = cat.slug.slice(0, 120);
     const row = await prisma.shopCategory.upsert({
@@ -344,7 +369,7 @@ async function importData(parsed) {
   console.log(`Upserted ${productCats.length} ShopCategory rows`);
 
   // product_id → preferred category (first product_cat)
-  const productCatMap = new Map();
+  const productCatMap = new Map<string, string>();
   for (const rel of relationships) {
     const tax = taxonomies.get(rel.term_taxonomy_id);
     if (!tax || tax.taxonomy !== "product_cat") continue;
@@ -413,13 +438,13 @@ async function importData(parsed) {
   console.log(`Products created=${created} updated=${updated}`);
 
   // Write a JSON snapshot for seed reuse
-  const outDir = path.join(__dirname, "../data");
+  const outDir = path.join(path.resolve(), "data");
   fs.mkdirSync(outDir, { recursive: true });
   const snapshot = {
     categories: productCats.map((c) => ({
       name: c.name,
       slug: c.slug,
-      parent: c.parentTermId ? terms.get(c.parentTermId)?.name || null : null,
+      parent: c.parentTermId ? terms.get(c.parentTermId)?.name ?? null : null,
       count: c.count,
     })),
     productCount: products.size,
@@ -427,7 +452,7 @@ async function importData(parsed) {
   fs.writeFileSync(
     path.join(outDir, "woo-shop-snapshot.json"),
     JSON.stringify(snapshot, null, 2),
-    "utf8"
+    "utf8",
   );
   console.log("Wrote backend/data/woo-shop-snapshot.json");
 }
@@ -436,7 +461,7 @@ async function main() {
   console.log(`Parsing ${sqlPath} ...`);
   const parsed = await streamParse(sqlPath);
   console.log(
-    `Parsed terms=${parsed.terms.size} taxonomies=${parsed.taxonomies.size} products=${parsed.products.size} metaKeys=${parsed.postmeta.size} rels=${parsed.relationships.length}`
+    `Parsed terms=${parsed.terms.size} taxonomies=${parsed.taxonomies.size} products=${parsed.products.size} metaKeys=${parsed.postmeta.size} rels=${parsed.relationships.length}`,
   );
   await importData(parsed);
   console.log("Import done.");

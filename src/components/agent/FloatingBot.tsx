@@ -15,7 +15,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import MessageBubble, { TypingIndicator } from "@/components/agent/MessageBubble";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import {
   playSendSound,
   playReceiveSound,

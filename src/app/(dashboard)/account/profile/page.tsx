@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { adminToast, adminToasts } from "@/lib/adminToast";
 import { useConfirmation } from "@/hooks/useConfirmation";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
@@ -13,8 +13,8 @@ const inputCls =
 const labelCls = "mb-1.5 block font-body text-xs text-muted-foreground";
 
 export default function AccountProfilePage() {
-  const { user, checkUserAuth } = useAuth();
-  const [fullName, setFullName] = useState(user?.full_name || "");
+  const { user, initializeAuth } = useAuth();
+  const [fullName, setFullName] = useState(user?.fullName || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [email, setEmail] = useState(user?.email || "");
   const [saving, setSaving] = useState(false);
@@ -44,7 +44,7 @@ export default function AccountProfilePage() {
         phone: phone || undefined,
         email: email || "",
       });
-      await checkUserAuth();
+      await initializeAuth();
       adminToasts.updated("پروفایل");
     } catch (err) {
       adminToast("error", "پروفایل", err instanceof Error ? err.message : "خطا");

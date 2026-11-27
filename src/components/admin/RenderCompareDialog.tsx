@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { api } from "@/api/client";
+import { api } from "@/api";
 import { resolveStyle, MECHANISM_LABELS } from "@/lib/curtainStyleResolve";
 import { OptimizedImage } from "@/components/ui/image";
 

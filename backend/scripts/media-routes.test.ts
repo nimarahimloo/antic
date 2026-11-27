@@ -3,12 +3,12 @@
  * Self-contained: starts the backend API against a temporary SQLite database
  * and isolated upload directory, runs all route tests, then cleans up.
  *
- * Run with: node --import tsx backend/scripts/media-routes.test.mjs
+ * Run with: npx tsx backend/scripts/media-routes.test.ts
  */
 import assert from "node:assert/strict";
 import sharp from "sharp";
 import { createServer } from "http";
-import { prisma } from "../src/lib/prisma.js";
+import { prisma } from "../src/lib/prisma.ts";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -16,14 +16,17 @@ import { execSync } from "child_process";
 import bcrypt from "bcryptjs";
 
 const BASE_PORT = 0; // OS assigns a free port
-let server;
-let baseUrl;
-let adminToken = null;
-let uploadedMediaId = null;
-let tempDbPath;
-let tempUploadDir;
+let server: ReturnType<typeof createServer> | null = null;
+let baseUrl: string | null = null;
+let adminToken: string | null = null;
+let uploadedMediaId: string | null = null;
+let tempDbPath: string | null = null;
+let tempUploadDir: string | null = null;
 
-function test(name, fn) {
+let passed = 0;
+let failed = 0;
+
+function test(name: string, fn: () => Promise<void> | void) {
   return Promise.resolve()
     .then(fn)
     .then(() => {
@@ -32,15 +35,12 @@ function test(name, fn) {
     })
     .catch((e) => {
       failed++;
-      console.error(`  ✗ ${name}: ${e.message}`);
+      console.error(`  ✗ ${name}: ${e instanceof Error ? e.message : String(e)}`);
     });
 }
 
-let passed = 0;
-let failed = 0;
-
-async function req(method, path, body, token, opts = {}) {
-  const headers = {};
+async function req(method: string, path: string, body: unknown, token: string | null, opts: Record<string, unknown> = {}) {
+  const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body instanceof FormData) {
     // don't set content-type for FormData
@@ -53,7 +53,7 @@ async function req(method, path, body, token, opts = {}) {
     body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
     ...opts,
   });
-  let data;
+  let data: unknown;
   try {
     data = await res.json();
   } catch {
@@ -66,9 +66,9 @@ async function login() {
   const res = await req("POST", "/api/auth/login", {
     identifier: "admin@antic.local",
     password: "admin123",
-  });
-  if (res.status === 200 && res.data.token) {
-    adminToken = res.data.token;
+  }, null);
+  if (res.status === 200 && (res.data as { token?: string })?.token) {
+    adminToken = (res.data as { token: string }).token;
     console.log(`  ℹ Admin token obtained`);
   } else {
     console.log(`  ⚠ Admin login failed (${res.status}), some tests will skip auth`);
@@ -106,7 +106,7 @@ async function setup() {
 
   // Run Prisma migrations against the temp database
   execSync("npx prisma db push", {
-    cwd: "/home/nima/Laptop-Backup/Documents/GitHub/antic-curtain/backend",
+    cwd: path.resolve(),
     stdio: "pipe",
     env: { ...process.env },
   });
@@ -127,12 +127,13 @@ async function setup() {
   console.log(`  ℹ Admin user seeded`);
 
   // Dynamically import the app AFTER env vars are set
-  const { default: app } = await import("../src/app.js");
+  const { default: app } = await import("../src/app.ts");
 
   // Start the server
   server = createServer(app);
   await new Promise((resolve) => server.listen(BASE_PORT, "127.0.0.1", resolve));
   const addr = server.address();
+  if (!addr || typeof addr === "string") throw new Error("Failed to get server address");
   baseUrl = `http://127.0.0.1:${addr.port}`;
   console.log(`  ℹ Backend running at ${baseUrl}`);
   console.log(`  ℹ Database: ${tempDbPath}`);
@@ -169,13 +170,14 @@ async function main() {
       form.append("file", file);
       const res = await req("POST", "/api/media", form, adminToken);
       assert.strictEqual(res.status, 201, `expected 201 got ${res.status}`);
-      assert.ok(res.data.media, "media object missing");
-      assert.ok(res.data.media.url, "media.url missing");
-      assert.ok(res.data.media.url.startsWith("/uploads/media/"), "url should be under /uploads/media/");
-      assert.strictEqual(res.data.media.mimeType, "image/jpeg");
-      assert.ok(res.data.media.sha256, "sha256 missing");
-      uploadedMediaId = res.data.media.id;
-      console.log(`    media id: ${uploadedMediaId}, url: ${res.data.media.url}`);
+      assert.ok((res.data as { media?: unknown }).media, "media object missing");
+      const media = (res.data as { media: { url?: string; mimeType?: string; sha256?: string; id?: string } }).media;
+      assert.ok(media.url, "media.url missing");
+      assert.ok(media.url.startsWith("/uploads/media/"), "url should be under /uploads/media/");
+      assert.strictEqual(media.mimeType, "image/jpeg");
+      assert.ok(media.sha256, "sha256 missing");
+      uploadedMediaId = media.id;
+      console.log(`    media id: ${uploadedMediaId}, url: ${media.url}`);
     });
 
     await test("POST /api/media uploads an AVIF image", async () => {
@@ -185,9 +187,10 @@ async function main() {
       form.append("file", file);
       const res = await req("POST", "/api/media", form, adminToken);
       assert.strictEqual(res.status, 201, `expected 201 got ${res.status}`);
-      assert.ok(res.data.media, "media object missing");
-      assert.strictEqual(res.data.media.mimeType, "image/avif");
-      assert.ok(res.data.media.url.startsWith("/uploads/media/"), "url should be under /uploads/media/");
+      assert.ok((res.data as { media?: unknown }).media, "media object missing");
+      const media = (res.data as { media: { mimeType?: string } }).media;
+      assert.strictEqual(media.mimeType, "image/avif");
+      assert.ok(media.url.startsWith("/uploads/media/"), "url should be under /uploads/media/");
     });
 
     await test("POST /api/media dedups identical bytes", async () => {
@@ -197,23 +200,27 @@ async function main() {
       form.append("file", file);
       const res = await req("POST", "/api/media", form, adminToken);
       assert.strictEqual(res.status, 200, `expected 200 got ${res.status}`);
-      assert.strictEqual(res.data.reused, true, "should reuse existing media");
-      assert.strictEqual(res.data.media.id, uploadedMediaId, "should return same media id");
+      assert.strictEqual((res.data as { reused?: boolean }).reused, true, "should reuse existing media");
+      assert.strictEqual(
+        (res.data as { media?: { id?: string } }).media?.id,
+        uploadedMediaId,
+        "should return same media id",
+      );
     });
 
     await test("GET /api/media lists media with pagination", async () => {
       const res = await req("GET", "/api/media?limit=10&offset=0", null, adminToken);
       assert.strictEqual(res.status, 200);
-      assert.ok(Array.isArray(res.data.items));
-      assert.ok(typeof res.data.total === "number");
-      assert.ok(res.data.total >= 1);
+      assert.ok(Array.isArray((res.data as { items?: unknown[] }).items));
+      assert.ok(typeof (res.data as { total?: number }).total === "number");
+      assert.ok((res.data as { total: number }).total >= 1);
     });
 
     await test("GET /api/media/:id returns media details", async () => {
       const res = await req("GET", `/api/media/${uploadedMediaId}`, null, adminToken);
       assert.strictEqual(res.status, 200);
-      assert.strictEqual(res.data.id, uploadedMediaId);
-      assert.ok(res.data.url);
+      assert.strictEqual((res.data as { id?: string }).id, uploadedMediaId);
+      assert.ok((res.data as { url?: string }).url);
     });
 
     await test("GET /api/media/:id returns 404 for missing id", async () => {
@@ -224,15 +231,16 @@ async function main() {
     await test("GET /api/media/:id/usages returns usage info", async () => {
       const res = await req("GET", `/api/media/${uploadedMediaId}/usages`, null, adminToken);
       assert.strictEqual(res.status, 200);
-      assert.ok(Array.isArray(res.data.usages));
-      assert.ok(typeof res.data.count === "number");
+      assert.ok(Array.isArray((res.data as { usages?: unknown[] }).usages));
+      assert.ok(typeof (res.data as { count?: number }).count === "number");
     });
 
     await test("PATCH /api/media/:id updates metadata", async () => {
       const res = await req("PATCH", `/api/media/${uploadedMediaId}`, { alt: "تست Replace", caption: "کاپشن تست" }, adminToken);
       assert.strictEqual(res.status, 200);
-      assert.strictEqual(res.data.media.alt, "تست Replace");
-      assert.strictEqual(res.data.media.caption, "کاپشن تست");
+      const media = (res.data as { media: { alt?: string; caption?: string } }).media;
+      assert.strictEqual(media.alt, "تست Replace");
+      assert.strictEqual(media.caption, "کاپشن تست");
     });
 
     await test("POST /api/media/usages registers usage", async () => {
@@ -243,7 +251,7 @@ async function main() {
         fieldName: "image",
       }, adminToken);
       assert.strictEqual(res.status, 201);
-      assert.ok(res.data.usage);
+      assert.ok((res.data as { usage?: unknown }).usage);
     });
 
     await test("DELETE /api/media/:id refuses when in use (409)", async () => {
@@ -254,7 +262,7 @@ async function main() {
     await test("DELETE /api/media/:id?force=true deletes despite usage", async () => {
       const res = await req("DELETE", `/api/media/${uploadedMediaId}?force=true`, null, adminToken);
       assert.strictEqual(res.status, 200);
-      assert.strictEqual(res.data.deleted, true);
+      assert.strictEqual((res.data as { deleted?: boolean }).deleted, true);
     });
 
     await test("GET /api/media/:id returns 404 after deletion", async () => {
