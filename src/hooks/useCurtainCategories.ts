@@ -48,21 +48,6 @@ export function parseSubs(raw: unknown): Array<{ name: string; slug: string }> {
   return [];
 }
 
-export interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  image: string | null;
-  description: string;
-  order: number;
-  mechanism: string | null;
-  subcategories: Array<{ name: string; slug: string }>;
-  inCatalog: boolean;
-  in_catalog: boolean;
-  backgroundImage: string | null;
-  backgroundGradient: string | null;
-}
-
 export function normalizeCategory(row: Record<string, unknown>): Category | null {
   if (!row) return null;
   const raw = row.in_catalog ?? row.inCatalog;

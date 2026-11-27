@@ -509,7 +509,9 @@ router.put("/:Entity/:id", requireAdmin, async (req: AuthedRequest, res) => {
         }
 
         // Manage parent->subcategories links when parent changes (CurtainCategory only)
-        if (meta.name === "CurtainCategory" && parentSlug !== undefined) {
+        // Only act when parentSlug was explicitly sent in the body; a missing field
+        // means "preserve existing parent", not "remove from all parents".
+        if (meta.name === "CurtainCategory" && "parentSlug" in body) {
           await updateCategoryParentHierarchy(tx, entityId, parentSlug, String(updated.name));
         }
 
@@ -702,29 +704,6 @@ router.get("/CurtainCategory/:slug/projects", async (req, res) => {
         categorySlug: true,
         subcategory: true,
       },
-    });
-
-    res.json({ projects });
-  } catch (err) {
-    sendError(res, err);
-  }
-});
-
-// Get related projects for a CurtainModel (using the implicit relation table)
-router.get("/CurtainModel/:id/related-projects", async (req, res) => {
-  try {
-    const modelId = req.params.id;
-    const limit = Math.min(Number(req.query.limit) || 6, 20);
-
-    const relations = await prisma.$queryRaw<Array<{ B: string }>>`
-      SELECT "B" FROM "_CurtainModelRelatedProjects" WHERE "A" = ${modelId} LIMIT ${limit}
-    `;
-    const projectIds = relations.map((r) => r.B);
-    const projects = await prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-      select: { id: true, title: true, coverImage: true, categorySlug: true, subcategory: true },
     });
 
     res.json({ projects });

@@ -71,26 +71,30 @@ export async function getCurtainModels(params: {
   limit?: number;
   sort?: string;
 } = {}) {
+  const filter: Record<string, unknown> = {};
+  if (params.category) filter.categorySlug = params.category;
+  if (params.subcategory) filter.subcategory = params.subcategory;
+
   const searchParams = new URLSearchParams();
-  if (params.category) searchParams.set("category", params.category);
-  if (params.subcategory) searchParams.set("subcategory", params.subcategory);
+  if (Object.keys(filter).length) searchParams.set("filter", JSON.stringify(filter));
   if (params.search) searchParams.set("search", params.search);
   if (params.limit) searchParams.set("limit", String(params.limit));
-  if (params.sort) searchParams.set("sort", params.sort);
+  if (params.sort) searchParams.set("sort_by", params.sort);
 
-  return request<{ items: unknown[]; total: number }>(
-    `/catalog/models?${searchParams}`
+  return request<{ count: number; items: unknown[] }>(
+    `/entities/CurtainModel?${searchParams}`
   );
 }
 
 export async function getCategoryProjects(categorySlug: string) {
-  return request<{ items: unknown[] }>(`/catalog/projects?category=${encodeURIComponent(categorySlug)}`);
+  return request<{ projects: unknown[] }>(`/entities/CurtainCategory/${encodeURIComponent(categorySlug)}/projects`);
 }
 
 export async function getRelatedProjects(modelId: string) {
-  return request<{ items: unknown[] }>(`/catalog/models/${encodeURIComponent(modelId)}/related-projects`);
+  return request<{ projects: unknown[] }>(`/entities/CurtainModel/${encodeURIComponent(modelId)}/related-projects`);
 }
 
 export async function getCategoryCounts() {
-  return request<Record<string, number>>("/catalog/category-counts");
+  // Backend has no per-category count endpoint; return empty map so callers degrade gracefully.
+  return {} as Record<string, number>;
 }

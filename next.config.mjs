@@ -36,7 +36,6 @@ const nextConfig = {
   poweredByHeader: false,
   // Use webpack instead of Turbopack for next-pwa compatibility
   // turbopack: {} allows Turbopack in dev (PWA disabled in dev anyway)
-  turbopack: {},
   
   // خروجی مستقل برای داکر/سرور اختصاصی
   output: process.env.NEXT_OUTPUT_STANDALONE === 'true' ? 'standalone' : undefined,
