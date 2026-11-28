@@ -15,6 +15,7 @@ import renderRoutes from "./routes/render.js";
 import searchRoutes from "./routes/search.js";
 import accountRoutes from "./routes/account.js";
 import aiRoutes from "./routes/ai.js";
+import diagnosticRoutes from "./routes/diagnostic.js";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./docs/swagger.js";
 import { HttpError, sendError } from "./lib/errors.js";
@@ -407,6 +408,7 @@ app.use("/api/mcp", mcpRoutes);
 app.use("/api/render", renderRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/diagnostic", diagnosticRoutes);
 
 // Swagger UI — OpenAPI 3.0 documentation
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {

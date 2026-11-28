@@ -24,7 +24,7 @@ bun run dev               # :3000 — /api و /uploads و /.well-known و /auth.
 - سلامت API: `GET http://localhost:3001/api/health`
 - توکن JWT در `localStorage` کلید `antic_access_token` (`src/api/token.ts`)
 
-## محیط و секреت (env)
+## محیط و secreto (env)
 
 - روت `.env` / `.env.example`: فقط متغیرهای فرانت (مثل `NEXT_PUBLIC_API_BASE`), کامنت شده به پیش‌فرض. هرگز کلید/رمز در `NEXT_PUBLIC_*` نباشد.
 - `backend/.env`: gitignored، نمونه `backend/.env.example`. شامل `JWT_SECRET` (۳۲+ نویسه)، `ADMIN_*`, `ZARINPAL_*`, `MCP_WORKER_TOKEN`, `AI_*`.
@@ -38,6 +38,7 @@ bun install
 bun run lint      # ESLint flat config (backend/، scripts/، prisma/، my-agent/ نادیده گرفته می‌شوند)
 bun run typecheck # tsc --noEmit
 bun run build     # next build --webpack (ویب‌پاک، نه توربوپاک — برای next-pwa)
+
 ```
 
 ```bash
@@ -64,27 +65,30 @@ node --test tests/functional/curtainStyleResolve.test.ts
 cd backend && bun run test        # smoke + functional
 cd backend && bun run smoke       # فقط smoke-test.ts
 cd backend && bun run test:functional  # فقط functional-test.ts
+
+# E2E (Playwright Chromium)
+npx playwright test --workers=1 --project=chromium
 ```
 
-CI (`.github/workflows/typescript-checks.yml`): typecheck فرانت و بک‌اند، تست گیت ارائه‌دهنده AI، تست Worker MCP، یکپارچگی MCP، و runtime داکر. (تست‌های پرداخت/ZarinPal حذف شده‌اند.)
+CI (`.github/workflows/typescript-checks.yml`): typecheck فرانت و بک‌اند، تست گیت ارائهدهنده AI، تست Worker MCP، یکپارچگی MCP، و runtime داکر. (تست‌های پرداخت/ZarinPal حذف شدهاند.)
 
 ## دیتابیس
 
 اسکیمای واحد: `backend/prisma/schema.prisma` (کپی در روت وجود ندارد و ایجاد نکنید). دیتابیس local SQLite: `backend/dev.db`. بعد از تغییر مدل: `cd backend && bun run db:generate && bun run db:push` (یا `bun run db:setup`).
 
-## دو دامنة دسته (هرگز مخلوط نکنید)
+## دو دامنه دسته (هرگز مخلوط نکنید)
 
-| دامنة | مدل | API | UI |
+| دامنه | مدل | API | UI |
 | کاتالوگ پرده | `CurtainCategory` | `/api/entities/CurtainCategory` | `useCurtainCategories` |
 | فروشگاه اکدرسوری | `ShopCategory` + `Product.categoryId` | `/api/catalog/categories` | `store-catalog` / `useShop` |
 
 - فروشگاه فقط اکدرسوری؛ به `CurtainCategory` وصل نیست.
-- سکشن‌های غیر-`/shop` دسته را از `useCurtainCategories` بخوانند — **لیست slug هاردکد ننویسید.**
-- کمک‌ها: `src/lib/categoryTree.ts` (`parseSubs`, `getRootCategories`, `getSubOptionsForParent`, `collectSubSlugs`)، `src/lib/installCategories.js` (`isInstallCategory`)، `src/lib/curtainStyleResolve.js` (`resolveStyle`).
+- سکشنهای غیر-`/shop` دسته را از `useCurtainCategories` بخوانند — **لیست slug هاردکد ننویسید.**
+- کمکها: `src/lib/categoryTree.ts` (`parseSubs`, `getRootCategories`, `getSubOptionsForParent`, `collectSubSlugs`)، `src/lib/installCategories.js` (`isInstallCategory`)، `src/lib/curtainStyleResolve.ts` (`resolveStyle`).
 
 ## کلاینت API (تغییر مهم)
 
-`src/api/client.ts` حذف شده؛ ماژول‌های `src/api/` barrels_export شده‌اند در `src/api/index.ts`:
+`src/api/client.ts` حذف شده؛ ماژولهای `src/api/` barrels_export شدهاند در `src/api/index.ts`:
 
 ```ts
 import { api, setToken, clearToken } from "@/api";
@@ -94,23 +98,23 @@ import { getCurrentCart, addToCart, checkout } from "@/rest/store-cart";
 import { searchProducts, queryCategories } from "@/rest/store-catalog";
 ```
 
-- همه ماژول‌های فرانت `.ts`/`.tsx` — فایل `.js` هم‌نام با `.ts` بسازید نه (Next.js `.js` را زودتر resolve می‌کند).
-- UI فارسی، شناسه‌های کد انگلیسی.
+- همه ماژولهای فرانت `.ts`/`.tsx` — فایل `.js` همنام با `.ts` بسازید نه (Next.js `.js` را زودتر resolve می‌کند).
+- UI فارسی، شناسههای کد انگلیسی.
 - پس از تغییر معنادار: `bun run lint` در روت.
-- `OptimizedImage` (`src/components/ui/image.tsx`) همیشه `unoptimized={false}` است؛ تصویر بهینه‌سازی می‌شود و والدین fill همه `relative` + ابعاد دارند.
+- `OptimizedImage` (`src/components/ui/image.tsx`) همیشه `unoptimized={false}` است؛ تصویر بهینه‌سازی میشود و والدین fill همه `relative` + ابعاد دارند.
 
 ## سفارش (تماس با ادمین)
 
-- درگاه پرداخت (زیرن‌پال) و صفحه `/checkout` حذف شده است؛ هیچ کدی برای پرداخت آنلاین وجود ندارد.
-- محصولات فقط از طریق تماس با ادمین سفارش می‌شوند (صفحه `/contact` و دکمه‌های "تماس بگیرید" در کارت محصول).
+- درگاه پرداخت (زیرنپال) و صفحه `/checkout` حذف شده است؛ هیچ کدی برای پرداخت آنلاین وجود ندارد.
+- محصولات فقط از طریق تماس با ادمین سفارش میشوند (صفحه `/contact` و دکمههای "تماس بگیرید" در کارت محصول).
 - سبد خرید غیرفعال است (`CART_ENABLED = false`); افزودن به سبد و پرداخت غیر فعال است.
 
-## این‌ها را انجام ندهید
+## اینها را انجام ندهید
 
 - `CurtainCategory` را با `ShopCategory` مخلوط نکنید.
 - `backend/**/*.db` یا هر `.env` را commit نکنید.
 - `@/api/client` را import نکنید (حذف شده؛ `@/api` استفاده کنید).
-- فایل `.js` هم‌نام با `.ts` موجود بسازید.
+- فایل `.js` همنام با `.ts` موجود بسازید.
 - درگاه پرداخت / ZarinPal / checkout را مجدداً اضافه نکنید (سفارش فقط با تماس).
 
 <!-- BEGIN:nextjs-agent-rules -->
@@ -122,3 +126,4 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, FileText, Settings, LogOut, ChevronLeft, ChevronRight, Sparkles, UploadCloud, Palette, FolderOpen, Image } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, FileText, Settings, LogOut, ChevronLeft, ChevronRight, Sparkles, UploadCloud, Palette, FolderOpen, Image, Activity } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
 import { LoginModal } from "@/components/LoginModal";
@@ -23,6 +23,7 @@ const ADMIN_NAV = [
   { label: "تنظیمات پنجره", href: "/admin/window", icon: Settings },
   { label: "تنظیمات", href: "/admin/settings", icon: Settings },
   { label: "کتابخانه رسانه", href: "/admin/media", icon: Image },
+  { label: "تشخیص مشکلات", href: "/admin/diagnostics", icon: Activity },
 ];
 
 export default function AdminLayout({

@@ -1,0 +1,99 @@
+name: Main Branch Auto-Fix & Update
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: main-update-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fix-and-update:
+    name: Run fix agents and update docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Node.js (for Playwright)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile 2>/dev/null || bun install
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: bun install --frozen-lockfile 2>/dev/null || bun install
+
+      - name: Run ESLint
+        run: bun run lint
+
+      - name: Run frontend typecheck
+        run: bun run typecheck
+
+      - name: Run backend typecheck
+        working-directory: backend
+        run: bun run typecheck
+
+      - name: Run backend tests
+        working-directory: backend
+        run: bun run test
+
+      - name: Run frontend functional tests
+        run: node --test tests/functional/categoryTree.test.ts tests/functional/installCategories.test.ts tests/functional/curtainStyleResolve.test.ts
+
+      - name: Start backend server for E2E
+        working-directory: backend
+        run: bun run dev > /tmp/backend-dev.log 2>&1 &
+        shell: bash
+        continue-on-error: true
+
+      - name: Wait for backend to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:3001/api/health >/dev/null 2>&1; then
+              echo "Backend is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend failed to start"
+          cat /tmp/backend-dev.log
+          exit 1
+
+      - name: Run E2E tests (Chromium)
+        run: npx playwright test --workers=1 --project=chromium
+
+      - name: Run auto-fix and update script
+        run: bash scripts/auto-fix-and-update.sh
+
+      - name: Commit doc updates if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet AGENTS.md README.md; then
+            echo "No doc changes to commit"
+          else
+            git add AGENTS.md README.md
+            git commit -m "docs: update AGENTS.md and README.md after main branch update"
+            git push origin main
+          fi
