@@ -22,7 +22,7 @@ const variantStyles = {
   warning: "border-amber/50 bg-amber/10 text-amber hover:bg-amber/20",
 };
 
-const variantIconStyles = {
+const _variantIconStyles = {
   destructive: "text-destructive",
   primary: "text-primary",
   warning: "text-amber",

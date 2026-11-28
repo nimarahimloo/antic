@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OptimizedImage } from "@/components/ui/image";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { useCurtainCategories, pickFeaturedCategories } from "@/hooks/useCurtainCategories";
@@ -40,10 +41,11 @@ export default function PremiumShowcase() {
                 className="group light-leak relative block h-72 overflow-hidden rounded-3xl border border-secondary/60 bg-card transition-all duration-500 hover:border-primary lg:h-80"
               >
                 {item.image ? (
-                  <img
+                  <OptimizedImage
                     src={item.image}
                     alt={item.name}
-                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-1200 ease-out group-hover:scale-105 motion-reduce:transition-none"
+                    fill
+                    className="object-cover transition-transform duration-1200 ease-out group-hover:scale-105 motion-reduce:transition-none"
                   />
                 ) : (
                   <div className="absolute inset-0 bg-secondary/40" />

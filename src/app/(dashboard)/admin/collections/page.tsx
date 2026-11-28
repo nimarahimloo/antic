@@ -1,5 +1,6 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 
 export default function AdminCollectionsPage() {
@@ -28,7 +29,7 @@ export default function AdminCollectionsPage() {
       key: "coverImage",
       label: "کاور",
       render: (v: unknown) =>
-        v ? <img src={String(v)} alt="" className="h-10 w-10 rounded-lg object-cover" /> : "—",
+        v ? <OptimizedImage src={String(v)} alt="" fill className="h-10 w-10 rounded-lg object-cover" priority /> : "—",
     },
     {
       key: "title",

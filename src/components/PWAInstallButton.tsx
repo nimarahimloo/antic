@@ -26,7 +26,9 @@ export function PWAInstallButton({
     const isIOSStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
     
     if (isStandalone || isIOSStandalone) {
-      setIsInstalled(true);
+      (async () => {
+        setIsInstalled(true);
+      })();
       return;
     }
 

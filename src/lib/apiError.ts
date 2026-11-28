@@ -51,7 +51,7 @@ const DEFAULT_MESSAGES: Record<number, string> = {
  * Parse a backend error response body into a stable code.
  * Backend now returns { error, code, requestId }.
  */
-function parseCode(body: unknown, fallback: string): string {
+function _parseCode(body: unknown, fallback: string): string {
   if (body && typeof body === "object" && "code" in body && typeof (body as Record<string, unknown>).code === "string") {
     return (body as Record<string, unknown>).code as string;
   }
@@ -133,7 +133,7 @@ function codeForStatus(status: number): string {
     case 409: return "CONFLICT";
     case 422: return "VALIDATION_ERROR";
     case 502: return "EXTERNAL_SERVICE_ERROR";
-    case 503: return "PAYMENT_ERROR";
+    case 503: return "SERVICE_UNAVAILABLE";
     default: return "INTERNAL_ERROR";
   }
 }
@@ -145,7 +145,6 @@ function ErrorCodeFromMessage(msg: string): string {
   if (m.includes("دسترسی") || m.includes("forbidden")) return "FORBIDDEN";
   if (m.includes("یافت نشد") || m.includes("not found")) return "NOT_FOUND";
   if (m.includes("تکراری") || m.includes("conflict")) return "CONFLICT";
-  if (m.includes("پرداخت") || m.includes("payment")) return "PAYMENT_ERROR";
   if (m.includes("بارگذاری") || m.includes("upload")) return "UPLOAD_ERROR";
   return "INTERNAL_ERROR";
 }

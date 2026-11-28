@@ -14,7 +14,9 @@ export function useFabricAnalysis(url: string | undefined | null): FabricAnalysi
   const [analysis, setAnalysis] = useState<FabricAnalysis | null>(() => null);
   useEffect(() => {
     if (!url) {
-      setAnalysis(null);
+      (async () => {
+        setAnalysis(null);
+      })();
       return;
     }
     let alive = true;

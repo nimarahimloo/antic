@@ -55,8 +55,8 @@ export default function RenderCompareDialog({ model, onClose }: RenderCompareDia
 
   useEffect(() => {
     if (!model) return;
-    setRefs(null);
     (async () => {
+      setRefs(null);
       const keys = [...new Set([catSlug, style].filter(Boolean))];
       const all: InstallReferenceRow[] = [];
       for (const k of keys) {

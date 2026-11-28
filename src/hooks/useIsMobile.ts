@@ -17,7 +17,9 @@ export function useIsMobile() {
     };
     mql.addEventListener("change", onChange);
     // Initial sync in case SSR didn't match
-    setIsMobile(mql.matches);
+    (async () => {
+      setIsMobile(mql.matches);
+    })();
     return () => mql.removeEventListener("change", onChange);
   }, []);
 

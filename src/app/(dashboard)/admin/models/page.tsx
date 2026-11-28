@@ -1,5 +1,6 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import FabricSwatch from "@/components/catalog/FabricSwatch";
 import { useCurtainCategories, allCategorySelectOptions } from "@/hooks/useCurtainCategories";
@@ -27,7 +28,7 @@ export default function AdminModelsPage() {
       render: (_v: unknown, r: Record<string, unknown>) => (
         <div className="h-14 w-20 overflow-hidden rounded-lg border border-secondary/60">
           {r.install_image ? (
-            <img src={String(r.install_image)} alt="" className="h-full w-full object-cover" />
+            <OptimizedImage src={String(r.install_image)} alt="" fill className="h-full w-full object-cover" priority />
           ) : (
             <FabricSwatch fabric={r} />
           )}

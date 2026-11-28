@@ -67,8 +67,10 @@ export function useProductDetail(slug: string, initialProduct?: DetailProduct | 
   useEffect(() => {
     if (initialProduct) return; // SSR data already provided, skip client fetch
     let cancelled = false;
-    setNotFound(false);
-    setError(null);
+    (async () => {
+      setNotFound(false);
+      setError(null);
+    })();
     getProductBySlug(slug)
       .then((p) => {
         if (cancelled) return;
@@ -90,9 +92,9 @@ export function useProductDetail(slug: string, initialProduct?: DetailProduct | 
     };
   }, [slug, initialProduct, reloadKey]);
 
-  const options = product?.options || [];
-  const modifiers = product?.modifiers || [];
-  const variants = product?.variantsInfo?.variants || [];
+  const options = useMemo(() => product?.options || [], [product?.options]);
+  const modifiers = useMemo(() => product?.modifiers || [], [product?.modifiers]);
+  const variants = useMemo(() => product?.variantsInfo?.variants || [], [product?.variantsInfo?.variants]);
 
   const variant = useMemo(() => {
     if (options.length === 0) return variants[0] || null;

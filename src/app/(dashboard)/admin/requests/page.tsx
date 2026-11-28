@@ -33,7 +33,11 @@ export default function AdminRequestsPage() {
       })
       .finally(() => setLoading(false));
   }, []);
-  useEffect(load, [load]);
+  useEffect(() => {
+    (async () => {
+      await load();
+    })();
+  }, [load]);
 
   async function setStatus(record: Record<string, unknown>, status: string) {
     const prev = record.status;

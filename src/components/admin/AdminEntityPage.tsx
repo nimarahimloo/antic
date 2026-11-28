@@ -100,7 +100,9 @@ export default function AdminEntityPage({
   }, [entity, sortBy]);
 
   useEffect(() => {
-    load();
+    (async () => {
+      await load();
+    })();
   }, [load]);
 
   function openNew() {
@@ -279,7 +281,8 @@ export default function AdminEntityPage({
                 className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-secondary/60 bg-secondary/5 px-4 py-2.5 font-body text-xs text-muted-foreground hover:border-primary/60 hover:text-primary"
                 disabled={uploadingField === f.key || analyzing}
               >
-                <Image className="h-4 w-4" /> کتابخانه
+                {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                <Image className="h-4 w-4" aria-hidden="true" /> کتابخانه
               </button>
               {form[f.key] != null && String(form[f.key]).trim() !== "" && (
                 <button
@@ -331,7 +334,8 @@ export default function AdminEntityPage({
               className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-secondary/60 bg-secondary/5 px-4 py-2.5 font-body text-xs text-muted-foreground hover:border-primary/60 hover:text-primary"
               disabled={uploadingField === f.key}
             >
-              <Image className="h-4 w-4" /> کتابخانه
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image className="h-4 w-4" aria-hidden="true" /> کتابخانه
             </button>
           </div>
           <div className="flex flex-wrap gap-2">

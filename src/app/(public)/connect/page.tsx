@@ -16,20 +16,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-interface ConsentTool {
-  name: string;
-  title?: string;
-  description?: string;
-}
-
-interface ConsentInfo {
-  authenticated?: boolean;
-  client_name?: string;
-  app_name?: string;
-  login_path?: string;
-  tools?: ConsentTool[];
-}
-
 function StepItem({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <li className="flex gap-4">

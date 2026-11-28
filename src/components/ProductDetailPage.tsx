@@ -29,12 +29,16 @@ export default function ProductDetailPage({ product }: { product: Record<string,
 
   useEffect(() => {
     if (!d.product?.categoryId) {
-      setSimilarProducts([]);
+      (async () => {
+        setSimilarProducts([]);
+      })();
       return;
     }
     let cancelled = false;
-    setSimilarLoading(true);
-    setSimilarError(null);
+    (async () => {
+      setSimilarLoading(true);
+      setSimilarError(null);
+    })();
 
     searchProducts({
       categoryId: d.product.categoryId,
@@ -62,7 +66,7 @@ export default function ProductDetailPage({ product }: { product: Record<string,
       });
 
     return () => { cancelled = true; };
-  }, [d.product?.categoryId, d.product?.id]);
+  }, [d.product]);
 
   const images = useMemo(
     () =>

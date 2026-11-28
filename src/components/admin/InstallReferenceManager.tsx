@@ -60,7 +60,9 @@ export function InstallReferenceManager() {
   }, []);
 
   useEffect(() => {
-    load();
+    (async () => {
+      await load();
+    })();
   }, [load]);
 
   async function upload(slug: string, files: File[]) {

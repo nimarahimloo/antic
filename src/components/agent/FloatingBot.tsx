@@ -15,6 +15,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import MessageBubble, { TypingIndicator } from "@/components/agent/MessageBubble";
+import { OptimizedImage } from "@/components/ui/image";
 import { api } from "@/api";
 import {
   playSendSound,
@@ -84,7 +85,6 @@ export default function FloatingBot({
   const allowReceiveSound = useRef(false);
   const bootstrapped = useRef(false);
   const localIdCounter = useRef(0);
-  const sendStartTime = useRef(0);
 
   const scrollToEnd = useCallback((smooth = true) => {
     requestAnimationFrame(() => {
@@ -163,14 +163,16 @@ export default function FloatingBot({
 
   useEffect(() => {
     if (open) {
-      setUnread(0);
-      unlockChatSounds();
-      ensureConversation().then(() => {
-        setTimeout(() => inputRef.current?.focus(), 200);
-        scrollToEnd(false);
-      });
+      (async () => {
+        setUnread(0);
+        unlockChatSounds();
+        ensureConversation().then(() => {
+          setTimeout(() => inputRef.current?.focus(), 200);
+          scrollToEnd(false);
+        });
+      })();
     }
-  }, [open]);
+  }, [open, ensureConversation, scrollToEnd]);
 
   useEffect(() => {
     if (open) scrollToEnd(true);
@@ -224,7 +226,7 @@ export default function FloatingBot({
 
     const attachments = pendingImage ? [{ type: "image", url: pendingImage }] : undefined;
     localIdCounter.current += 1;
-    const localId = `local-${localIdCounter.current}-${Date.now().toString(36)}`;
+    const localId = `local-${localIdCounter.current}`;
     const optimistic: Message = {
       role: "user",
       content: content || (attachments ? "📷 تصویر" : ""),
@@ -243,15 +245,13 @@ export default function FloatingBot({
     try {
       const id = await ensureConversation();
       if (!id) throw new Error("no conversation");
-      sendStartTime.current = performance.now();
       const conv = await api.agents.addMessage(id, {
         role: "user",
         content: content || (attachments ? "[تصویر]" : ""),
         attachments,
         context: context || undefined,
       });
-      const wait = Math.max(0, 650 - (performance.now() - sendStartTime.current));
-      if (wait) await new Promise((r) => setTimeout(r, wait));
+      await new Promise((r) => setTimeout(r, 650));
 
       const next = (conv.messages || []).map((m) => ({
         ...m,
@@ -437,7 +437,13 @@ export default function FloatingBot({
 
           {pendingImage && (
             <div className="flex shrink-0 items-center gap-2 border-t border-secondary/40 px-3 py-2">
-              <img src={pendingImage} alt="" className="h-12 w-12 rounded-lg object-cover ring-1 ring-secondary" />
+              <OptimizedImage
+                src={pendingImage}
+                alt=""
+                className="h-12 w-12 rounded-lg object-cover ring-1 ring-secondary"
+                width={48}
+                height={48}
+              />
               <div className="min-w-0 flex-1 text-right">
                 <p className="truncate font-body text-[11px] text-muted-foreground">آماده ارسال</p>
               </div>

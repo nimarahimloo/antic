@@ -39,7 +39,7 @@ function codeForStatus(status: number): string {
     case 409: return ErrorCode.CONFLICT;
     case 422: return ErrorCode.VALIDATION;
     case 502: return ErrorCode.EXTERNAL;
-    case 503: return ErrorCode.PAYMENT;
+    case 503: return ErrorCode.SERVICE_UNAVAILABLE;
     default: return ErrorCode.INTERNAL;
   }
 }
@@ -70,7 +70,7 @@ export const ErrorCode = {
   INTERNAL: "INTERNAL_ERROR",
   NETWORK: "NETWORK_ERROR",
   UPLOAD: "UPLOAD_ERROR",
-  PAYMENT: "PAYMENT_ERROR",
+  SERVICE_UNAVAILABLE: "SERVICE_UNAVAILABLE",
 } as const;
 
 /** Human-readable Persian messages for stable codes. */
@@ -87,7 +87,7 @@ const PERSIAN_MESSAGES: Record<string, string> = {
   [ErrorCode.INTERNAL]: "خطای داخلی سرور.",
   [ErrorCode.NETWORK]: "خطا در برقراری ارتباط شبکه.",
   [ErrorCode.UPLOAD]: "بارگذاری فایل ناموفق بود.",
-  [ErrorCode.PAYMENT]: "خطا در پردازش پرداخت.",
+  [ErrorCode.SERVICE_UNAVAILABLE]: "سرویس در دسترس نیست.",
 };
 
 function persianMessage(code: string, fallback: string): string {

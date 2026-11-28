@@ -25,7 +25,9 @@ export function useSavedCurtains() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setSaved(JSON.parse(raw));
+      if (raw) (async () => {
+        setSaved(JSON.parse(raw));
+      })();
     } catch {
       /* ignore */
     }

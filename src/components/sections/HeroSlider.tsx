@@ -56,7 +56,9 @@ export default function HeroSlider() {
   const [direction, setDirection] = useState(1);
 
   useEffect(() => {
-    setIndex(0);
+    (async () => {
+      setIndex(0);
+    })();
   }, [slides.length]);
 
   const paginate = useCallback(

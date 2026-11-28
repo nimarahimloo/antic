@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { OptimizedImage } from "@/components/ui/image";
 import { useRouter } from "next/navigation";
 import { Search, X, Loader2, FolderKanban, Layers, ShoppingBag, FileText, Tag } from "lucide-react";
 
@@ -65,13 +66,17 @@ export default function GlobalSearch({ compact = false, className = "" }: { comp
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
-    if (!q.trim()) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    timer.current = setTimeout(() => runSearch(q), 220);
+
+    (async () => {
+      if (!q.trim()) {
+        setResults([]);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      timer.current = setTimeout(() => runSearch(q), 220);
+    })();
+
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
@@ -184,7 +189,7 @@ export default function GlobalSearch({ compact = false, className = "" }: { comp
               >
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/50 bg-background">
                   {item.image ? (
-                    <img src={item.image} alt="" className="h-full w-full object-cover" />
+                    <OptimizedImage src={item.image} alt="" width={44} height={44} className="h-full w-full object-cover" />
                   ) : (
                     <Icon className="h-4 w-4 text-primary" />
                   )}

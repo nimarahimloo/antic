@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OptimizedImage } from "@/components/ui/image";
 
 /**
  * کارت کاور دسته — برای کاتالوگ، نمونه‌های اجرا، و هر جای سایت اصلی
@@ -28,10 +29,12 @@ export default function CategoryCoverCard({
       className={`group relative block overflow-hidden rounded-2xl border border-secondary/60 bg-card transition-all duration-500 hover:border-primary ${aspect} ${className}`}
     >
       {image ? (
-        <img
+        <OptimizedImage
           src={image}
           alt={name ?? ""}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+          fill
+          className="absolute inset-0 object-cover transition-transform duration-700 group-hover:scale-105"
+          priority
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-secondary/40">

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ChevronLeft, ChevronRight, Phone } from "lucide-react";
 import { searchProducts } from "@/rest/store-catalog";
+import { OptimizedImage } from "@/components/ui/image";
 import { productImage } from "@/lib/storeImage";
 import { SITE_PHONE_HREF } from "@/lib/siteContact";
 
@@ -160,10 +161,11 @@ export default function ProductSlider() {
                 >
                   <Link href={`/product/${(p as { slug: string }).slug}`} className="relative aspect-[4/5] overflow-hidden bg-secondary/20">
                     {img ? (
-                      <img
+                      <OptimizedImage
                         src={img}
                         alt={(p as { name: string }).name}
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        fill
+                        className="object-cover transition-transform duration-700 group-hover:scale-105"
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center font-body text-xs text-muted-foreground">

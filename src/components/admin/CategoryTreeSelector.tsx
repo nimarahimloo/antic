@@ -41,7 +41,7 @@ export default function CategoryTreeSelector({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // Build a map from slug to option for label lookup
-  const optionLabels = useMemo(
+  const _optionLabels = useMemo(
     () => new Map(options.map((o) => [o.value, o.label])),
     [options],
   );
@@ -86,11 +86,11 @@ export default function CategoryTreeSelector({
   }, [options]);
 
   // Filter nodes by search text
-  const matchesSearch = useCallback((node: CategoryNode): boolean => {
+  const matchesSearch = useCallback(function matchNode(node: CategoryNode): boolean {
     if (!search.trim()) return true;
     const q = search.trim().toLowerCase();
     if (node.name.toLowerCase().includes(q)) return true;
-    return node.children.some(matchesSearch);
+    return node.children.some(matchNode);
   }, [search]);
 
   const filteredRoots = useMemo(() => {
@@ -108,7 +108,7 @@ export default function CategoryTreeSelector({
     [excludeSlug, descendantSlugs],
   );
 
-  const isSelected = (slug: string) => slug === value;
+  const isSelected = useCallback((slug: string) => slug === value, [value]);
 
   const toggleExpand = useCallback((slug: string) => {
     setExpanded((prev) => {
@@ -119,7 +119,7 @@ export default function CategoryTreeSelector({
     });
   }, []);
 
-  const isExpanded = (slug: string) => expanded.has(slug);
+  const isExpanded = useCallback((slug: string) => expanded.has(slug), [expanded]);
 
   const renderNode = useCallback(
     (node: CategoryNode, showChildren: boolean): React.ReactNode => {
@@ -128,7 +128,7 @@ export default function CategoryTreeSelector({
       const hasChildren = node.children.length > 0;
       const childrenVisible = showChildren && isExpanded(node.slug) && hasChildren;
 
-      const visibleChildren = childrenVisible
+      const _visibleChildren = childrenVisible
         ? node.children.filter((c) => matchesSearch(c))
         : [];
 
@@ -183,7 +183,7 @@ export default function CategoryTreeSelector({
         </div>
       );
     },
-    [isDisabled, isSelected, toggleExpand, isExpanded, matchesSearch, onChange],
+    [isDisabled, isSelected, toggleExpand, isExpanded, matchesSearch, onChange, excludeSlug],
   );
 
   return (

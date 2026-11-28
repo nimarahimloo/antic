@@ -99,6 +99,7 @@ export function useShop({
 
   useEffect(() => {
     const id = ++generation.current;
+    const generationSnapshot = generation.current;
     let alive = true;
     pendingMore.current = null;
     setPage({ key, products: null, cursor: null, error: null, loadingMore: false });
@@ -116,7 +117,7 @@ export function useShop({
       });
     return () => {
       alive = false;
-      generation.current++;
+      generation.current = generationSnapshot + 1;
     };
   }, [key]);
 

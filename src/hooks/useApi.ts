@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isApiError, ApiError } from "@/api";
 
-interface UseApiOptions<T> {
+interface UseApiOptions<_T> {
   immediate?: boolean;
   onError?: (err: ApiError | Error) => void;
 }

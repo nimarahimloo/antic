@@ -15,6 +15,8 @@ import renderRoutes from "./routes/render.js";
 import searchRoutes from "./routes/search.js";
 import accountRoutes from "./routes/account.js";
 import aiRoutes from "./routes/ai.js";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./docs/swagger.js";
 import { HttpError, sendError } from "./lib/errors.js";
 import { prisma } from "./lib/prisma.js";
 import { buildSitemap } from "./lib/sitemap.js";
@@ -405,6 +407,17 @@ app.use("/api/mcp", mcpRoutes);
 app.use("/api/render", renderRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/ai", aiRoutes);
+
+// Swagger UI — OpenAPI 3.0 documentation
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  explorer: true,
+  customCss: ".swagger-ui .topbar { display: none }",
+  customSiteTitle: "Antic Curtain API Docs",
+}));
+app.get("/api/docs/json", (_req, res) => {
+  res.set("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
 
 /** Public XML sitemap at site root — regenerated from the DB on every request
  *  so it always reflects published / removed content. */

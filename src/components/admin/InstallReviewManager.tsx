@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, Loader2, RefreshCw, X } from "lucide-react";
 import RenderCompareDialog from "@/components/admin/RenderCompareDialog";
+import { OptimizedImage } from "@/components/ui/image";
 import { api } from "@/api";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToasts } from "@/lib/adminToast";
@@ -171,14 +172,14 @@ export function InstallReviewManager() {
                 title="مقایسه در کنار هم"
               >
                 {m.install_image ? (
-                  <img src={m.install_image} alt={m.code} className="aspect-[4/3] w-2/3 rounded-lg object-cover" />
+                  <OptimizedImage src={m.install_image} alt={m.code} width={400} height={300} className="aspect-[4/3] w-2/3 rounded-lg object-cover" />
                 ) : (
                   <div className="aspect-[4/3] w-2/3 rounded-lg bg-secondary/20 flex items-center justify-center">
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   </div>
                 )}
                 {m.image && (
-                  <img src={m.image} alt="پارچهٔ اصلی" className="aspect-square w-1/3 self-start rounded-lg object-cover" />
+                  <OptimizedImage src={m.image} alt="پارچهٔ اصلی" width={200} height={200} className="aspect-square w-1/3 self-start rounded-lg object-cover" />
                 )}
               </button>
               <div className="mt-2 flex items-center justify-between text-xs">

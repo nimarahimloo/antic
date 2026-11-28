@@ -1,5 +1,6 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -28,10 +29,12 @@ export default function CatalogTeaser() {
           <div className="relative">
             <div className="relative aspect-[4/3] overflow-hidden rounded-3xl border border-secondary/60 bg-card">
               <div className="absolute inset-3 overflow-hidden rounded-2xl border border-primary/20">
-                <img
+                <OptimizedImage
                   src="/images/migrated/4c8e23e61_generated_image.png"
                   alt="نمونه پرده لوکس در فضای داخلی"
+                  fill
                   className="h-full w-full object-cover"
+                  priority
                 />
               </div>
             </div>

@@ -122,10 +122,10 @@ export default function AdminFabricLibraryPage() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {HARMONY_SLUGS.map((slug) => {
-            const cat = categories.find((c) => c.slug === slug);
+            const _cat = categories.find((c) => c.slug === slug);
             const data = formData[slug] || { backgroundImage: "", backgroundGradient: "" };
             const hasImage = Boolean(data.backgroundImage);
-            const hasGradient = Boolean(data.backgroundGradient);
+            const _hasGradient = Boolean(data.backgroundGradient);
 
             return (
               <div key={slug} className="rounded-2xl border border-secondary/50 bg-card p-5">

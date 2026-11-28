@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OptimizedImage } from "@/components/ui/image";
 import { useProductCard } from "@/hooks/useProductCard";
 import { storeImage } from "@/lib/storeImage";
 import { Phone } from "lucide-react";
@@ -35,7 +36,7 @@ export default function ProductCard({ product }: { product: Product }) {
     hoverImage,
   } = useProductCard(product);
 
-  const hasOptions = product.modifiers?.some((m: { mandatory?: boolean }) => m.mandatory) || !isQuickAddable;
+  const _hasOptions = product.modifiers?.some((m: { mandatory?: boolean }) => m.mandatory) || !isQuickAddable;
 
   const handleContact = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -48,23 +49,12 @@ export default function ProductCard({ product }: { product: Product }) {
       <article className="light-leak overflow-hidden rounded-2xl border border-secondary/60 bg-card transition-all duration-500 hover:border-primary/50">
         <div className="relative aspect-[4/5] overflow-hidden bg-secondary/40">
           {image ? (
-            <img
-              src={storeImage(image) ?? undefined}
-              alt={product.name}
-              loading="lazy"
-              className="h-full w-full object-cover transition-all duration-700 ease-out group-hover:scale-105"
-            />
+            <OptimizedImage src={storeImage(image) ?? undefined} alt={product.name} fill className="h-full w-full object-cover transition-all duration-700 ease-out group-hover:scale-105" />
           ) : (
             <div className="flex h-full items-center justify-center font-body text-xs text-muted-foreground">بدون تصویر</div>
           )}
           {hoverImage && (
-            <img
-              src={storeImage(hoverImage) ?? undefined}
-              alt=""
-              aria-hidden="true"
-              loading="lazy"
-              className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-700 group-hover:opacity-100"
-            />
+            <OptimizedImage src={storeImage(hoverImage) ?? undefined} alt="" aria-hidden="true" fill className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
           )}
           {isSoldOut && (
             <span className="absolute right-3 top-3 rounded-full bg-background/90 px-3 py-1 font-display text-[10px] font-bold text-muted-foreground">

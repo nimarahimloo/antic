@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 export function PWARegistration() {
-  const [isInstallable, setIsInstallable] = useState(false);
+  const [_isInstallable, setIsInstallable] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
@@ -74,7 +74,7 @@ export function PWARegistration() {
     };
   }, []);
 
-  const installApp = async () => {
+  const _installApp = async () => {
     if (!deferredPrompt) return false;
     
     deferredPrompt.prompt();

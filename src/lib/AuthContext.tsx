@@ -57,7 +57,7 @@ function normalizeUser(data: unknown): User | null {
   return { id, email, fullName, role, phone, createdDate };
 }
 
-function isValidUser(data: unknown): data is User {
+function _isValidUser(data: unknown): data is User {
   return normalizeUser(data) !== null;
 }
 
@@ -111,6 +111,12 @@ interface AuthContextType {
   initializeAuth: () => Promise<void>;
   isLoggingIn: boolean;
   isRegistering: boolean;
+  /** When true, a login modal is shown (e.g. after token expiry on admin pages). */
+  showLoginModal: boolean;
+  /** Opens the login modal (e.g. after a 401/403 on an admin page). */
+  openLoginModal: () => void;
+  /** Closes the login modal. */
+  closeLoginModal: () => void;
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -123,6 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [appPublicSettings, setAppPublicSettings] = useState<PublicSettings | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const authRetryRef = React.useRef(0);
 
   const navigateToLogin = useCallback(
@@ -132,6 +139,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     },
     [],
   );
+
+  const openLoginModal = useCallback(() => {
+    setShowLoginModal(true);
+  }, []);
+
+  const closeLoginModal = useCallback(() => {
+    setShowLoginModal(false);
+  }, []);
 
   const initializeAuth = useCallback(async () => {
     consumeAccessTokenFromUrl();
@@ -188,7 +203,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Trigger a retry after a short delay using ref (doesn't cause re-render)
             setTimeout(() => {
               authRetryRef.current += 1;
-              initializeAuth();
+              initializeAuthRef.current();
             }, 2000);
             // isLoadingAuth stays true, authChecked stays false - will retry
           }
@@ -213,17 +228,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const initializeAuthRef = React.useRef(initializeAuth);
+
   useEffect(() => {
-    initializeAuth();
-  }, [initializeAuth]);
+    (async () => {
+      initializeAuthRef.current();
+    })();
+  }, []);
 
   useEffect(() => {
     const onUnauthorized = () => {
-      clearToken();
-      setUser(null);
-      setIsAuthenticated(false);
-      setAuthChecked(true);
-      navigateToLogin();
+      // If we're on an admin page, show the login modal instead of immediately
+      // clearing auth state and redirecting. This lets the user re-authenticate
+      // without losing their place in the admin panel.
+      if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
+        setShowLoginModal(true);
+      } else {
+        clearToken();
+        setUser(null);
+        setIsAuthenticated(false);
+        setAuthChecked(true);
+        navigateToLogin();
+      }
     };
     window.addEventListener(AUTH_EVENT, onUnauthorized);
     return () => {
@@ -302,6 +328,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         initializeAuth,
         isLoggingIn,
         isRegistering,
+        showLoginModal,
+        openLoginModal,
+        closeLoginModal,
       }}
     >
       {children}

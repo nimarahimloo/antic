@@ -46,20 +46,6 @@ async function getModel(id: string) {
   return { model: model as CurtainModel, relatedProjects };
 }
 
-async function generateStaticParams() {
-  // Pre-render popular models (limit to avoid build time issues)
-  // During build, API might not be available
-  try {
-    const models = await import("@/lib/server-data").then(m => m.getCurtainModels({}, 100));
-    return models.slice(0, 50).map((model) => ({
-      id: String(model.id),
-    }));
-  } catch {
-    // During build, return empty to skip static generation
-    return [];
-  }
-}
-
 export async function generateMetadata({ params }: CurtainDetailPageProps) {
   try {
     const resolvedParams = await params;

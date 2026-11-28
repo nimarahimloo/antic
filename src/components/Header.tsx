@@ -14,6 +14,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { OptimizedImage } from "@/components/ui/image";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -46,13 +47,19 @@ export default function Header() {
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
-    onScroll();
+
+    (async () => {
+      onScroll();
+    })();
+
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
-    setOpen(false);
+    (async () => {
+      setOpen(false);
+    })();
   }, [pathname]);
 
   return (
@@ -66,7 +73,7 @@ export default function Header() {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:h-20 sm:px-5 lg:px-10">
         <Link href="/" className="group flex shrink-0 items-center gap-2.5 sm:gap-3">
-          <img
+          <OptimizedImage
             src={logoSrc}
             alt="Antic Curtain"
             className="h-9 w-9 object-contain transition-transform group-hover:scale-105 sm:h-11 sm:w-11"
@@ -182,7 +189,7 @@ export default function Header() {
                     ANTIC CURTAIN
                   </SheetDescription>
                 </div>
-                <img
+                <OptimizedImage
                   src={logoSrc}
                   alt=""
                   className="h-10 w-10 shrink-0 object-contain"

@@ -1,5 +1,6 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import Link from "next/link";
 
 interface Project {
@@ -19,10 +20,12 @@ export default function ProjectCard({ project, className = "" }: ProjectCardProp
     <Link href={`/projects/${project.id}`} className={`group block h-full min-h-0 ${className}`}>
       <div className="relative aspect-[4/3] h-full min-h-[180px] overflow-hidden rounded-2xl border border-secondary/60 bg-card lg:aspect-auto lg:min-h-full">
         {project.cover_image ? (
-          <img
+          <OptimizedImage
             src={project.cover_image}
             alt={project.title}
+            fill
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+            priority
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-secondary/40">

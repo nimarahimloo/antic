@@ -8,7 +8,9 @@ import { api } from "@/api";
 /**
  * Hook for handling API errors consistently across the frontend.
  * - Shows a sonner toast with the Persian error message
- * - Redirects to login on 401/403 auth errors
+ * - On 401/403 auth errors: calls `onAuthError` (if provided) and does NOT
+ *   redirect — the caller (e.g. admin layout with login modal) handles the
+ *   redirect/modal logic. If `onAuthError` is not provided, redirects to login.
  * - Returns a structured ErrorInfo for inline display
  */
 export function useApiError(opts?: { onAuthError?: () => void; showToast?: boolean }) {
@@ -28,7 +30,9 @@ export function useApiError(opts?: { onAuthError?: () => void; showToast?: boole
                     label: "ورود دوباره",
                     onClick: () => {
                       opts?.onAuthError?.();
-                      api.auth.redirectToLogin(window.location.href);
+                      if (!opts?.onAuthError) {
+                        api.auth.redirectToLogin(window.location.href);
+                      }
                     },
                   },
                 }
@@ -41,7 +45,9 @@ export function useApiError(opts?: { onAuthError?: () => void; showToast?: boole
 
       if (info.isAuthError) {
         opts?.onAuthError?.();
-        api.auth.redirectToLogin(window.location.href);
+        if (!opts?.onAuthError) {
+          api.auth.redirectToLogin(window.location.href);
+        }
       }
 
       return info;

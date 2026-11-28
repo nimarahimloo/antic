@@ -60,7 +60,9 @@ export function RenderTemplateManager() {
   }, []);
 
   useEffect(() => {
-    reload();
+    (async () => {
+      await reload();
+    })();
   }, [reload]);
 
   const rowOf = useCallback(

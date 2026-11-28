@@ -8,12 +8,16 @@
     "bun": ">=1.1"
   },
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "next dev --port 3000 --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:guest": "playwright test tests/e2e/guest.test.ts",
+    "test:e2e:user": "playwright test tests/e2e/user.test.ts",
+    "test:e2e:admin": "playwright test tests/e2e/admin.test.ts"
   },
   "packageManager": "bun@1.1",
   "dependencies": {
@@ -88,6 +92,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/lodash": "^4.17.15",

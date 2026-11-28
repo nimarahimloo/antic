@@ -297,7 +297,7 @@ export default function AdminSettingsPage() {
                 {logoUrl ? (
                   <OptimizedImage src={logoUrl} alt="لوگو" fill className="object-contain" sizes="80px" />
                 ) : (
-                  <img src="/brand/mark.svg" alt="پیش‌فرض" className="h-12 w-12 object-contain opacity-70" />
+                  <OptimizedImage src="/brand/mark.svg" alt="پیش‌فرض" fill className="h-12 w-12 object-contain opacity-70" priority />
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2">

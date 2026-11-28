@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, Package, ShoppingBag, FileText, Settings, LogOut, ChevronLeft, ChevronRight, Sparkles, UploadCloud, Palette, FolderOpen, Image } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
+import { LoginModal } from "@/components/LoginModal";
 
 const ADMIN_NAV = [
   { label: "داشبورد", href: "/admin", icon: LayoutDashboard },
@@ -30,22 +31,32 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [, setRefreshKey] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isAuthenticated, isLoadingAuth, authChecked, logout } = useAuth();
+  const {
+    user,
+    isAuthenticated,
+    isLoadingAuth,
+    authChecked,
+    logout,
+    showLoginModal,
+    closeLoginModal,
+  } = useAuth();
   const isAdmin = Boolean(isAuthenticated && user?.role === "admin");
 
-  // Do not redirect while AuthProvider is still restoring the persisted session.
-  // This prevents a false login redirect when an admin page is loaded directly.
+  // Do not redirect while AuthProvider is still restoring the persisted session,
+  // or while the login modal is open (user is re-authenticating after token expiry).
   useEffect(() => {
     if (!authChecked || isLoadingAuth) return;
+    if (showLoginModal) return;
     if (!isAdmin) {
       const returnTo = pathname || "/admin";
       router.replace(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }
-  }, [authChecked, isLoadingAuth, isAdmin, pathname, router]);
+  }, [authChecked, isLoadingAuth, isAdmin, showLoginModal, pathname, router]);
 
-  if (!authChecked || isLoadingAuth || !isAdmin) {
+  if (!authChecked || isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -54,6 +65,11 @@ export default function AdminLayout({
         </div>
       </div>
     );
+  }
+
+  if (!isAdmin && !showLoginModal) {
+    router.replace(`/login?returnTo=${encodeURIComponent(pathname || "/admin")}`);
+    return null;
   }
 
   const handleLogout = () => {
@@ -154,6 +170,19 @@ export default function AdminLayout({
 
         <main className="p-4 lg:p-6">{children}</main>
       </div>
+
+      {/* Login modal — shown when the admin token expires (401/403) */}
+      {showLoginModal && (
+        <LoginModal
+          open={true}
+          onClose={closeLoginModal}
+          onSuccess={() => {
+            // Force child pages to re-fetch data after successful re-login.
+            setRefreshKey((k) => k + 1);
+          }}
+          returnTo={pathname}
+        />
+      )}
     </div>
   );
 }

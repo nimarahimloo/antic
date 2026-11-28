@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OptimizedImage } from "@/components/ui/image";
 
 interface Collection {
   id: string;
@@ -44,11 +45,11 @@ export default function CollectionsSection({ collections = [] }: CollectionsSect
           >
             <div className="relative aspect-[4/3] overflow-hidden">
               {collection.coverImage ? (
-                <img
+                <OptimizedImage
                   src={collection.coverImage}
                   alt={collection.title}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  loading="lazy"
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               ) : (
                 <div className="h-full w-full bg-gradient-to-br from-[#d9cfc0] via-[#b5a48c] to-[#8f7d64]" />

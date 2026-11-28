@@ -6,6 +6,7 @@ import { api } from "@/api";
 import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import { OptimizedImage } from "@/components/ui/image";
 
 const GALLERY_MAX = 20;
 const ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
@@ -150,7 +151,9 @@ export default function AdminProductsPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    (async () => {
+      await load();
+    })();
   }, [load]);
 
   function openNew() {
@@ -365,7 +368,7 @@ export default function AdminProductsPage() {
                     <tr key={String(p.id)} className="border-b border-secondary/40 last:border-0">
                       <td className="px-4 py-3">
                         {img ? (
-                          <img src={String(img)} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                          <OptimizedImage src={String(img)} alt="" width={40} height={40} className="h-10 w-10 rounded-lg object-cover" />
                         ) : (
                           "—"
                         )}
@@ -467,7 +470,7 @@ export default function AdminProductsPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-secondary/60 bg-background">
                     {form.image ? (
-                      <img src={String(form.image)} alt="" className="h-full w-full object-cover" />
+                      <OptimizedImage src={String(form.image)} alt="" fill className="h-full w-full object-cover" />
                     ) : (
                       <Upload className="h-5 w-5 text-muted-foreground" />
                     )}
@@ -525,7 +528,7 @@ export default function AdminProductsPage() {
                       key={`${url}-${idx}`}
                       className="relative h-20 w-20 overflow-hidden rounded-xl border border-secondary/60"
                     >
-                      <img src={String(url)} alt="" className="h-full w-full object-cover" />
+                      <OptimizedImage src={String(url)} alt="" fill className="h-full w-full object-cover" />
                       <button
                         type="button"
                         onClick={() =>

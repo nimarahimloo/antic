@@ -1,5 +1,6 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -115,7 +116,7 @@ export default function CategoryCarousel() {
     el.scrollLeft = dragRef.current.scrollLeft - dx;
   };
 
-  const endDrag = (e: React.PointerEvent) => {
+  const endDrag = (_e: React.PointerEvent) => {
     if (!dragRef.current.active) return;
     const el = scrollerRef.current;
     if (el && dragRef.current.pointerId != null) {
@@ -202,12 +203,7 @@ export default function CategoryCarousel() {
             draggable={false}
           >
             {cat.image ? (
-              <img
-                src={cat.image}
-                alt={cat.name}
-                className="pointer-events-none h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-                draggable={false}
-              />
+              <OptimizedImage src={cat.image} alt={cat.name} fill className="pointer-events-none h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-secondary/40">
                 <span className="font-display text-sm font-bold text-muted-foreground">{cat.name}</span>

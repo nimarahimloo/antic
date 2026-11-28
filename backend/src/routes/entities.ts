@@ -276,7 +276,7 @@ router.get("/:Entity/count", optionalAuth, async (req: AuthedRequest, res) => {
       }
     }
     for (const [k, v] of Object.entries(req.query)) {
-      if (["filter", "search"].includes(k)) continue;
+      if (["filter", "search", "catalog_only"].includes(k)) continue;
       if (typeof v === "string") filter[k] = v;
     }
     let where: Record<string, unknown> = parseFilter(filter);
@@ -307,7 +307,7 @@ router.get("/:Entity", optionalAuth, async (req: AuthedRequest, res) => {
       }
     }
     for (const [k, v] of Object.entries(req.query)) {
-      if (["sort_by", "sort", "limit", "skip", "filter", "q", "search"].includes(k)) continue;
+      if (["sort_by", "sort", "limit", "skip", "filter", "q", "search", "catalog_only"].includes(k)) continue;
       if (typeof v === "string") filter[k] = v;
     }
 

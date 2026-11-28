@@ -1,9 +1,10 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { mosaicGridClass, mosaicItemClass } from "@/lib/mosaicLayout";
 
-interface ProjectCategory {
+interface _ProjectCategory {
   id: string;
   name: string;
   slug: string;
@@ -115,11 +116,7 @@ export default function ProjectsList({ categories = [] }: ProjectsListProps) {
                 <div className="relative h-full w-full overflow-hidden rounded-3xl border border-secondary/50 bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.35)] transition-all duration-500 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_20px_50px_-24px_rgba(201,162,39,0.35)]">
                   <div className="absolute inset-0">
                     {c.image ? (
-                      <img
-                        src={c.image}
-                        alt={c.name}
-                        className="h-full w-full transition-transform duration-700 group-hover:scale-105"
-                      />
+                      <OptimizedImage src={c.image} alt={c.name} fill className="h-full w-full transition-transform duration-700 group-hover:scale-105" />
                     ) : (
                       <div
                         className={`h-full w-full bg-gradient-to-br ${

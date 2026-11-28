@@ -1,5 +1,6 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import { useEffect, useMemo, useState } from "react";
 import AdminEntityPage from "@/components/admin/AdminEntityPage";
 import { useCurtainCategories, allCategorySelectOptions } from "@/hooks/useCurtainCategories";
@@ -147,7 +148,7 @@ export default function AdminCategoriesPage() {
       key: "image",
       label: "کاور",
       render: (v: unknown) =>
-        v ? <img src={String(v)} alt="" className="h-10 w-10 rounded-lg object-cover" /> : "—",
+        v ? <OptimizedImage src={String(v)} alt="" fill className="h-10 w-10 rounded-lg object-cover" priority /> : "—",
     },
     {
       key: "name",

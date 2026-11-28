@@ -13,6 +13,7 @@ import { searchProducts, getCurtainModelRelatedProjects, RelatedProject, Product
 import { CatalogCardSkeleton } from "@/components/sections/InteractiveCatalogSkeletons";
 import { InteractiveCatalogSkeleton } from "@/components/sections/InteractiveCatalogSkeletons";
 import { ModelGrid } from "./ModelGrid";
+import { OptimizedImage } from "@/components/ui/image";
 
 interface RawCategory {
   id: string;
@@ -75,7 +76,7 @@ export default function InteractiveCatalogClient({
   const [selectedModel, setSelectedModel] = useState<Record<string, unknown> | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>(initialCategoryCounts);
+  const [categoryCounts, _setCategoryCounts] = useState<Record<string, number>>(initialCategoryCounts);
   const countsLoaded = useRef(false);
   const [relatedProjects, setRelatedProjects] = useState<RelatedProject[]>([]);
   const [relatedProjectsLoading, setRelatedProjectsLoading] = useState(false);
@@ -90,7 +91,7 @@ export default function InteractiveCatalogClient({
   });
   const resumeTimer = useRef<NodeJS.Timeout | null>(null);
   const [paused, setPaused] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+  const [_isDragging, _setIsDragging] = useState(false);
 
   const pauseAuto = useCallback(() => {
     setPaused(true);
@@ -131,7 +132,7 @@ export default function InteractiveCatalogClient({
       pointerId: e.pointerId,
     };
     el.setPointerCapture(e.pointerId);
-    setIsDragging(true);
+    _setIsDragging(true);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -148,7 +149,7 @@ export default function InteractiveCatalogClient({
     const el = scrollerRef.current;
     if (el) el.releasePointerCapture(e.pointerId);
     dragRef.current.active = false;
-    setIsDragging(false);
+    _setIsDragging(false);
   };
 
   // Load category counts
@@ -161,13 +162,17 @@ export default function InteractiveCatalogClient({
   // Fetch models when category/subcategory/search changes
   useEffect(() => {
     if (!selectedCategory) {
-      setGridItems([]);
-      setLoading(false);
+      (async () => {
+        setGridItems([]);
+        setLoading(false);
+      })();
       return;
     }
 
     let cancelled = false;
-    setLoading(true);
+    (async () => {
+      setLoading(true);
+    })();
 
     searchProducts({
       categoryId: selectedCategory,
@@ -202,12 +207,16 @@ export default function InteractiveCatalogClient({
   // Fetch related projects when model selected
   useEffect(() => {
     if (!selectedModel?.id) {
-      setRelatedProjects([]);
+      (async () => {
+        setRelatedProjects([]);
+      })();
       return;
     }
 
     let cancelled = false;
-    setRelatedProjectsLoading(true);
+    (async () => {
+      setRelatedProjectsLoading(true);
+    })();
 
     getCurtainModelRelatedProjects(selectedModel.id as string)
       .then((projects: RelatedProject[]) => {
@@ -395,7 +404,7 @@ export default function InteractiveCatalogClient({
               >
                 <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-secondary/30">
                   {cat.image ? (
-                    <img
+                    <OptimizedImage
                       src={cat.image}
                       alt={cat.name}
                       className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
@@ -479,7 +488,11 @@ export default function InteractiveCatalogClient({
                     >
                       <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-secondary/30">
                         {project.cover_image ? (
-                          <img src={project.cover_image} alt={project.title as string} className="w-full h-full object-cover" />
+                          <OptimizedImage
+                            src={project.cover_image}
+                            alt={project.title as string}
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

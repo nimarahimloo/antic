@@ -61,7 +61,9 @@ export default function AccountAddressesPage() {
   }
 
   useEffect(() => {
-    load();
+    (async () => {
+      await load();
+    })();
   }, []);
 
   function startNew() {

@@ -3,7 +3,7 @@
  * Web Audio؛ بدون وابستگی به فایل (اختیاری /sounds/*.mp3)
  */
 
-let unlocked = false;
+let _unlocked = false;
 let audioCtx: AudioContext | null = null;
 let muted = false;
 
@@ -20,7 +20,7 @@ function getCtx(): AudioContext | null {
 }
 
 export function unlockChatSounds() {
-  unlocked = true;
+  _unlocked = true;
   try {
     const ctx = getCtx();
     if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});

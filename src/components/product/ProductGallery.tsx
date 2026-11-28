@@ -27,7 +27,11 @@ export default function ProductGallery({ images, focusUrl, productName }: Produc
   useEffect(() => {
     if (!focusUrl || images.length === 0) return;
     const idx = images.findIndex((img) => mediaKey(img.url) === mediaKey(focusUrl));
-    if (idx >= 0) setActiveIndex(idx);
+    if (idx >= 0) {
+      (async () => {
+        setActiveIndex(idx);
+      })();
+    }
   }, [focusUrl, images]);
 
   useEffect(() => {

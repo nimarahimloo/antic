@@ -496,7 +496,7 @@ export default function AIWorkspacePage() {
     } catch (err) {
       setMemoryFormError(errorMessage(err));
     }
-  }, [conversationId, memoryFormData, loadMemories, setMemoryFormError, setShowMemoryForm, setMemoryPage]);
+  }, [conversationId, memoryFormData, loadMemories, setMemoryFormError, setShowMemoryForm]);
 
   const updateMemory = useCallback(async () => {
     if (!editingMemory) return;
@@ -513,9 +513,9 @@ export default function AIWorkspacePage() {
     editingMemory,
     memoryFormData,
     loadMemories,
+    setMemoryFormData,
     setMemoryFormError,
     setEditingMemory,
-    setMemoryPage,
   ]);
 
   const deleteMemory = useCallback(async (id: string) => {
@@ -581,10 +581,12 @@ export default function AIWorkspacePage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "memory") {
-      setMemoryPage(0);
-      loadMemories();
-    }
+    (async () => {
+      if (activeTab === "memory") {
+        setMemoryPage(0);
+        loadMemories();
+      }
+    })();
   }, [activeTab, memoryFilterType, memoryFilterCategory, memorySearch, loadMemories]);
 
   useEffect(() => {

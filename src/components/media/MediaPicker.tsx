@@ -122,13 +122,17 @@ export function MediaPicker({
   }, [offset, search, mimeFilter]);
 
   useEffect(() => {
-    load();
+    (async () => {
+      await load();
+    })();
   }, [load]);
 
   useEffect(() => {
     if (mode === "single") {
-      setSelectedIds(new Set());
-      setSelectedMedia([]);
+      (async () => {
+        setSelectedIds(new Set());
+        setSelectedMedia([]);
+      })();
     }
   }, [open, mode]);
 
@@ -276,7 +280,8 @@ export function MediaPicker({
                 tab === "library" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-muted-foreground"
               }`}
             >
-              <Image className="h-4 w-4" /> کتابخانه رسانه
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image className="h-4 w-4" aria-hidden="true" /> کتابخانه رسانه
             </button>
             <button
               onClick={() => setTab("upload")}

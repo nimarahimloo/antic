@@ -122,11 +122,13 @@ export function useCurtainCategories({ catalogOnly = false, initialData }: UseCu
     // Use the module-level cache directly to avoid setState in effect.
     if (!cache && !initialData) {
       let alive = true;
-      reload(false).then((list) => {
-        if (!alive && list) {
-          /* unmounted */
-        }
-      });
+      (async () => {
+        reload(false).then((list) => {
+          if (!alive && list) {
+            /* unmounted */
+          }
+        });
+      })();
       return () => { alive = false; };
     }
     const onVis = () => {

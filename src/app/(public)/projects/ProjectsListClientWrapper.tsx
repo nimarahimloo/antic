@@ -9,8 +9,8 @@ interface ProjectsListClientWrapperProps {
 
 export default function ProjectsListClientWrapper({ categories }: ProjectsListClientWrapperProps) {
   const searchParams = useSearchParams();
-  const category = searchParams.get("category") || undefined;
-  const subcategory = searchParams.get("subcategory") || undefined;
+  const _category = searchParams.get("category") || undefined;
+  const _subcategory = searchParams.get("subcategory") || undefined;
 
   return <ProjectsList categories={categories} />;
 }

@@ -23,7 +23,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   // Use absolute URL for server-side calls to avoid relative URL issues during build
-  const baseUrl = process.env.BACKEND_INTERNAL_URL ? SERVER_API_BASE : API_BASE;
+const baseUrl = process.env.BACKEND_INTERNAL_URL
+  ? `${SERVER_API_BASE.replace(/\/+$/, "")}/api`
+  : API_BASE;
   
   let res: Response;
   try {

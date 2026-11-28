@@ -58,7 +58,9 @@ export default function AdminMediaLibraryPage() {
   }, [offset, search, mimeFilter]);
 
   useEffect(() => {
-    load();
+    (async () => {
+      await load();
+    })();
   }, [load]);
 
   const handleSave = (media: Media | Media[]) => {

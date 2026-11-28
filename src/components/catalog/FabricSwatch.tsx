@@ -1,5 +1,6 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import { useEffect, useRef, useState } from "react";
 import { renderFabricCanvas } from "@/components/catalog/fabricSwatch";
 
@@ -18,7 +19,9 @@ export default function FabricSwatch({ fabric, className }: FabricSwatchProps) {
   const hasPhoto = Boolean(fabric?.image) && !imgFailed;
 
   useEffect(() => {
-    setImgFailed(false);
+    (async () => {
+      setImgFailed(false);
+    })();
   }, [fabric?.image, fabric?.id]);
 
   useEffect(() => {
@@ -28,26 +31,11 @@ export default function FabricSwatch({ fabric, className }: FabricSwatchProps) {
     c.width = 400;
     c.height = 300;
     renderFabricCanvas(c, fabric);
-  }, [
-    hasPhoto,
-    fabric?.color_code,
-    fabric?.material,
-    fabric?.texture,
-    fabric?.fabric,
-    fabric?.category_slug,
-    fabric?.id,
-  ]);
+  }, [hasPhoto, fabric]);
 
   if (hasPhoto) {
     return (
-      <img
-        src={String(fabric.image)}
-        alt={`نمونه پارچه ${String(fabric?.code || "")}`}
-        className={className}
-        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-        loading="lazy"
-        onError={() => setImgFailed(true)}
-      />
+      <OptimizedImage src={String(fabric.image)} alt={`نمونه پارچه ${String(fabric?.code || "")}`} fill className={className} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} onError={() => setImgFailed(true)} />
     );
   }
 

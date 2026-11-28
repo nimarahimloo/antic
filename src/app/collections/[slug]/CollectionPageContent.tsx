@@ -1,5 +1,6 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -46,11 +47,12 @@ function ProjectCard({ project }: { project: Project }) {
       <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-secondary/50 bg-card transition-all duration-300 hover:border-primary/40 hover:shadow-[0_12px_24px_-6px_rgba(201,162,39,0.15)]">
         <div className="absolute inset-0">
           {project.cover_image ? (
-            <img
+            <OptimizedImage
               src={project.cover_image}
               alt={project.title}
+              fill
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
+              priority
             />
           ) : (
             <div className="h-full w-full bg-gradient-to-br from-[#d9cfc0] via-[#b5a48c] to-[#8f7d64]" />
@@ -270,12 +272,7 @@ export function CollectionPageContent({ collection, categories, curtainCategorie
           </div>
           {collection.coverImage ? (
             <div className="relative overflow-hidden rounded-2xl border border-secondary/60">
-              <img
-                src={collection.coverImage}
-                alt={collection.title}
-                className="h-[300px] w-full object-cover lg:h-[400px]"
-                loading="lazy"
-              />
+              <OptimizedImage src={collection.coverImage} alt={collection.title} fill className="h-[300px] w-full object-cover lg:h-[400px]" />
             </div>
           ) : null}
         </div>

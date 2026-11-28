@@ -1,5 +1,6 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -157,18 +158,22 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
   };
 
   useEffect(() => {
-    if (!allCats.length) return;
-    if (initialCategory && allCats.find((c) => c.slug === initialCategory)) {
-      setSelectedCategory(initialCategory);
-    } else if (!selectedCategory || !allCats.find((c) => c.slug === selectedCategory)) {
-      setSelectedCategory(allCats[0].slug);
-    }
+    (async () => {
+      if (!allCats.length) return;
+      if (initialCategory && allCats.find((c) => c.slug === initialCategory)) {
+        setSelectedCategory(initialCategory);
+      } else if (!selectedCategory || !allCats.find((c) => c.slug === selectedCategory)) {
+        setSelectedCategory(allCats[0].slug);
+      }
+    })();
   }, [allCats, initialCategory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const category = allCats.find((c) => c.slug === selectedCategory);
 
   useEffect(() => {
-    setSelectedSubcategory("");
+    (async () => {
+      setSelectedSubcategory("");
+    })();
   }, [selectedCategory]);
 
   // Debounce search so the API isn't hammered on every keystroke
@@ -178,88 +183,92 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
   }, [search]);
 
   useEffect(() => {
-    if (!selectedCategory && !debouncedSearch.trim()) {
-      setTimeout(() => {
-        setGridItems([]);
-        setProjectFallback([]);
-        setLoading(false);
-      }, 0);
-      return;
-    }
-    setLoading(true);
-    const q = debouncedSearch.trim();
-    const filter: Record<string, string> = {};
-    if (!q) {
-      if (selectedCategory) filter.category_slug = selectedCategory;
-      if (selectedSubcategory) filter.subcategory = selectedSubcategory;
-    }
-    api.entities.CurtainModel.filter(filter, {
-      sort: "-created_date",
-      limit: 80,
-      search: q || undefined,
-    })
-      .then(async (data) => {
-        const models = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
-        setGridItems(models);
-        if (!q && models.length === 0 && selectedCategory) {
-          try {
-            const pf: Record<string, string> = { category_slug: selectedCategory };
-            if (selectedSubcategory) pf.subcategory = selectedSubcategory;
-            const projects = await api.entities.Project.filter(pf, {
-              sort: "-created_date",
-              limit: 24,
-            });
-            setProjectFallback((Array.isArray(projects) ? projects : []) as Record<string, unknown>[]);
-          } catch (err) {
-            console.error("Failed to load project fallback:", apiErrorMessage(err));
+    (async () => {
+      if (!selectedCategory && !debouncedSearch.trim()) {
+        setTimeout(() => {
+          setGridItems([]);
+          setProjectFallback([]);
+          setLoading(false);
+        }, 0);
+        return;
+      }
+      setLoading(true);
+      const q = debouncedSearch.trim();
+      const filter: Record<string, string> = {};
+      if (!q) {
+        if (selectedCategory) filter.category_slug = selectedCategory;
+        if (selectedSubcategory) filter.subcategory = selectedSubcategory;
+      }
+      api.entities.CurtainModel.filter(filter, {
+        sort: "-created_date",
+        limit: 80,
+        search: q || undefined,
+      })
+        .then(async (data) => {
+          const models = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
+          setGridItems(models);
+          if (!q && models.length === 0 && selectedCategory) {
+            try {
+              const pf: Record<string, string> = { category_slug: selectedCategory };
+              if (selectedSubcategory) pf.subcategory = selectedSubcategory;
+              const projects = await api.entities.Project.filter(pf, {
+                sort: "-created_date",
+                limit: 24,
+              });
+              setProjectFallback((Array.isArray(projects) ? projects : []) as Record<string, unknown>[]);
+            } catch (err) {
+              console.error("Failed to load project fallback:", apiErrorMessage(err));
+              setProjectFallback([]);
+            }
+          } else {
             setProjectFallback([]);
           }
-        } else {
+        })
+        .catch((err) => {
+          console.error("Failed to load models:", apiErrorMessage(err));
+          setGridItems([]);
           setProjectFallback([]);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load models:", apiErrorMessage(err));
-        setGridItems([]);
-        setProjectFallback([]);
-      })
-      .finally(() => setLoading(false));
+        })
+        .finally(() => setLoading(false));
+    })();
   }, [filterKey, debouncedSearch, selectedCategory, selectedSubcategory]);
 
   // Fetch related projects when category or selected model changes
   useEffect(() => {
     let cancelled = false;
-    setRelatedProjectsLoading(true);
+    (async () => {
+      setRelatedProjectsLoading(true);
 
-    const fetchProjects = async () => {
-      try {
-        let projects: RelatedProject[] = [];
+      const fetchProjects = async () => {
+        try {
+          let projects: RelatedProject[] = [];
 
-        // If a model is selected, fetch its directly related projects
-        if (selectedModel?.id) {
-          projects = await getCurtainModelRelatedProjects(String(selectedModel.id), 6);
-        }
-        // Otherwise if a category is selected (and no search), fetch category projects
-        else if (selectedCategory && !debouncedSearch.trim()) {
-          projects = await getCategoryProjects(selectedCategory, selectedSubcategory || undefined, 6);
-        }
+          // If a model is selected, fetch its directly related projects
+          if (selectedModel?.id) {
+            projects = await getCurtainModelRelatedProjects(String(selectedModel.id), 6);
+          }
+          // Otherwise if a category is selected (and no search), fetch category projects
+          else if (selectedCategory && !debouncedSearch.trim()) {
+            projects = await getCategoryProjects(selectedCategory, selectedSubcategory || undefined, 6);
+          }
 
-        if (!cancelled) {
-          setRelatedProjects(projects);
+          if (!cancelled) {
+            setRelatedProjects(projects);
+          }
+        } catch (err) {
+          console.error("Failed to load related projects:", err);
+          if (!cancelled) {
+            setRelatedProjects([]);
+          }
+        } finally {
+          if (!cancelled) {
+            setRelatedProjectsLoading(false);
+          }
         }
-      } catch (err) {
-        console.error("Failed to load related projects:", err);
-        if (!cancelled) {
-          setRelatedProjects([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setRelatedProjectsLoading(false);
-        }
-      }
-    };
+      };
 
-    fetchProjects();
+      fetchProjects();
+    })();
 
     return () => {
       cancelled = true;
@@ -297,13 +306,15 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
   }, [allCats]);
 
   useEffect(() => {
-    if (gridItems.length > 0) {
-      if (!selectedModel || !gridItems.find((m) => m.id === selectedModel.id)) {
-        setSelectedModel(gridItems[0]);
+    (async () => {
+      if (gridItems.length > 0) {
+        if (!selectedModel || !gridItems.find((m) => m.id === selectedModel.id)) {
+          setSelectedModel(gridItems[0]);
+        }
+      } else {
+        setSelectedModel(null);
       }
-    } else {
-      setSelectedModel(null);
-    }
+    })();
   }, [gridItems]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading && categories.length === 0) {
@@ -384,11 +395,7 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
                     }`}
                   >
                     {cat.image ? (
-                      <img
-                        src={cat.image}
-                        alt={cat.name}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
+                      <OptimizedImage src={cat.image} alt={cat.name} fill className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center bg-secondary/40">
                         <span className="px-2 text-center font-display text-[11px] font-bold text-muted-foreground">
@@ -638,11 +645,7 @@ export default function InteractiveCatalog({ initialCategory }: { initialCategor
                     <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-secondary/50 bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.35)] transition-all duration-500 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_20px_50px_-24px_rgba(201,162,39,0.35)]">
                       <div className="absolute inset-0">
                         {project.cover_image ? (
-                          <img
-                            src={project.cover_image}
-                            alt={project.title}
-                            className="h-full w-full transition-transform duration-700 group-hover:scale-105"
-                          />
+                          <OptimizedImage src={project.cover_image} alt={project.title} fill className="h-full w-full transition-transform duration-700 group-hover:scale-105" />
                         ) : (
                           <div className="h-full w-full bg-gradient-to-br from-[#d9cfc0] via-[#b5a48c] to-[#8f7d64]" />
                         )}

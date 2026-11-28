@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { OptimizedImage } from "@/components/ui/image";
 import { api } from "@/api";
 import { apiErrorMessage } from "@/lib/apiError";
 import { getCategoryProjects, RelatedProject } from "@/rest/store-catalog";
@@ -21,11 +22,12 @@ export default function ProjectDetailPage({ projectId }: ProjectDetailProps) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
-    api.entities.Project.get(projectId)
-      .then((data) => {
+    async function fetchProject() {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await api.entities.Project.get(projectId);
         if (!cancelled) {
           if (data) {
             setProject(data as Record<string, unknown>);
@@ -34,13 +36,15 @@ export default function ProjectDetailPage({ projectId }: ProjectDetailProps) {
           }
           setLoading(false);
         }
-      })
-      .catch((err: unknown) => {
+      } catch (err: unknown) {
         if (!cancelled) {
           setError(apiErrorMessage(err));
           setLoading(false);
         }
-      });
+      }
+    }
+
+    fetchProject();
 
     return () => {
       cancelled = true;
@@ -51,13 +55,13 @@ export default function ProjectDetailPage({ projectId }: ProjectDetailProps) {
   useEffect(() => {
     if (!project) return;
 
-    let cancelled = false;
-    setRelatedLoading(true);
-
     const categorySlug = (project.categorySlug as string) || "";
     const subcategory = (project.subcategory as string) || undefined;
 
-    const fetchRelated = async () => {
+    let cancelled = false;
+
+    async function fetchRelated() {
+      setRelatedLoading(true);
       try {
         const projects = await getCategoryProjects(categorySlug, subcategory, 6);
         if (!cancelled) {
@@ -75,7 +79,7 @@ export default function ProjectDetailPage({ projectId }: ProjectDetailProps) {
           setRelatedLoading(false);
         }
       }
-    };
+    }
 
     fetchRelated();
 
@@ -139,10 +143,12 @@ export default function ProjectDetailPage({ projectId }: ProjectDetailProps) {
         {/* Hero Image */}
         <div className="mb-12 overflow-hidden rounded-3xl border border-secondary/60">
           {coverImageUrl ? (
-            <img
+            <OptimizedImage
               src={coverImageUrl}
               alt={title}
+              fill
               className="aspect-[16/9] w-full object-cover"
+              priority
             />
           ) : (
             <div className="aspect-[16/9] flex items-center justify-center bg-secondary/40">
@@ -190,10 +196,12 @@ export default function ProjectDetailPage({ projectId }: ProjectDetailProps) {
                       >
                         <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-secondary/50 bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.35)] transition-all duration-500 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_20px_50px_-24px_rgba(201,162,39,0.35)]">
                           <div className="absolute inset-0">
-                            <img
+                            <OptimizedImage
                               src={img}
                               alt={`${title} - عکس ${i + 1}`}
+                              fill
                               className="h-full w-full transition-transform duration-700 group-hover:scale-105"
+                              priority
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent" />
                           </div>
@@ -245,10 +253,12 @@ export default function ProjectDetailPage({ projectId }: ProjectDetailProps) {
                       <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-secondary/50 bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.35)] transition-all duration-500 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_20px_50px_-24px_rgba(201,162,39,0.35)]">
                         <div className="absolute inset-0">
                           {rp.cover_image ? (
-                            <img
+                            <OptimizedImage
                               src={rp.cover_image}
                               alt={rp.title}
+                              fill
                               className="h-full w-full transition-transform duration-700 group-hover:scale-105"
+                              priority
                             />
                           ) : (
                             <div className="h-full w-full bg-gradient-to-br from-[#d9cfc0] via-[#b5a48c] to-[#8f7d64]" />

@@ -7,6 +7,7 @@ import { compressImage } from "@/lib/compressImage";
 import { apiErrorMessage } from "@/lib/apiError";
 import { adminToast, adminToasts } from "@/lib/adminToast";
 import { Card } from "@/components/ui/card";
+import { OptimizedImage } from "@/components/ui/image";
 import { useCurtainCategories } from "@/hooks/useCurtainCategories";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import { useConfirmation } from "@/hooks/useConfirmation";
@@ -19,13 +20,6 @@ interface BulkItem {
   name: string;
   color: string;
   color_code: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  subcategories?: Array<{ name: string; slug: string }>;
 }
 
 export default function AdminBulkUploadPage() {
@@ -43,9 +37,11 @@ export default function AdminBulkUploadPage() {
   const { confirm, dialogState, handleConfirm, handleCancel } = useConfirmation();
 
   useEffect(() => {
-    if (categories.length) {
-      setSelectedCategory(categories[0]?.slug || "");
-    }
+    (async () => {
+      if (categories.length) {
+        setSelectedCategory(categories[0]?.slug || "");
+      }
+    })();
   }, [categories]);
 
   const category = categories.find((c) => c.slug === selectedCategory);
@@ -145,7 +141,7 @@ export default function AdminBulkUploadPage() {
     } finally {
       setCreating(false);
     }
-  }, [items, selectedCategory, subcategory]);
+  }, [items, selectedCategory, subcategory, confirm, category]);
 
   if (catsLoading) {
     return (
@@ -276,11 +272,13 @@ export default function AdminBulkUploadPage() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((it) => (
                 <div key={it.id} className="rounded-xl border border-secondary/60 bg-card p-3">
-                  <div className="relative mb-3">
-                    <img
+                  <div className="relative mb-3 h-28">
+                    <OptimizedImage
                       src={it.image}
                       alt={it.code || "پارچه"}
-                      className="h-28 w-full rounded-lg object-cover"
+                      fill
+                      className="rounded-lg object-cover"
+                      sizes="100vw"
                     />
                     <button
                       onClick={() => removeItem(it.id)}

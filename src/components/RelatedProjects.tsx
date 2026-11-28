@@ -1,5 +1,6 @@
 "use client";
 
+import { OptimizedImage } from "@/components/ui/image";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
@@ -18,8 +19,10 @@ export default function RelatedProjects({ productId, productCategorySlug, limit 
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    (async () => {
+      setLoading(true);
+      setError(null);
+    })();
 
     getRelatedProjects(productId, limit)
       .then((data) => {
@@ -91,11 +94,7 @@ export default function RelatedProjects({ productId, productCategorySlug, limit 
               <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-secondary/50 bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.35)] transition-all duration-500 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_20px_50px_-24px_rgba(201,162,39,0.35)]">
                 <div className="absolute inset-0">
                   {project.cover_image ? (
-                    <img
-                      src={project.cover_image}
-                      alt={project.title}
-                      className="h-full w-full transition-transform duration-700 group-hover:scale-105"
-                    />
+                    <OptimizedImage src={project.cover_image} alt={project.title} fill className="h-full w-full transition-transform duration-700 group-hover:scale-105" />
                   ) : (
                     <div className="h-full w-full bg-gradient-to-br from-[#d9cfc0] via-[#b5a48c] to-[#8f7d64]" />
                   )}

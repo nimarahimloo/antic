@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { notFound as nextNotFound } from "next/navigation";
 import Link from "next/link";
+import { OptimizedImage } from "@/components/ui/image";
 import { useMemo } from "react";
 import { ArrowRight } from "lucide-react";
 import CategoryCoverCard from "@/components/CategoryCoverCard";
@@ -100,10 +101,12 @@ function PortfolioCategoryPageContent({ category, projects }: { category: NonNul
           </div>
           {effectiveCategory.image ? (
             <div className="overflow-hidden rounded-3xl border border-secondary/60">
-              <img
+              <OptimizedImage
                 src={effectiveCategory.image}
                 alt={effectiveCategory.name}
+                fill
                 className="aspect-[16/10] w-full object-cover"
+                priority
               />
             </div>
           ) : null}

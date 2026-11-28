@@ -19,10 +19,6 @@ interface StyleData {
   name?: string;
 }
 
-interface TemplateResult {
-  url: string | null;
-  style: string;
-}
 
 describe("resolveStyle", () => {
   it("defaults to drape for empty fabric", () => {

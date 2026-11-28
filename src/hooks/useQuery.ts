@@ -32,7 +32,8 @@ export function useQuery<T>(
   const mounted = useRef(true);
   const attemptRef = useRef(0);
   const queryFnRef = useRef(queryFn);
-  
+  const executeRef = useRef<(() => Promise<T | null>) | null>(null);
+
   useEffect(() => {
     queryFnRef.current = queryFn;
   }, [queryFn]);
@@ -68,7 +69,7 @@ export function useQuery<T>(
       if (attemptRef.current < retry) {
         attemptRef.current++;
         await new Promise((r) => setTimeout(r, retryDelay * attemptRef.current));
-        return execute();
+        return executeRef.current!();
       }
 
       onError?.(normalized);
@@ -76,9 +77,13 @@ export function useQuery<T>(
     } finally {
       if (mounted.current) setLoading(false);
     }
-  }, [onSuccess, retry, retryDelay]);
+  }, [onSuccess, retry, retryDelay, onError]);
 
-  const refetch = useCallback(() => execute(), [execute]);
+  useEffect(() => {
+    executeRef.current = execute;
+  }, [execute]);
+
+  const refetch = useCallback(() => executeRef.current!(), []);
 
   useEffect(() => {
     mounted.current = true;

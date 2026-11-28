@@ -110,6 +110,25 @@ async function seedAdmin() {
   }
 }
 
+async function seedTestUser() {
+  const email = process.env.TEST_USER_EMAIL || "user@antic.local";
+  const password = process.env.TEST_USER_PASSWORD || "user123";
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (!existing) {
+    await prisma.user.create({
+      data: {
+        email,
+        passwordHash: await bcrypt.hash(password, 10),
+        fullName: "کاربر تست",
+        role: "user",
+      },
+    });
+    console.log(`Test user created: ${email}`);
+  } else {
+    console.log(`Test user exists: ${email} — unchanged`);
+  }
+}
+
 async function seedCurtainCategories() {
   let created = 0;
   let skipped = 0;
@@ -242,6 +261,7 @@ async function seedVirtualWindow() {
 async function main() {
   console.log("Safe seed — no deletes, no overwrite of existing content");
   await seedAdmin();
+  await seedTestUser();
   await seedCurtainCategories();
   const slugToId = await seedShopAccessoryCategories();
   await seedAccessoryProducts(slugToId);

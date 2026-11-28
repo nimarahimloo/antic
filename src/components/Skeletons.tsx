@@ -821,6 +821,7 @@ export function CurtainDetailPageSkeleton() {
  * Auth Pages Skeleton (Login, Register, Forgot Password, Reset Password)
  */
 export function AuthPageSkeleton({ title = "ورود" }: { title?: string }) {
+  void title;
   return (
     <motion.div
       initial={{ opacity: 0 }}

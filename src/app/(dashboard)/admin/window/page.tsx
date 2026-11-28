@@ -45,6 +45,7 @@ function WindowColorsPanel({
   onUpdate: (key: keyof VirtualWindowSetting, value: string) => void;
   saving: boolean;
 }) {
+  void saving;
   const fields = [
     { key: "wallColor" as keyof VirtualWindowSetting, label: "رنگ دیواره", defaultValue: "#75634f" },
     { key: "frameColor" as keyof VirtualWindowSetting, label: "رنگ فریم", defaultValue: "#3b352c" },
@@ -211,7 +212,7 @@ export default function AdminWindowPage() {
   const [setting, setSetting] = useState<VirtualWindowSetting>(emptySetting());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploading, _setUploading] = useState(false);
   const [error, setError] = useState("");
   const [hint, setHint] = useState("");
 
@@ -291,7 +292,7 @@ export default function AdminWindowPage() {
     } finally {
       setSaving(false);
     }
-  }, [setting]);
+  }, [setting, confirm]);
 
   if (loading) {
     return (

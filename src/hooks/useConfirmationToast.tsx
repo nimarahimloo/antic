@@ -37,7 +37,7 @@ export function useConfirmationToast() {
         const cancelLabel = options.cancelLabel || "انصراف";
 
         // Use a custom toast component for confirmation
-        const toastId = toast.custom((id: string | number) => (
+        const _toastId = toast.custom((id: string | number) => (
           <div className="flex flex-col gap-3 p-4">
             <div>
               <p className="font-display text-sm font-bold">{options.title}</p>
